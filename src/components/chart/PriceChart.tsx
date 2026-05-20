@@ -20,10 +20,14 @@ import { useSelectedPriceLineHandle } from "@/hooks/chart/useSelectedPriceLineHa
 import { useMeasureTool } from "@/hooks/chart/useMeasureTool";
 import { useChartInteraction } from "@/hooks/chart/useChartInteraction";
 import { useKlineData } from "@/hooks/chart/useKlineData";
+import { useTrendLineTool } from "@/hooks/chart/useTrendLineTool";
+import { useTrendLinePrimitives } from "@/hooks/chart/useTrendLinePrimitives";
+import { useTrendLineInteraction } from "@/hooks/chart/useTrendLineInteraction";
 
 import { SymbolHeader } from "./overlay/SymbolHeader";
 import { ChartLegend } from "./overlay/ChartLegend";
 import { SubPaneLegend } from "./overlay/SubPaneLegend";
+import { TrendLinesLayer } from "./overlay/TrendLinesLayer";
 
 interface Props {
   symbol: string;
@@ -40,7 +44,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const tool = useChartStore((s) => s.tool);
   const theme = useChartStore((s) => s.theme);
 
-  const { chartRef } = useChartInit(containerRef, theme);
+  const { chartRef, chartReady } = useChartInit(containerRef, theme);
   const { paneOffsets, recomputePaneOffsets } = usePaneLayout(chartRef, containerRef);
 
   const { candleSeriesRef, updateEMAs, lastEMA20, lastEMA50, lastEMA200, lastVolume } =
@@ -53,6 +57,12 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const { updateVRVP } = useVRVPSeries(chartRef, candlesRef, indicators, hidden, config);
 
   usePriceLines(candleSeriesRef, symbol);
+  // Trend line hooks must add their capture listeners BEFORE usePriceLineDrag so that
+  // useTrendLineInteraction.onPointerDown can call stopImmediatePropagation when a
+  // line is hit, preventing usePriceLineDrag from deselecting drawings.
+  const { inProgress } = useTrendLineTool(containerRef, chartRef, candleSeriesRef, candlesRef, tool, symbol);
+  const { primitivesRef } = useTrendLinePrimitives(candleSeriesRef, symbol);
+  useTrendLineInteraction(containerRef, primitivesRef, symbol, tool);
   usePriceLineDrag(containerRef, candleSeriesRef, symbol, tool);
   const { handleY } = useSelectedPriceLineHandle(chartRef, candleSeriesRef);
 
@@ -94,6 +104,13 @@ export function PriceChart({ symbol, timeframe }: Props) {
       <div ref={containerRef} className="h-full w-full" />
 
       {measureRender}
+
+      <TrendLinesLayer
+        chartRef={chartRef}
+        candleSeriesRef={candleSeriesRef}
+        inProgress={inProgress}
+        chartReady={chartReady}
+      />
 
       {handleY !== null && (
         <div

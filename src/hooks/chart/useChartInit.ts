@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { createChart, CrosshairMode, type IChartApi } from "lightweight-charts";
 import { getChartColors, TV_COLORS } from "@/lib/chart/chart-colors";
 
 export function useChartInit(
   containerRef: RefObject<HTMLDivElement | null>,
   theme: "dark" | "light",
-): { chartRef: RefObject<IChartApi | null> } {
+): { chartRef: RefObject<IChartApi | null>; chartReady: boolean } {
   const chartRef = useRef<IChartApi | null>(null);
+  const [chartReady, setChartReady] = useState(false);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -40,9 +41,11 @@ export function useChartInit(
       autoSize: true,
     });
     chartRef.current = chart;
+    setChartReady(true);
     return () => {
       chart.remove();
       chartRef.current = null;
+      setChartReady(false);
     };
   }, []);
 
@@ -66,5 +69,5 @@ export function useChartInit(
     });
   }, [theme]);
 
-  return { chartRef };
+  return { chartRef, chartReady };
 }

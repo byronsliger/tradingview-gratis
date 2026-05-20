@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Timeframe } from "@/lib/binance/types";
+import type { Drawing, TrendLineDrawing } from "@/lib/drawings/types";
 
 export type IndicatorKey =
   | "ema20"
@@ -15,7 +16,7 @@ export type IndicatorKey =
   | "adx"
   | "vrvp";
 
-export type DrawingTool = "cursor" | "hline" | "measure" | "eraser";
+export type DrawingTool = "cursor" | "hline" | "measure" | "eraser" | "trendline";
 export type Theme = "dark" | "light";
 
 export interface PriceLine {
@@ -151,6 +152,9 @@ interface ChartState {
   settingsTarget: IndicatorKey | null;
   priceLineEditTarget: string | null;
   selectedPriceLineId: string | null;
+  drawings: Drawing[];
+  drawingEditTarget: string | null;
+  selectedDrawingId: string | null;
   /** Shared collapsed state for both ChartLegend and SubPaneLegend */
   legendCollapsed: boolean;
 
@@ -174,6 +178,11 @@ interface ChartState {
   setPriceLineEditTarget: (id: string | null) => void;
   setSelectedPriceLineId: (id: string | null) => void;
   updatePriceLineOptions: (id: string, patch: Partial<Pick<PriceLine, "color" | "lineWidth" | "lineStyle" | "axisLabelVisible">>) => void;
+  addDrawing: (d: Drawing) => void;
+  removeDrawing: (id: string) => void;
+  updateDrawing: (id: string, patch: Partial<Omit<TrendLineDrawing, "id" | "symbol" | "type">>) => void;
+  setDrawingEditTarget: (id: string | null) => void;
+  setSelectedDrawingId: (id: string | null) => void;
   toggleLegendCollapsed: () => void;
 }
 
@@ -213,6 +222,9 @@ export const useChartStore = create<ChartState>()(
       settingsTarget: null,
       priceLineEditTarget: null,
       selectedPriceLineId: null,
+      drawings: [],
+      drawingEditTarget: null,
+      selectedDrawingId: null,
       legendCollapsed: true,
 
       setSymbol: (symbol) => set({ symbol }),
@@ -286,6 +298,14 @@ export const useChartStore = create<ChartState>()(
         set((state) => ({
           priceLines: state.priceLines.map((p) => p.id === id ? { ...p, ...patch } : p),
         })),
+      addDrawing: (d) => set((s) => ({ drawings: [...s.drawings, d] })),
+      removeDrawing: (id) => set((s) => ({ drawings: s.drawings.filter((d) => d.id !== id) })),
+      updateDrawing: (id, patch) =>
+        set((s) => ({
+          drawings: s.drawings.map((d) => d.id === id ? { ...d, ...patch } : d),
+        })),
+      setDrawingEditTarget: (drawingEditTarget) => set({ drawingEditTarget }),
+      setSelectedDrawingId: (selectedDrawingId) => set({ selectedDrawingId }),
       toggleLegendCollapsed: () => set((s) => ({ legendCollapsed: !s.legendCollapsed })),
     }),
     {
@@ -299,6 +319,7 @@ export const useChartStore = create<ChartState>()(
         config: s.config,
         watchlist: s.watchlist,
         priceLines: s.priceLines,
+        drawings: s.drawings,
       }),
       /**
        * Deep-merge persisted state into the current (default) state so that

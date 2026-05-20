@@ -1,6 +1,6 @@
 "use client";
 
-import { MousePointer2, Minus, Ruler, Eraser, Trash2, Lock } from "lucide-react";
+import { MousePointer2, Minus, Ruler, Eraser, Trash2, Lock, TrendingUp } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import { cn } from "@/lib/utils";
@@ -32,10 +32,15 @@ const TOOLS: ToolDef[] = [
     label: "Borrar línea",
     hint: "Click cerca de una línea para eliminarla",
   },
+  {
+    key: "trendline",
+    icon: TrendingUp,
+    label: "Línea de tendencia",
+    hint: "Click en dos puntos para trazar una línea de tendencia",
+  },
 ];
 
 const LOCKED = [
-  { label: "Línea de tendencia" },
   { label: "Fibonacci" },
   { label: "Texto" },
 ];

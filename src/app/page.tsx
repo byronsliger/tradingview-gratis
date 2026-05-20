@@ -7,6 +7,7 @@ import { BottomPanel } from "@/components/layout/BottomPanel";
 import { PriceChart } from "@/components/chart/PriceChart";
 import { IndicatorSettingsDialog } from "@/components/chart/IndicatorSettingsDialog";
 import { PriceLineSettingsDialog } from "@/components/chart/PriceLineSettingsDialog";
+import { DrawingSettingsDialog } from "@/components/chart/DrawingSettingsDialog";
 import { useChartStore } from "@/lib/store/chart-store";
 
 export default function HomePage() {
@@ -28,6 +29,7 @@ export default function HomePage() {
       <BottomPanel />
       <IndicatorSettingsDialog />
       <PriceLineSettingsDialog />
+      <DrawingSettingsDialog />
     </div>
   );
 }

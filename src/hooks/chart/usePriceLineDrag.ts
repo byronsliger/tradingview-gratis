@@ -20,6 +20,7 @@ export function usePriceLineDrag(
   const setPriceLineEditTarget = useChartStore((s) => s.setPriceLineEditTarget);
   const setSelectedPriceLineId = useChartStore((s) => s.setSelectedPriceLineId);
   const selectedPriceLineId = useChartStore((s) => s.selectedPriceLineId);
+  const setSelectedDrawingId = useChartStore((s) => s.setSelectedDrawingId);
 
   const priceLinesRef = useRef(priceLines);
   // eslint-disable-next-line react-hooks/refs
@@ -36,6 +37,9 @@ export function usePriceLineDrag(
   const selectedPriceLineIdRef = useRef(selectedPriceLineId);
   // eslint-disable-next-line react-hooks/refs
   selectedPriceLineIdRef.current = selectedPriceLineId;
+  const setSelectedDrawingIdRef = useRef(setSelectedDrawingId);
+  // eslint-disable-next-line react-hooks/refs
+  setSelectedDrawingIdRef.current = setSelectedDrawingId;
   const setPriceLineEditTargetRef = useRef(setPriceLineEditTarget);
   // eslint-disable-next-line react-hooks/refs
   setPriceLineEditTargetRef.current = setPriceLineEditTarget;
@@ -118,7 +122,12 @@ export function usePriceLineDrag(
       // Hover: show ns-resize cursor near lines, track for Delete key
       const nearby = findNearbyLine(y);
       hoveredLineIdRef.current = nearby;
-      container.style.cursor = nearby ? "ns-resize" : "";
+      if (nearby) {
+        container.style.cursor = "ns-resize";
+      } else if (container.style.cursor === "ns-resize") {
+        // Only clear cursor if we set it — don't override "move"/"crosshair" from other hooks
+        container.style.cursor = "";
+      }
     };
 
     const onPointerDown = (e: PointerEvent) => {
@@ -126,10 +135,11 @@ export function usePriceLineDrag(
       const id = findNearbyLine(getY(e));
 
       if (!id) {
-        // Clicked on empty chart → deselect
+        // Clicked on empty chart → deselect both price lines and drawings
         if (selectedPriceLineIdRef.current) {
           setSelectedPriceLineIdRef.current(null);
         }
+        setSelectedDrawingIdRef.current(null);
         return;
       }
 
