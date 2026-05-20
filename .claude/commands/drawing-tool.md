@@ -40,12 +40,14 @@ type Drawing = TrendLineDrawing | NuevaHerramientaDrawing;
 ```
 
 ### PASO 2 — Store (`src/lib/store/chart-store.ts`)
-El store ya tiene `drawings`, `addDrawing`, `removeDrawing`, `updateDrawing`, `drawingEditTarget`, `selectedDrawingId`, `setTool`.
+El store ya tiene `drawings`, `addDrawing`, `removeDrawing`, `updateDrawing`, `clearDrawings`, `drawingEditTarget`, `selectedDrawingId`, `setTool`.
 Solo agrega el nuevo valor al union type `DrawingTool`:
 ```typescript
 type DrawingTool = "cursor" | "trendline" | "nueva_herramienta";
 ```
 Si la herramienta necesita estado temporal propio (poco común), agrégalo al store con su setter.
+
+> **`clearDrawings` ya maneja todos los tipos del union `Drawing`** — como el lifecycle hook filtra por `d.type === "nueva_herramienta"` y detach las primitivas cuando el drawing desaparece del store, no se necesita código extra para que el botón "Borrar todos los dibujos" funcione con la nueva herramienta. Solo asegúrate de que el tipo esté en el union `Drawing`.
 
 ### PASO 3 — Primitiva de canvas (`src/lib/drawings/primitives/NuevaHerramientaPrimitive.ts`)
 Implementa la interfaz `ISeriesPrimitive` de lightweight-charts:
@@ -200,6 +202,7 @@ useNuevaHerramientaInteraction({ ..., primitivesRef })
 8. **Hit radius estándar**: 12px para cuerpo, 14px para endpoints.
 9. **Umbral de drag**: 4px antes de activar el drag real.
 10. **Doble-click en 400ms** para abrir settings dialog.
+11. **"Borrar todos los dibujos" automático** — el botón Trash en `LeftSidebar` llama `clearDrawings(symbol)` que elimina del store todo `Drawing` con ese símbolo. El lifecycle hook (`useNuevaHerramientaPrimitives`) detecta que desaparecieron y hace `detachPrimitive` automáticamente. **No se requiere ningún código extra** siempre que: (a) el tipo esté en el union `Drawing`, y (b) el lifecycle hook filtre correctamente por `d.type === "nueva_herramienta"`.
 
 ---
 
@@ -216,5 +219,7 @@ useNuevaHerramientaInteraction({ ..., primitivesRef })
 - [ ] Toolbar tiene botón
 - [ ] `PriceChart.tsx` llama hooks en orden correcto
 - [ ] `useChartInteraction.ts` maneja cursor crosshair para la nueva herramienta
+- [ ] El tipo está en el union `Drawing` (garantiza que `clearDrawings` lo borra correctamente)
+- [ ] El lifecycle hook filtra por `d.type === "nueva_herramienta"` (garantiza detach al borrar todo)
 - [ ] Sin `console.log` en código final
 - [ ] Sin placeholders ni TODO pendientes

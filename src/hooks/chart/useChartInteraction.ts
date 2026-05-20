@@ -66,24 +66,6 @@ export function useChartInteraction(
         return;
       }
 
-      if (toolRef.current === "eraser") {
-        const THRESHOLD_PX = 8;
-        let closestId: string | null = null;
-        let closestDist = Infinity;
-        for (const pl of priceLinesRef.current) {
-          if (pl.symbol !== symbolRef.current) continue;
-          const lineY = candleSeriesRef.current.priceToCoordinate(pl.price);
-          if (lineY === null) continue;
-          const dist = Math.abs(lineY - param.point.y);
-          if (dist < THRESHOLD_PX && dist < closestDist) {
-            closestDist = dist;
-            closestId = pl.id;
-          }
-        }
-        if (closestId) removePriceLineRef.current(closestId);
-        return;
-      }
-
       if (toolRef.current === "measure") {
         if (!param.time) return;
         const time = Number(param.time);
@@ -145,8 +127,7 @@ export function useChartInteraction(
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.style.cursor =
-        tool === "hline" || tool === "measure" || tool === "trendline" || tool === "rectangle" ? "crosshair" :
-        tool === "eraser" ? "cell" : "";
+        tool === "hline" || tool === "measure" || tool === "trendline" || tool === "rectangle" ? "crosshair" : "";
     }
   }, [tool, containerRef]);
 

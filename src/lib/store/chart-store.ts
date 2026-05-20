@@ -16,7 +16,7 @@ export type IndicatorKey =
   | "adx"
   | "vrvp";
 
-export type DrawingTool = "cursor" | "hline" | "measure" | "eraser" | "trendline" | "rectangle";
+export type DrawingTool = "cursor" | "hline" | "measure" | "trendline" | "rectangle";
 export type Theme = "dark" | "light";
 
 export interface PriceLine {
@@ -222,6 +222,7 @@ interface ChartState {
   addDrawing: (d: Drawing) => void;
   removeDrawing: (id: string) => void;
   updateDrawing: (id: string, patch: Partial<Omit<TrendLineDrawing | RectangleDrawing, "id" | "symbol" | "type">>) => void;
+  clearDrawings: (symbol?: string) => void;
   setDrawingEditTarget: (id: string | null) => void;
   setSelectedDrawingId: (id: string | null) => void;
   toggleLegendCollapsed: () => void;
@@ -344,6 +345,12 @@ export const useChartStore = create<ChartState>()(
       updateDrawing: (id, patch) =>
         set((s) => ({
           drawings: s.drawings.map((d) => d.id === id ? { ...d, ...patch } : d),
+        })),
+      clearDrawings: (symbol) =>
+        set((s) => ({
+          drawings: symbol ? s.drawings.filter((d) => d.symbol !== symbol) : [],
+          selectedDrawingId: null,
+          drawingEditTarget: null,
         })),
       setDrawingEditTarget: (drawingEditTarget) => set({ drawingEditTarget }),
       setSelectedDrawingId: (selectedDrawingId) => set({ selectedDrawingId }),

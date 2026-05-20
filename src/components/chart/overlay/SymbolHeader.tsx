@@ -22,7 +22,7 @@ export const SymbolHeader = React.memo(function SymbolHeader({ symbol, timeframe
   return (
     <div
       style={{ top, left }}
-      className="pointer-events-none absolute z-10 flex flex-col gap-1 text-xs tabular-nums"
+      className="pointer-events-none absolute z-10 flex flex-col gap-0.5 text-xs tabular-nums"
     >
       {/* Row 1: symbol info + OHLC stats inline on hover */}
       <div className="flex h-5 flex-nowrap items-center gap-x-3 overflow-hidden whitespace-nowrap">
@@ -59,13 +59,13 @@ export const SymbolHeader = React.memo(function SymbolHeader({ symbol, timeframe
       </div>
 
       {/* Row 2: big live price */}
-      <div className="flex h-7 items-center gap-2">
+      <div className="flex h-6 items-baseline gap-2">
         {lastPrice ? (
           <>
-            <span className={`text-lg font-semibold tabular-nums ${greenOrRed(lastPrice.pct)}`}>
+            <span className={`text-[17px] font-semibold leading-none tabular-nums ${greenOrRed(lastPrice.pct)}`}>
               {formatPrice(lastPrice.value)}
             </span>
-            <span className={`text-xs ${greenOrRed(lastPrice.pct)}`}>
+            <span className={`text-[11px] leading-none ${greenOrRed(lastPrice.pct)}`}>
               {lastPrice.pct >= 0 ? "+" : ""}
               {lastPrice.pct.toFixed(2)}%
             </span>

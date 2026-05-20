@@ -148,7 +148,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
         timeframe={timeframe}
         hover={hover}
         lastPrice={lastPrice}
-        top={mainPaneTop + 16}
+        top={mainPaneTop + 12}
         left={leftOffset}
       />
 
@@ -157,7 +157,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
         hidden={hidden}
         config={config}
         lastValues={lastValues}
-        top={mainPaneTop + 60}
+        top={mainPaneTop + 52}
         left={leftOffset}
       />
 

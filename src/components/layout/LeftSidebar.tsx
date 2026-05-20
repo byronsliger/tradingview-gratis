@@ -1,6 +1,6 @@
 "use client";
 
-import { MousePointer2, Minus, Ruler, Eraser, Trash2, Lock, TrendingUp, RectangleHorizontal } from "lucide-react";
+import { MousePointer2, Minus, Trash2, Lock, RectangleHorizontal, Slash } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import { cn } from "@/lib/utils";
@@ -13,37 +13,10 @@ interface ToolDef {
 }
 
 const TOOLS: ToolDef[] = [
-  { key: "cursor", icon: MousePointer2, label: "Cursor", hint: "Modo navegación" },
-  {
-    key: "hline",
-    icon: Minus,
-    label: "Línea horizontal",
-    hint: "Click en el chart para marcar un precio",
-  },
-  {
-    key: "measure",
-    icon: Ruler,
-    label: "Regla / Medir",
-    hint: "Click en dos puntos para medir Δ precio, %, barras y volumen",
-  },
-  {
-    key: "eraser",
-    icon: Eraser,
-    label: "Borrar línea",
-    hint: "Click cerca de una línea para eliminarla",
-  },
-  {
-    key: "trendline",
-    icon: TrendingUp,
-    label: "Línea de tendencia",
-    hint: "Click en dos puntos para trazar una línea de tendencia",
-  },
-  {
-    key: "rectangle",
-    icon: RectangleHorizontal,
-    label: "Rectángulo",
-    hint: "Click en dos puntos para dibujar un rectángulo",
-  },
+  { key: "cursor",    icon: MousePointer2,        label: "Cursor",              hint: "Modo navegación" },
+  { key: "hline",     icon: Minus,                label: "Línea horizontal",    hint: "Click en el chart para marcar un precio" },
+  { key: "trendline", icon: Slash,                label: "Línea de tendencia",  hint: "Click en dos puntos para trazar una línea diagonal" },
+  { key: "rectangle", icon: RectangleHorizontal,  label: "Rectángulo",          hint: "Click en dos puntos para dibujar un rectángulo" },
 ];
 
 const LOCKED = [
@@ -55,7 +28,13 @@ export function LeftSidebar() {
   const tool = useChartStore((s) => s.tool);
   const setTool = useChartStore((s) => s.setTool);
   const clearPriceLines = useChartStore((s) => s.clearPriceLines);
+  const clearDrawings = useChartStore((s) => s.clearDrawings);
   const symbol = useChartStore((s) => s.symbol);
+
+  function handleClearAll() {
+    clearPriceLines(symbol);
+    clearDrawings(symbol);
+  }
 
   return (
     <aside className="flex w-11 flex-shrink-0 flex-col items-center gap-0.5 border-r border-tv-border bg-tv-panel py-1.5">
@@ -88,16 +67,16 @@ export function LeftSidebar() {
 
       <Tooltip>
         <TooltipTrigger
-          onClick={() => clearPriceLines(symbol)}
-          aria-label="Borrar dibujos"
+          onClick={handleClearAll}
+          aria-label="Borrar todos los dibujos"
           className="flex h-8 w-8 items-center justify-center rounded text-tv-text-muted hover:bg-tv-panel-hover hover:text-tv-red"
         >
           <Trash2 className="h-4 w-4" />
         </TooltipTrigger>
         <TooltipContent side="right" className="text-xs">
-          <div className="font-medium">Borrar dibujos</div>
+          <div className="font-medium">Borrar todos los dibujos</div>
           <div className="mt-0.5 text-[10px] text-tv-text-muted">
-            Limpia las líneas de este símbolo
+            Elimina todas las líneas y formas de este símbolo
           </div>
         </TooltipContent>
       </Tooltip>
