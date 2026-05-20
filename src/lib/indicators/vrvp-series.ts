@@ -40,8 +40,8 @@ class VRVPRenderer implements ICustomSeriesPaneRenderer {
     this._options = options;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public draw(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     target: any,
     priceConverter: PriceToCoordinateConverter,
     _isHovered: boolean,
@@ -58,6 +58,7 @@ class VRVPRenderer implements ICustomSeriesPaneRenderer {
 
     if (!vrvp || vrvp.bins.length === 0) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     target.useMediaCoordinateSpace((scope: any) => {
       const ctx = scope.context;
       const { width } = scope.mediaSize;

@@ -43,6 +43,9 @@ next-env.d.ts
 # claude code local settings (per-developer)
 .claude/settings.local.json
 
+# plans (local only, not for version control)
+/plans/
+
 # additional secret patterns
 *.key
 id_rsa*
