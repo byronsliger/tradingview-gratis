@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { INDICATOR_COLORS, useChartStore, type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import { IndicatorPill } from "@/components/chart/IndicatorPill";
 import { formatPrice, formatVolume } from "@/lib/format";
@@ -39,7 +39,8 @@ function LegendToggleButton({ collapsed, count, onClick }: { collapsed: boolean;
 }
 
 export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden, config, lastValues, top, left }: Props) {
-  const [collapsed, setCollapsed] = useState(true);
+  const collapsed = useChartStore((s) => s.legendCollapsed);
+  const toggleLegendCollapsed = useChartStore((s) => s.toggleLegendCollapsed);
   const toggleHidden = useChartStore((s) => s.toggleHidden);
   const setSettingsTarget = useChartStore((s) => s.setSettingsTarget);
   const removeIndicator = useChartStore((s) => s.removeIndicator);
@@ -49,7 +50,7 @@ export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden,
 
   return (
     <div style={{ top, left: left - 5 }} className="absolute z-30 flex flex-col items-start gap-1">
-      <LegendToggleButton collapsed={collapsed} count={mainCount} onClick={() => setCollapsed((v) => !v)} />
+      <LegendToggleButton collapsed={collapsed} count={mainCount} onClick={toggleLegendCollapsed} />
       {!collapsed && (
         <div className="ml-1.5 flex flex-col items-start gap-1">
           {indicators.ema20 && (

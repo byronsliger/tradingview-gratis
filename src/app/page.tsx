@@ -17,7 +17,7 @@ export default function HomePage() {
       <Header />
       <div className="flex min-h-0 flex-1">
         <LeftSidebar />
-        <main className="relative flex min-h-0 flex-1 flex-col">
+        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="min-h-0 flex-1">
             <PriceChart symbol={symbol} timeframe={timeframe} />
           </div>

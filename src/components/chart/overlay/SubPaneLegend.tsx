@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { INDICATOR_COLORS, useChartStore, type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import { IndicatorPill } from "@/components/chart/IndicatorPill";
 
@@ -44,7 +44,8 @@ function LegendToggleButton({ collapsed, count, onClick }: { collapsed: boolean;
 }
 
 export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hidden, config, lastValues, paneOffsets, left }: Props) {
-  const [collapsed, setCollapsed] = useState(true);
+  const collapsed = useChartStore((s) => s.legendCollapsed);
+  const toggleLegendCollapsed = useChartStore((s) => s.toggleLegendCollapsed);
   const toggleHidden = useChartStore((s) => s.toggleHidden);
   const setSettingsTarget = useChartStore((s) => s.setSettingsTarget);
   const removeIndicator = useChartStore((s) => s.removeIndicator);
@@ -68,7 +69,7 @@ export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hid
     <>
       {/* Toggle button anchored to first visible sub-pane */}
       <div style={{ top: firstPane.top + 8, left: left - 10 }} className="absolute z-30">
-        <LegendToggleButton collapsed={collapsed} count={subCount} onClick={() => setCollapsed((v) => !v)} />
+        <LegendToggleButton collapsed={collapsed} count={subCount} onClick={toggleLegendCollapsed} />
       </div>
 
       {!collapsed && (

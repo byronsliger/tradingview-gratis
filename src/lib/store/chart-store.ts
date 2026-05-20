@@ -145,6 +145,8 @@ interface ChartState {
   symbolDialogOpen: boolean;
   /** Which indicator's settings dialog is open (null = closed) */
   settingsTarget: IndicatorKey | null;
+  /** Shared collapsed state for both ChartLegend and SubPaneLegend */
+  legendCollapsed: boolean;
 
   // Actions
   setSymbol: (s: string) => void;
@@ -158,9 +160,11 @@ interface ChartState {
   removeFromWatchlist: (s: string) => void;
   setTool: (t: DrawingTool) => void;
   addPriceLine: (price: number, symbol: string) => void;
+  removePriceLine: (id: string) => void;
   clearPriceLines: (symbol?: string) => void;
   setSymbolDialogOpen: (v: boolean) => void;
   setSettingsTarget: (k: IndicatorKey | null) => void;
+  toggleLegendCollapsed: () => void;
 }
 
 export const useChartStore = create<ChartState>()(
@@ -197,6 +201,7 @@ export const useChartStore = create<ChartState>()(
       priceLines: [],
       symbolDialogOpen: false,
       settingsTarget: null,
+      legendCollapsed: true,
 
       setSymbol: (symbol) => set({ symbol }),
       setTimeframe: (timeframe) => set({ timeframe }),
@@ -243,6 +248,10 @@ export const useChartStore = create<ChartState>()(
             },
           ],
         })),
+      removePriceLine: (id) =>
+        set((state) => ({
+          priceLines: state.priceLines.filter((p) => p.id !== id),
+        })),
       clearPriceLines: (symbol) =>
         set((state) => ({
           priceLines: symbol
@@ -251,6 +260,7 @@ export const useChartStore = create<ChartState>()(
         })),
       setSymbolDialogOpen: (symbolDialogOpen) => set({ symbolDialogOpen }),
       setSettingsTarget: (settingsTarget) => set({ settingsTarget }),
+      toggleLegendCollapsed: () => set((s) => ({ legendCollapsed: !s.legendCollapsed })),
     }),
     {
       name: "tv-gratis-chart-state",
@@ -262,6 +272,7 @@ export const useChartStore = create<ChartState>()(
         hidden: s.hidden,
         config: s.config,
         watchlist: s.watchlist,
+        priceLines: s.priceLines,
       }),
       /**
        * Deep-merge persisted state into the current (default) state so that

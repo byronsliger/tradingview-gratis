@@ -1,6 +1,6 @@
 "use client";
 
-import { MousePointer2, Minus, Ruler, Trash2, Lock } from "lucide-react";
+import { MousePointer2, Minus, Ruler, Eraser, Trash2, Lock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,12 @@ const TOOLS: ToolDef[] = [
     label: "Regla / Medir",
     hint: "Click en dos puntos para medir Δ precio, %, barras y volumen",
   },
+  {
+    key: "eraser",
+    icon: Eraser,
+    label: "Borrar línea",
+    hint: "Click cerca de una línea para eliminarla",
+  },
 ];
 
 const LOCKED = [
@@ -41,7 +47,7 @@ export function LeftSidebar() {
   const symbol = useChartStore((s) => s.symbol);
 
   return (
-    <aside className="flex w-11 flex-col items-center gap-0.5 border-r border-tv-border bg-tv-panel py-1.5">
+    <aside className="flex w-11 flex-shrink-0 flex-col items-center gap-0.5 border-r border-tv-border bg-tv-panel py-1.5">
       {TOOLS.map((t) => {
         const Icon = t.icon;
         const active = tool === t.key;

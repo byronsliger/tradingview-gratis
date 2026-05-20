@@ -29,12 +29,20 @@ export function useChartInteraction(
   const [hover, setHover] = useState<HoverInfo | null>(null);
 
   const addPriceLine = useChartStore((s) => s.addPriceLine);
+  const removePriceLine = useChartStore((s) => s.removePriceLine);
+  const priceLines = useChartStore((s) => s.priceLines);
   const toolRef = useRef(tool);
   // eslint-disable-next-line react-hooks/refs
   toolRef.current = tool;
   const addPriceLineRef = useRef(addPriceLine);
   // eslint-disable-next-line react-hooks/refs
   addPriceLineRef.current = addPriceLine;
+  const removePriceLineRef = useRef(removePriceLine);
+  // eslint-disable-next-line react-hooks/refs
+  removePriceLineRef.current = removePriceLine;
+  const priceLinesRef = useRef(priceLines);
+  // eslint-disable-next-line react-hooks/refs
+  priceLinesRef.current = priceLines;
   const symbolRef = useRef(symbol);
   // eslint-disable-next-line react-hooks/refs
   symbolRef.current = symbol;
@@ -55,6 +63,24 @@ export function useChartInteraction(
 
       if (toolRef.current === "hline") {
         addPriceLineRef.current(price, symbolRef.current);
+        return;
+      }
+
+      if (toolRef.current === "eraser") {
+        const THRESHOLD_PX = 8;
+        let closestId: string | null = null;
+        let closestDist = Infinity;
+        for (const pl of priceLinesRef.current) {
+          if (pl.symbol !== symbolRef.current) continue;
+          const lineY = candleSeriesRef.current.priceToCoordinate(pl.price);
+          if (lineY === null) continue;
+          const dist = Math.abs(lineY - param.point.y);
+          if (dist < THRESHOLD_PX && dist < closestDist) {
+            closestDist = dist;
+            closestId = pl.id;
+          }
+        }
+        if (closestId) removePriceLineRef.current(closestId);
         return;
       }
 
@@ -118,7 +144,9 @@ export function useChartInteraction(
   // Cursor style
   useEffect(() => {
     if (containerRef.current) {
-      containerRef.current.style.cursor = tool === "hline" || tool === "measure" ? "crosshair" : "";
+      containerRef.current.style.cursor =
+        tool === "hline" || tool === "measure" ? "crosshair" :
+        tool === "eraser" ? "cell" : "";
     }
   }, [tool, containerRef]);
 
