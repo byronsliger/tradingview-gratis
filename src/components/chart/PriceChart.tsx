@@ -68,6 +68,24 @@ const TV_COLORS = {
   grid: "#1e222d",
 };
 
+const TV_COLORS_LIGHT = {
+  bg: "#ffffff",
+  panel: "#f0f3fa",
+  border: "#e0e3eb",
+  text: "#131722",
+  textMuted: "#787b86",
+  green: "#26a69a",
+  red: "#ef5350",
+  blue: "#2962ff",
+  yellow: "#f57c00",
+  purple: "#ab47bc",
+  grid: "#f0f3fa",
+};
+
+function getChartColors(theme: "dark" | "light") {
+  return theme === "light" ? TV_COLORS_LIGHT : TV_COLORS;
+}
+
 interface HoverInfo {
   o: number;
   h: number;
@@ -130,6 +148,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const removeIndicator = useChartStore((s) => s.removeIndicator);
   const toggleHidden = useChartStore((s) => s.toggleHidden);
   const setSettingsTarget = useChartStore((s) => s.setSettingsTarget);
+  const theme = useChartStore((s) => s.theme);
 
   // Refs to avoid recreating subscribeClick on every tool change
   const toolRef = useRef(tool);
@@ -368,6 +387,39 @@ export function PriceChart({ symbol, timeframe }: Props) {
       vrvpSeriesRef.current = null;
     };
   }, []);
+
+  // Update chart colors when theme changes
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const c = getChartColors(theme);
+    chartRef.current.applyOptions({
+      layout: {
+        background: { color: c.bg },
+        textColor: c.text,
+        panes: { separatorColor: c.border, separatorHoverColor: c.border },
+      },
+      grid: {
+        vertLines: { color: c.grid },
+        horzLines: { color: c.grid },
+      },
+      crosshair: {
+        vertLine: { color: c.textMuted, labelBackgroundColor: c.panel },
+        horzLine: { color: c.textMuted, labelBackgroundColor: c.panel },
+      },
+      rightPriceScale: { borderColor: c.border, textColor: c.textMuted },
+      leftPriceScale: { borderColor: c.border, textColor: c.textMuted },
+      timeScale: { borderColor: c.border },
+    });
+    candleSeriesRef.current?.applyOptions({
+      upColor: c.green,
+      downColor: c.red,
+      borderUpColor: c.green,
+      borderDownColor: c.red,
+      wickUpColor: c.green,
+      wickDownColor: c.red,
+      priceLineColor: c.textMuted,
+    });
+  }, [theme]);
 
   // Manage volume — overlay at the bottom of the main pane
   useEffect(() => {

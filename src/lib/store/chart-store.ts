@@ -16,6 +16,7 @@ export type IndicatorKey =
   | "vrvp";
 
 export type DrawingTool = "cursor" | "hline" | "measure" | "eraser";
+export type Theme = "dark" | "light";
 
 export interface PriceLine {
   id: string;
@@ -129,6 +130,7 @@ export const DEFAULT_WATCHLIST = [
 interface ChartState {
   symbol: string;
   timeframe: Timeframe;
+  theme: Theme;
   /** Indicator is added to the chart (appears in pill + renders unless hidden) */
   indicators: Record<IndicatorKey, boolean>;
   /** Indicator is hidden (eye icon off) — kept in pill list, just not rendered */
@@ -147,6 +149,7 @@ interface ChartState {
   // Actions
   setSymbol: (s: string) => void;
   setTimeframe: (t: Timeframe) => void;
+  setTheme: (t: Theme) => void;
   toggleIndicator: (key: IndicatorKey) => void;
   removeIndicator: (key: IndicatorKey) => void;
   toggleHidden: (key: IndicatorKey) => void;
@@ -165,6 +168,7 @@ export const useChartStore = create<ChartState>()(
     (set) => ({
       symbol: "BTCUSDT",
       timeframe: "15m" as Timeframe,
+      theme: "dark" as Theme,
       indicators: {
         ema20: true,
         ema50: true,
@@ -196,6 +200,7 @@ export const useChartStore = create<ChartState>()(
 
       setSymbol: (symbol) => set({ symbol }),
       setTimeframe: (timeframe) => set({ timeframe }),
+      setTheme: (theme) => set({ theme }),
       toggleIndicator: (key) =>
         set((s) => ({
           indicators: { ...s.indicators, [key]: !s.indicators[key] },
@@ -252,6 +257,7 @@ export const useChartStore = create<ChartState>()(
       partialize: (s) => ({
         symbol: s.symbol,
         timeframe: s.timeframe,
+        theme: s.theme,
         indicators: s.indicators,
         hidden: s.hidden,
         config: s.config,

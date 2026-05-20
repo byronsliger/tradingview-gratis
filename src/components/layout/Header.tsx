@@ -1,12 +1,16 @@
 "use client";
 
-import { Code2, Zap } from "lucide-react";
+import { Code2, Moon, Sun, Zap } from "lucide-react";
 import { SymbolSelector } from "@/components/chart/SymbolSelector";
 import { TimeframeSelector } from "@/components/chart/TimeframeSelector";
 import { IndicatorMenu } from "@/components/chart/IndicatorMenu";
 import { Separator } from "@/components/ui/separator";
+import { useChartStore } from "@/lib/store/chart-store";
 
 export function Header() {
+  const theme = useChartStore((s) => s.theme);
+  const setTheme = useChartStore((s) => s.setTheme);
+
   return (
     <header className="flex h-12 items-center justify-between border-b border-tv-border bg-tv-panel px-3">
       <div className="flex items-center gap-1">
@@ -27,6 +31,17 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
+        <button
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="flex h-7 w-7 items-center justify-center rounded text-tv-text-muted hover:bg-tv-panel-hover hover:text-tv-text"
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === "dark" ? (
+            <Sun className="h-4 w-4" />
+          ) : (
+            <Moon className="h-4 w-4" />
+          )}
+        </button>
         <a
           href="https://github.com"
           target="_blank"
