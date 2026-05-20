@@ -113,7 +113,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const macdSignalRef = useRef<ISeriesApi<"Line"> | null>(null);
   const macdHistRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const sqzmomHistRef = useRef<ISeriesApi<"Histogram"> | null>(null);
-  const sqzmomDotRef  = useRef<ISeriesApi<"Line"> | null>(null);
+  const sqzmomDotRef = useRef<ISeriesApi<"Line"> | null>(null);
   const adxRef = useRef<ISeriesApi<"Line"> | null>(null);
   const adxKeyLineRef = useRef<IPriceLine | null>(null);
   const adxStrengthLineRef = useRef<IPriceLine | null>(null);
@@ -361,7 +361,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
       macdSignalRef.current = null;
       macdHistRef.current = null;
       sqzmomHistRef.current = null;
-      sqzmomDotRef.current  = null;
+      sqzmomDotRef.current = null;
       adxRef.current = null;
       adxKeyLineRef.current = null;
       adxStrengthLineRef.current = null;
@@ -442,7 +442,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
       try {
         chartRef.current.panes()[1]?.setStretchFactor(1);
         chartRef.current.panes()[0]?.setStretchFactor(3);
-      } catch {}
+      } catch { }
       updateRSI();
     } else if (!indicators.rsi && rsiRef.current && chartRef.current) {
       chartRef.current.removeSeries(rsiRef.current);
@@ -492,7 +492,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
       try {
         chartRef.current.panes()[paneIndex]?.setStretchFactor(1);
         chartRef.current.panes()[0]?.setStretchFactor(3);
-      } catch {}
+      } catch { }
       updateMACD();
     } else if (!indicators.macd && macdRef.current && chartRef.current) {
       if (macdRef.current) chartRef.current.removeSeries(macdRef.current);
@@ -529,17 +529,17 @@ export function PriceChart({ symbol, timeframe }: Props) {
         paneIndex,
       );
       sqzmomHistRef.current = hist;
-      sqzmomDotRef.current  = dot;
+      sqzmomDotRef.current = dot;
       try {
         chartRef.current.panes()[paneIndex]?.setStretchFactor(1);
         chartRef.current.panes()[0]?.setStretchFactor(3);
-      } catch {}
+      } catch { }
       updateSqueezeMom();
     } else if (!indicators.sqzmom && sqzmomHistRef.current && chartRef.current) {
       if (sqzmomHistRef.current) chartRef.current.removeSeries(sqzmomHistRef.current);
-      if (sqzmomDotRef.current)  chartRef.current.removeSeries(sqzmomDotRef.current);
+      if (sqzmomDotRef.current) chartRef.current.removeSeries(sqzmomDotRef.current);
       sqzmomHistRef.current = null;
-      sqzmomDotRef.current  = null;
+      sqzmomDotRef.current = null;
     }
     requestAnimationFrame(() => recomputePaneOffsets());
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -550,13 +550,13 @@ export function PriceChart({ symbol, timeframe }: Props) {
     if (!chartRef.current) return;
     if (indicators.adx && !adxRef.current) {
       const paneIndex = (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1;
-      
+
       const aSeries = chartRef.current.addSeries(
         LineSeries,
-        { 
-          color: TV_COLORS.text, 
-          lineWidth: 2, 
-          priceLineVisible: false, 
+        {
+          color: TV_COLORS.text,
+          lineWidth: 2,
+          priceLineVisible: false,
           lastValueVisible: false,
           priceScaleId: "left",
         },
@@ -573,13 +573,13 @@ export function PriceChart({ symbol, timeframe }: Props) {
       try {
         chartRef.current.panes()[paneIndex]?.setStretchFactor(1);
         chartRef.current.panes()[0]?.setStretchFactor(3);
-      } catch {}
+      } catch { }
       updateADX();
     } else if (!indicators.adx && adxRef.current && chartRef.current) {
       // Disable left price scale visibility when ADX is removed
       try {
         adxRef.current.priceScale().applyOptions({ visible: false });
-      } catch {}
+      } catch { }
       chartRef.current.applyOptions({
         leftPriceScale: { visible: false },
       });
@@ -606,7 +606,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
     if (macdHistRef.current) macdHistRef.current.applyOptions({ visible: v("macd") });
     if (volumeSeriesRef.current) volumeSeriesRef.current.applyOptions({ visible: v("volume") });
     if (sqzmomHistRef.current) sqzmomHistRef.current.applyOptions({ visible: v("sqzmom") });
-    if (sqzmomDotRef.current)  sqzmomDotRef.current.applyOptions({  visible: v("sqzmom") });
+    if (sqzmomDotRef.current) sqzmomDotRef.current.applyOptions({ visible: v("sqzmom") });
     if (adxRef.current) adxRef.current.applyOptions({ visible: v("adx") });
   }, [indicators, hidden]);
 
@@ -674,7 +674,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
       if (!activeIds.has(id)) {
         try {
           series.removePriceLine(apiLine);
-        } catch {}
+        } catch { }
         map.delete(id);
       }
     }
@@ -809,23 +809,26 @@ export function PriceChart({ symbol, timeframe }: Props) {
 
     // Histogram bars (momentum value)
     sqzmomHistRef.current.setData(
-      pts.map((p) => ({
-        time:  p.time as UTCTimestamp,
-        value: p.val,
-        color: p.val > 0
-          ? (pts[pts.indexOf(p) - 1]?.val ?? p.val) <= p.val
-            ? "#26a69a"   // lime  — growing positive
-            : "#1a6e65"   // green — shrinking positive
-          : (pts[pts.indexOf(p) - 1]?.val ?? p.val) >= p.val
-            ? "#ef5350"   // red    — growing negative
-            : "#9b1c1a",  // maroon — shrinking negative
-      })),
+      pts.map((p, i) => {
+        const prevVal = i > 0 ? pts[i - 1].val : p.val;
+        let color = "#808080"; // fallback for gray
+        if (p.val > 0 && p.val > prevVal) color = "#00FF00";
+        else if (p.val > 0 && p.val < prevVal) color = "#008000";
+        else if (p.val < 0 && p.val < prevVal) color = "#008eff";
+        else if (p.val < 0 && p.val > prevVal) color = "#1848cc";
+
+        return {
+          time: p.time as UTCTimestamp,
+          value: p.val,
+          color,
+        };
+      }),
     );
 
     // Zero-line dots coloured by squeeze state
     sqzmomDotRef.current?.setData(
       pts.map((p) => ({
-        time:  p.time as UTCTimestamp,
+        time: p.time as UTCTimestamp,
         value: 0,
         color: p.noSqz ? "#2962ff" : p.sqzOn ? "#131722" : "#787b86",
       })),
@@ -844,7 +847,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
       pts.map((p, i) => ({
         time: p.time as UTCTimestamp,
         value: p.adx,
-        color: i > 0 && p.adx > pts[i - 1].adx ? "#ffffff" : "#a09a9a",
+        color: i > 0 && p.adx > pts[i - 1].adx ? "#008eff" : "#f57f17",
       })),
     );
 
