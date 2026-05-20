@@ -54,6 +54,33 @@ interface Props {
   timeframe: Timeframe;
 }
 
+function LegendToggleButton({
+  collapsed,
+  count,
+  onClick,
+}: {
+  collapsed: boolean;
+  count: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title="Leyenda de los indicadores"
+      className="pointer-events-auto group flex h-5 items-center gap-1 rounded border border-transparent px-1.5 text-[10px] text-[#787b86] transition-all hover:border-[#2a2e39] hover:bg-[#1e222d] hover:text-[#d1d4dc] cursor-pointer"
+      style={{ position: "relative", zIndex: 30 }}
+    >
+      <span className="leading-none">{collapsed ? "▼" : "▲"}</span>
+      {collapsed && (
+        <span className="leading-none tabular-nums">{count}</span>
+      )}
+      <span className="hidden leading-none group-hover:inline">
+        {collapsed ? "Mostrar indicadores" : "Leyenda de los indicadores"}
+      </span>
+    </button>
+  );
+}
+
 const TV_COLORS = {
   bg: "#131722",
   panel: "#1e222d",
@@ -166,7 +193,13 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const [paneOffsets, setPaneOffsets] = useState<PaneOffset[]>([]);
   const [measure, setMeasure] = useState<MeasureState>(INITIAL_MEASURE);
   const [renderTick, setRenderTick] = useState(0);
+  const [legendCollapsed, setLegendCollapsed] = useState(true);
+  const [subLegendCollapsed, setSubLegendCollapsed] = useState(true);
   const measureRef = useRef(measure);
+
+  // When ADX is active the chart reserves ~60 px for the left price scale.
+  // Shift overlays past it so they appear inside the chart content area.
+  const leftOffset = indicators.adx ? 72 : 12;
   measureRef.current = measure;
 
   // Helper — compute pane top offsets from chart layout
@@ -908,9 +941,9 @@ export function PriceChart({ symbol, timeframe }: Props) {
     }
     adxKeyLineRef.current = adxRef.current.createPriceLine({
       price: cfg.adxKeyLevel,
-      color: "#ffffff",
-      lineWidth: 1,
-      lineStyle: 2,
+      color: "#13172266",
+      lineWidth: 2,
+      lineStyle: 0,
       axisLabelVisible: false,
       title: "Key Level",
     });
@@ -1177,7 +1210,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
 
       {/* Top-left of main pane: symbol info + OHLC + Volume pill + EMA pills */}
       <div
-        style={{ top: (paneOffsets[0]?.top ?? 0) + 12, left: 12 }}
+        style={{ top: (paneOffsets[0]?.top ?? 0) + 16, left: leftOffset }}
         className="pointer-events-none absolute z-10 flex flex-col gap-1 text-xs tabular-nums"
       >
         {/* Row 1: symbol info + OHLC stats inline on hover (fixed height, never wraps) */}
@@ -1232,69 +1265,105 @@ export function PriceChart({ symbol, timeframe }: Props) {
         </div>
 
         {/* Indicator pills for the main pane (fixed position below price) */}
-        <div className="mt-1 flex flex-col items-start gap-1">
-          {indicators.ema20 && (
-            <IndicatorPill
-              name={`EMA ${config.ema20}`}
-              value={lastValues.ema20 !== undefined ? formatPrice(lastValues.ema20) : undefined}
-              color={INDICATOR_COLORS.ema20}
-              hidden={hidden.ema20}
-              onToggleHide={() => toggleHidden("ema20")}
-              onSettings={() => setSettingsTarget("ema20")}
-              onRemove={() => removeIndicator("ema20")}
+        <div className="mt-1 flex flex-col items-start gap-0.5">
+          {/* Toggle button always at top, above the pills */}
+          {Object.values(indicators).some(Boolean) && (
+            <LegendToggleButton
+              collapsed={legendCollapsed}
+              count={Object.values(indicators).filter(Boolean).length}
+              onClick={() => setLegendCollapsed((v) => !v)}
             />
           )}
-          {indicators.ema50 && (
-            <IndicatorPill
-              name={`EMA ${config.ema50}`}
-              value={lastValues.ema50 !== undefined ? formatPrice(lastValues.ema50) : undefined}
-              color={INDICATOR_COLORS.ema50}
-              hidden={hidden.ema50}
-              onToggleHide={() => toggleHidden("ema50")}
-              onSettings={() => setSettingsTarget("ema50")}
-              onRemove={() => removeIndicator("ema50")}
-            />
-          )}
-          {indicators.ema200 && (
-            <IndicatorPill
-              name={`EMA ${config.ema200}`}
-              value={lastValues.ema200 !== undefined ? formatPrice(lastValues.ema200) : undefined}
-              color={INDICATOR_COLORS.ema200}
-              hidden={hidden.ema200}
-              onToggleHide={() => toggleHidden("ema200")}
-              onSettings={() => setSettingsTarget("ema200")}
-              onRemove={() => removeIndicator("ema200")}
-            />
-          )}
-          {indicators.volume && (
-            <IndicatorPill
-              name="Vol"
-              value={lastValues.volume !== undefined ? formatVolume(lastValues.volume) : undefined}
-              color={INDICATOR_COLORS.volume}
-              hidden={hidden.volume}
-              onToggleHide={() => toggleHidden("volume")}
-              onSettings={() => setSettingsTarget("volume")}
-              onRemove={() => removeIndicator("volume")}
-            />
-          )}
-          {indicators.vrvp && (
-            <IndicatorPill
-              name="VRVP"
-              value={undefined}
-              color={INDICATOR_COLORS.vrvp}
-              hidden={hidden.vrvp}
-              onToggleHide={() => toggleHidden("vrvp")}
-              onSettings={() => setSettingsTarget("vrvp")}
-              onRemove={() => removeIndicator("vrvp")}
-            />
+          {!legendCollapsed && (
+            <div className="mt-0.5 flex flex-col items-start gap-1">
+              {indicators.ema20 && (
+                <IndicatorPill
+                  name={`EMA ${config.ema20}`}
+                  value={lastValues.ema20 !== undefined ? formatPrice(lastValues.ema20) : undefined}
+                  color={INDICATOR_COLORS.ema20}
+                  hidden={hidden.ema20}
+                  onToggleHide={() => toggleHidden("ema20")}
+                  onSettings={() => setSettingsTarget("ema20")}
+                  onRemove={() => removeIndicator("ema20")}
+                />
+              )}
+              {indicators.ema50 && (
+                <IndicatorPill
+                  name={`EMA ${config.ema50}`}
+                  value={lastValues.ema50 !== undefined ? formatPrice(lastValues.ema50) : undefined}
+                  color={INDICATOR_COLORS.ema50}
+                  hidden={hidden.ema50}
+                  onToggleHide={() => toggleHidden("ema50")}
+                  onSettings={() => setSettingsTarget("ema50")}
+                  onRemove={() => removeIndicator("ema50")}
+                />
+              )}
+              {indicators.ema200 && (
+                <IndicatorPill
+                  name={`EMA ${config.ema200}`}
+                  value={lastValues.ema200 !== undefined ? formatPrice(lastValues.ema200) : undefined}
+                  color={INDICATOR_COLORS.ema200}
+                  hidden={hidden.ema200}
+                  onToggleHide={() => toggleHidden("ema200")}
+                  onSettings={() => setSettingsTarget("ema200")}
+                  onRemove={() => removeIndicator("ema200")}
+                />
+              )}
+              {indicators.volume && (
+                <IndicatorPill
+                  name="Vol"
+                  value={lastValues.volume !== undefined ? formatVolume(lastValues.volume) : undefined}
+                  color={INDICATOR_COLORS.volume}
+                  hidden={hidden.volume}
+                  onToggleHide={() => toggleHidden("volume")}
+                  onSettings={() => setSettingsTarget("volume")}
+                  onRemove={() => removeIndicator("volume")}
+                />
+              )}
+              {indicators.vrvp && (
+                <IndicatorPill
+                  name="VRVP"
+                  value={undefined}
+                  color={INDICATOR_COLORS.vrvp}
+                  hidden={hidden.vrvp}
+                  onToggleHide={() => toggleHidden("vrvp")}
+                  onSettings={() => setSettingsTarget("vrvp")}
+                  onRemove={() => removeIndicator("vrvp")}
+                />
+              )}
+            </div>
           )}
         </div>
       </div>
 
+      {/* Sub-pane toggle button — anchored to first visible sub-pane */}
+      {(() => {
+        const subCount = [indicators.rsi, indicators.macd, indicators.sqzmom, indicators.adx].filter(Boolean).length;
+        if (subCount === 0) return null;
+        const firstPane = indicators.rsi
+          ? paneOffsets[rsiPaneIdx]
+          : indicators.macd
+            ? paneOffsets[macdPaneIdx]
+            : paneOffsets[sqzmomPaneIdx];
+        if (!firstPane) return null;
+        return (
+          <div
+            style={{ top: firstPane.top + 10, left: leftOffset }}
+            className="absolute z-30"
+          >
+            <LegendToggleButton
+              collapsed={subLegendCollapsed}
+              count={subCount}
+              onClick={() => setSubLegendCollapsed((v) => !v)}
+            />
+          </div>
+        );
+      })()}
+
       {/* RSI pane label */}
-      {indicators.rsi && paneOffsets[rsiPaneIdx] && (
+      {!subLegendCollapsed && indicators.rsi && paneOffsets[rsiPaneIdx] && (
         <div
-          style={{ top: paneOffsets[rsiPaneIdx].top + 6, left: 12 }}
+          style={{ top: paneOffsets[rsiPaneIdx].top + 32, left: leftOffset }}
           className="pointer-events-none absolute z-10"
         >
           <IndicatorPill
@@ -1310,9 +1379,9 @@ export function PriceChart({ symbol, timeframe }: Props) {
       )}
 
       {/* MACD pane label */}
-      {indicators.macd && paneOffsets[macdPaneIdx] && (
+      {!subLegendCollapsed && indicators.macd && paneOffsets[macdPaneIdx] && (
         <div
-          style={{ top: paneOffsets[macdPaneIdx].top + 6, left: 12 }}
+          style={{ top: paneOffsets[macdPaneIdx].top + 32, left: leftOffset }}
           className="pointer-events-none absolute z-10"
         >
           <IndicatorPill
@@ -1332,9 +1401,9 @@ export function PriceChart({ symbol, timeframe }: Props) {
       )}
 
       {/* Squeeze Momentum pane label */}
-      {indicators.sqzmom && paneOffsets[sqzmomPaneIdx] && (
+      {!subLegendCollapsed && indicators.sqzmom && paneOffsets[sqzmomPaneIdx] && (
         <div
-          style={{ top: paneOffsets[sqzmomPaneIdx].top + 6, left: 12 }}
+          style={{ top: paneOffsets[sqzmomPaneIdx].top + 32, left: leftOffset }}
           className="pointer-events-none absolute z-10"
         >
           <IndicatorPill
@@ -1354,9 +1423,9 @@ export function PriceChart({ symbol, timeframe }: Props) {
       )}
 
       {/* ADX pane label */}
-      {indicators.adx && paneOffsets[adxPaneIdx] && (
+      {!subLegendCollapsed && indicators.adx && paneOffsets[adxPaneIdx] && (
         <div
-          style={{ top: paneOffsets[adxPaneIdx].top + (indicators.sqzmom ? 28 : 6), left: 12 }}
+          style={{ top: paneOffsets[adxPaneIdx].top + (indicators.sqzmom ? 54 : 32), left: leftOffset }}
           className="pointer-events-none absolute z-10"
         >
           <IndicatorPill
