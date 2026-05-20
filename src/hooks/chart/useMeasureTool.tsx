@@ -78,6 +78,17 @@ export function useMeasureTool(
     const bY = candleSeriesRef.current.priceToCoordinate(measure.b.price);
 
     if (aX !== null && bX !== null && aY !== null && bY !== null) {
+      let leftScaleWidth = 0;
+      try {
+        if (chartRef.current.options().leftPriceScale?.visible) {
+          leftScaleWidth = chartRef.current.priceScale("left").width();
+        }
+      } catch (e) {
+        // Ignore internal lightweight-charts initialization errors
+      }
+      const absAX = aX + leftScaleWidth;
+      const absBX = bX + leftScaleWidth;
+
       const priceDiff = measure.b.price - measure.a.price;
       const pctChange = measure.a.price === 0 ? 0 : (priceDiff / measure.a.price) * 100;
       const isUp = priceDiff >= 0;
@@ -91,9 +102,9 @@ export function useMeasureTool(
 
       measureRender = (
         <MeasureOverlay
-          aX={aX}
+          aX={absAX}
           aY={aY}
-          bX={bX}
+          bX={absBX}
           bY={bY}
           priceDiff={priceDiff}
           pctChange={pctChange}

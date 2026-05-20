@@ -65,13 +65,24 @@ export function useTrendLineTool(
       const candles = candlesRef.current;
       if (!chart || !series || candles.length === 0) return null;
       const rect = container.getBoundingClientRect();
-      const x = e.clientX - rect.left;
+      let leftScaleWidth = 0;
+      try {
+        if (chart.options().leftPriceScale?.visible) {
+          leftScaleWidth = chart.priceScale("left").width();
+        }
+      } catch (e) {
+        // Ignore internal lightweight-charts initialization errors
+      }
+      const x = e.clientX - rect.left - leftScaleWidth;
       const y = e.clientY - rect.top;
       const price = series.coordinateToPrice(y);
       if (price === null || !isFinite(price)) return null;
-      // Use logical index → candle lookup so the result is always an actual bar time.
-      // coordinateToTime() can return extrapolated future times when rightOffset is
-      // inflated by VRVP, and returns null in the rightOffset zone altogether.
+      // 1. Try to get the exact time from the timescale coordinate
+      const time = chart.timeScale().coordinateToTime(x);
+      if (time !== null) {
+        return { time: time as number, price };
+      }
+      // 2. Fall back to logical index lookup (e.g. in the rightOffset zone) clamped to the last candle
       const logical = chart.timeScale().coordinateToLogical(x);
       if (logical === null) return null;
       const idx = Math.max(0, Math.min(Math.round(logical), candles.length - 1));

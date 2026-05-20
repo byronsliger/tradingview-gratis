@@ -62,7 +62,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
   // line is hit, preventing usePriceLineDrag from deselecting drawings.
   const { inProgress } = useTrendLineTool(containerRef, chartRef, candleSeriesRef, candlesRef, tool, symbol);
   const { primitivesRef } = useTrendLinePrimitives(candleSeriesRef, symbol);
-  useTrendLineInteraction(containerRef, primitivesRef, symbol, tool);
+  useTrendLineInteraction(containerRef, chartRef, primitivesRef, symbol, tool);
   usePriceLineDrag(containerRef, candleSeriesRef, symbol, tool);
   const { handleY } = useSelectedPriceLineHandle(chartRef, candleSeriesRef);
 

@@ -37,19 +37,30 @@ export const TrendLinesLayer = React.memo(function TrendLinesLayer({
   const bY = series.priceToCoordinate(inProgress.b.price);
   if (aX === null || aY === null || bX === null || bY === null) return null;
 
+  let leftScaleWidth = 0;
+  try {
+    if (chart.options().leftPriceScale?.visible) {
+      leftScaleWidth = chart.priceScale("left").width();
+    }
+  } catch (e) {
+    // Ignore internal lightweight-charts initialization errors
+  }
+  const absAX = aX + leftScaleWidth;
+  const absBX = bX + leftScaleWidth;
+
   return (
     <svg
       className="pointer-events-none absolute inset-0 z-10 h-full w-full"
       style={{ overflow: "visible" }}
     >
       <line
-        x1={aX} y1={aY} x2={bX} y2={bY}
+        x1={absAX} y1={aY} x2={absBX} y2={bY}
         stroke="#2962ff"
         strokeWidth={1}
         strokeDasharray="4,3"
       />
-      <circle cx={aX} cy={aY} r={4} fill="#2962ff" />
-      <circle cx={bX} cy={bY} r={3} fill="#2962ff" />
+      <circle cx={absAX} cy={aY} r={4} fill="#2962ff" />
+      <circle cx={absBX} cy={bY} r={3} fill="#2962ff" />
     </svg>
   );
 });

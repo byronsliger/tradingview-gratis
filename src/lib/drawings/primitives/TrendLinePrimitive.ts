@@ -73,11 +73,17 @@ class TrendLinePaneRenderer implements IPrimitivePaneRenderer {
         ctx.setLineDash([]);
         ctx.lineWidth = 2 * pr;
         ctx.strokeStyle = drawing.color;
-        ctx.fillStyle = "#131722";
+
+        const bg = chart.options().layout.background;
+        ctx.fillStyle = bg.type === "solid" ? bg.color : "#ffffff";
 
         for (const { x, y } of [{ x: aX, y: aY }, { x: bX, y: bY }]) {
           ctx.beginPath();
-          ctx.rect((x - 5) * pr, (y - 5) * vpr, 10 * pr, 10 * vpr);
+          if (ctx.roundRect) {
+            ctx.roundRect((x - 5) * pr, (y - 5) * vpr, 10 * pr, 10 * vpr, 2 * pr);
+          } else {
+            ctx.rect((x - 5) * pr, (y - 5) * vpr, 10 * pr, 10 * vpr);
+          }
           ctx.fill();
           ctx.stroke();
         }

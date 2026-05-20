@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type RefObject } from "react";
+import { type IChartApi } from "lightweight-charts";
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import type { TrendLineDrawing } from "@/lib/drawings/types";
 import type { TrendLinePrimitive } from "@/lib/drawings/primitives/TrendLinePrimitive";
@@ -15,6 +16,7 @@ type DragState =
 
 export function useTrendLineInteraction(
   containerRef: RefObject<HTMLDivElement | null>,
+  chartRef: RefObject<IChartApi | null>,
   primitivesRef: RefObject<Map<string, TrendLinePrimitive>>,
   symbol: string,
   tool: DrawingTool,
@@ -67,7 +69,15 @@ export function useTrendLineInteraction(
 
     const getCursorPos = (e: PointerEvent) => {
       const rect = container.getBoundingClientRect();
-      return { px: e.clientX - rect.left, py: e.clientY - rect.top };
+      let leftScaleWidth = 0;
+      try {
+        if (chartRef.current?.options().leftPriceScale?.visible) {
+          leftScaleWidth = chartRef.current.priceScale("left").width();
+        }
+      } catch (e) {
+        // Ignore internal lightweight-charts initialization errors
+      }
+      return { px: e.clientX - rect.left - leftScaleWidth, py: e.clientY - rect.top };
     };
 
     const getContainerWidth = () => container.clientWidth;
