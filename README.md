@@ -12,7 +12,8 @@ Plataforma de charts crypto construida sobre los datos públicos de **Binance** 
 - 📊 **Velas en vivo** vía WebSocket de Binance (sin API key)
 - 🔍 **Búsqueda de símbolo** sobre todos los pares USDT del exchange
 - ⏱️ **Multi-timeframe**: 1m / 5m / 15m / 1h / 4h / 1d / 1w
-- 📐 **Indicadores client-side**: EMA 20/50/200, RSI 14, MACD 12/26/9, Volumen
+- 📐 **Indicadores client-side**: EMA 20/50/200, RSI 14, MACD 12/26/9, ADX/DMI, Squeeze Momentum, VRVP, Volumen
+- 🎯 **Estrategia TradingLatino**: todos los indicadores usados en la metodología de [@TradingLatino](https://www.youtube.com/@TradingLatino) están incluidos (EMA 10/55, MACD, Squeeze Momentum, ADX)
 - 👁️ **Watchlist** con precios y cambio 24h actualizándose en tiempo real
 - 🎨 **Visual idéntica a TradingView** (paleta, fuentes, layout)
 - 💾 **Persistencia** en localStorage (símbolo, timeframe, indicadores)
@@ -97,11 +98,25 @@ Al reconectarse (Binance corta el WS cada 24h) se vuelven a suscribir todos los 
 
 ### Indicadores
 Se calculan **client-side** sobre el array de velas en cada update. Implementaciones puras de TypeScript:
-- `EMA`: seeded con SMA del primer período, luego `close * k + prev * (1-k)`
-- `RSI`: Wilder (suavizado exponencial sobre ganancias/pérdidas, período 14)
-- `MACD`: EMA(12) − EMA(26), signal = EMA(9) sobre MACD line
 
-Para 1000 velas y panes múltiples el costo es despreciable.
+| Indicador | Descripción |
+|---|---|
+| `EMA 10/50` | Media móvil exponencial — base de la estrategia TradingLatino |
+| `MACD 12/26/9` | Divergencia de medias, histograma y señal |
+| `RSI 14` | Wilder (suavizado exponencial sobre ganancias/pérdidas) |
+| `ADX / DMI` | Fuerza de tendencia + líneas +DI / −DI |
+| `Squeeze Momentum` | Identifica compresión de volatilidad (TTM Squeeze) |
+| `VRVP` | Volume Range Visible Profile — perfil de volumen por rango visible |
+| `Volumen` | Histograma de volumen con colores alcista/bajista |
+
+#### Estrategia TradingLatino
+La plataforma incluye todos los indicadores del sistema enseñado por TradingLatino:
+- **EMA 10, 55** para tendencia y soportes dinámicos
+- **MACD** para momentum y divergencias
+- **Squeeze Momentum** para entradas en baja volatilidad
+- **ADX** para confirmar la fuerza de la tendencia antes de entrar
+
+Para 1000 velas y panes múltiples el costo computacional es despreciable.
 
 ## ⚠️ Qué NO incluye (todavía)
 
