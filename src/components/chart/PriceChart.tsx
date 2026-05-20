@@ -184,8 +184,15 @@ export function PriceChart({ symbol, timeframe }: Props) {
   addPriceLineRef.current = addPriceLine;
   const symbolRef = useRef(symbol);
   symbolRef.current = symbol;
+  const timeframeRef = useRef(timeframe);
+  timeframeRef.current = timeframe;
   const configRef = useRef(config);
   configRef.current = config;
+
+  // Historical lazy-load state
+  const isLoadingHistoryRef = useRef(false);
+  const hasReachedHistoryStartRef = useRef(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const [hover, setHover] = useState<HoverInfo | null>(null);
   const [lastPrice, setLastPrice] = useState<{ value: number; pct: number } | null>(null);
@@ -214,6 +221,64 @@ export function PriceChart({ symbol, timeframe }: Props) {
       return o;
     });
     setPaneOffsets(offsets);
+  }
+
+  // Loads 500 older candles and prepends them — triggered when user scrolls to the left edge
+  async function loadMoreHistory() {
+    if (isLoadingHistoryRef.current || hasReachedHistoryStartRef.current) return;
+    if (!chartRef.current || candlesRef.current.length === 0) return;
+
+    isLoadingHistoryRef.current = true;
+    setIsLoadingHistory(true);
+    try {
+      const oldest = candlesRef.current[0];
+      const endTime = oldest.time * 1000 - 1; // ms, just before the oldest candle
+      const older = await fetchKlines(symbolRef.current, timeframeRef.current, 500, endTime);
+
+      if (older.length === 0) {
+        hasReachedHistoryStartRef.current = true;
+        return;
+      }
+
+      // Deduplicate and prepend
+      const existingTimes = new Set(candlesRef.current.map((c) => c.time));
+      const fresh = older.filter((c) => !existingTimes.has(c.time));
+      if (fresh.length === 0) {
+        hasReachedHistoryStartRef.current = true;
+        return;
+      }
+
+      candlesRef.current = [...fresh, ...candlesRef.current];
+
+      // Re-feed all series with full combined history
+      const all = candlesRef.current;
+      candleSeriesRef.current?.setData(
+        all.map((k) => ({
+          time: k.time as UTCTimestamp,
+          open: k.open,
+          high: k.high,
+          low: k.low,
+          close: k.close,
+        })),
+      );
+      volumeSeriesRef.current?.setData(
+        all.map((k) => ({
+          time: k.time as UTCTimestamp,
+          value: k.volume,
+          color: k.close >= k.open ? `${TV_COLORS.green}66` : `${TV_COLORS.red}66`,
+        })),
+      );
+      updateEMAs();
+      updateRSI();
+      updateMACD();
+      updateSqueezeMom();
+      updateADX();
+    } catch {
+      // Silently ignore network errors — user can scroll back and retry
+    } finally {
+      isLoadingHistoryRef.current = false;
+      setIsLoadingHistory(false);
+    }
   }
 
   // Create chart once
@@ -387,6 +452,11 @@ export function PriceChart({ symbol, timeframe }: Props) {
     const logicalRangeHandler = () => {
       setRenderTick((t) => t + 1);
       updateVRVP();
+      // Trigger historical load when the user scrolls close to the left edge
+      const range = chart.timeScale().getVisibleLogicalRange();
+      if (range && range.from < 10) {
+        loadMoreHistory();
+      }
     };
     chart.timeScale().subscribeVisibleLogicalRangeChange(logicalRangeHandler);
 
@@ -1065,6 +1135,10 @@ export function PriceChart({ symbol, timeframe }: Props) {
     let cancelled = false;
 
     async function load() {
+      // Reset history flags on each fresh load (symbol or timeframe change)
+      hasReachedHistoryStartRef.current = false;
+      isLoadingHistoryRef.current = false;
+
       try {
         const klines = await fetchKlines(symbol, timeframe, 1000);
         if (cancelled) return;
@@ -1261,6 +1335,13 @@ export function PriceChart({ symbol, timeframe }: Props) {
             count={Object.values(indicators).filter(Boolean).length}
             onClick={() => setLegendCollapsed((v) => !v)}
           />
+        </div>
+      )}
+
+      {/* Historical load indicator — top-left corner, fades in/out */}
+      {isLoadingHistory && (
+        <div className="pointer-events-none absolute left-1/2 top-2 z-40 -translate-x-1/2 rounded bg-tv-panel/90 px-2.5 py-1 text-[10px] text-tv-text-muted backdrop-blur">
+          Cargando historial…
         </div>
       )}
 

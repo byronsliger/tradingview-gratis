@@ -6,8 +6,10 @@ export async function fetchKlines(
   symbol: string,
   interval: Timeframe,
   limit = 1000,
+  endTime?: number, // Unix timestamp in milliseconds
 ): Promise<Candle[]> {
-  const url = `${BASE}/klines?symbol=${symbol.toUpperCase()}&interval=${interval}&limit=${limit}`;
+  let url = `${BASE}/klines?symbol=${symbol.toUpperCase()}&interval=${interval}&limit=${limit}`;
+  if (endTime !== undefined) url += `&endTime=${endTime}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`klines ${res.status}`);
   const data = (await res.json()) as unknown[][];
