@@ -46,33 +46,57 @@ Abrí [http://localhost:3000](http://localhost:3000).
 ```
 src/
 ├── app/
-│   ├── layout.tsx          # Root, fuente Inter, TooltipProvider, dark
-│   ├── page.tsx            # Dashboard armando el layout
-│   └── globals.css         # Paleta TradingView
+│   ├── layout.tsx              # Root, fuente Inter, TooltipProvider, dark
+│   ├── page.tsx                # Dashboard armando el layout
+│   └── globals.css             # Paleta TradingView
 ├── components/
 │   ├── chart/
-│   │   ├── PriceChart.tsx     # Chart core (lightweight-charts + panes)
-│   │   ├── SymbolSelector.tsx # Búsqueda de pares USDT
+│   │   ├── PriceChart.tsx         # Orchestrator ~100 líneas (usa hooks especializados)
+│   │   ├── overlay/
+│   │   │   ├── SymbolHeader.tsx   # Símbolo + OHLC hover + precio live
+│   │   │   ├── ChartLegend.tsx    # Pills EMA/Vol/VRVP + toggle collapse
+│   │   │   └── SubPaneLegend.tsx  # Pills RSI/MACD/SQZ/ADX por sub-pane
+│   │   ├── SymbolSelector.tsx     # Búsqueda de pares USDT
 │   │   ├── TimeframeSelector.tsx
-│   │   └── IndicatorMenu.tsx  # Toggle EMA/RSI/MACD/Volume
+│   │   ├── IndicatorMenu.tsx      # Toggle EMA/RSI/MACD/Volume
+│   │   ├── IndicatorPill.tsx      # Pill con hide/settings/remove
+│   │   ├── IndicatorSettingsDialog.tsx
+│   │   └── MeasureOverlay.tsx     # Overlay de la herramienta de medición
 │   ├── layout/
 │   │   ├── Header.tsx
-│   │   ├── LeftSidebar.tsx    # Iconos drawing tools (visual)
+│   │   ├── LeftSidebar.tsx        # Iconos drawing tools (visual)
 │   │   ├── RightSidebar.tsx
-│   │   └── BottomPanel.tsx    # Stats 24h
+│   │   └── BottomPanel.tsx        # Stats 24h
 │   ├── watchlist/
-│   │   └── Watchlist.tsx      # Precios live multi-símbolo
-│   └── ui/                    # shadcn primitives
+│   │   └── Watchlist.tsx          # Precios live multi-símbolo
+│   └── ui/                        # shadcn primitives
+├── hooks/
+│   └── chart/
+│       ├── useChartInit.ts        # createChart + theme + cleanup
+│       ├── usePaneLayout.ts       # Offsets de panes + ResizeObserver
+│       ├── useCandleSeries.ts     # CandlestickSeries + 3 EMA lines + updateEMAs()
+│       ├── useVolumeSeries.ts     # HistogramSeries volumen (add/remove reactivo)
+│       ├── useRSIPane.ts          # RSI pane + updateRSI()
+│       ├── useMACDPane.ts         # MACD pane + updateMACD()
+│       ├── useSQZPane.ts          # Squeeze Momentum pane + updateSQZ()
+│       ├── useADXPane.ts          # ADX pane + left scale + updateADX()
+│       ├── useVRVPSeries.ts       # VRVP custom series + rightOffset
+│       ├── useKlineData.ts        # fetch inicial + WS subscription + lazy history
+│       ├── usePriceLines.ts       # Sync store.priceLines → chart price lines
+│       ├── useMeasureTool.tsx     # State machine de medición + overlay render
+│       └── useChartInteraction.ts # Click / crosshair / cursor style
 └── lib/
     ├── binance/
-    │   ├── rest.ts            # klines / ticker / exchangeInfo
-    │   ├── ws.ts              # WS multiplex + auto-reconnect
+    │   ├── rest.ts                # klines / ticker / exchangeInfo
+    │   ├── ws.ts                  # WS multiplex + auto-reconnect
     │   └── types.ts
+    ├── chart/
+    │   └── chart-colors.ts        # TV_COLORS, TV_COLORS_LIGHT, getChartColors()
     ├── indicators/
-    │   └── index.ts           # SMA, EMA, RSI (Wilder), MACD
+    │   └── index.ts               # SMA, EMA, RSI (Wilder), MACD, ADX, SQZ, VRVP
     ├── store/
-    │   └── chart-store.ts     # Zustand global state
-    └── format.ts              # formatPrice / formatPct / formatVolume
+    │   └── chart-store.ts         # Zustand global state
+    └── format.ts                  # formatPrice / formatPct / formatVolume
 ```
 
 ## 🌐 Deploy a Vercel

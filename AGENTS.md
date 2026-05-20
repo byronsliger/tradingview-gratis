@@ -32,13 +32,28 @@ Welcome! This file provides comprehensive instructions, context, rules, and comm
 - **`src/app/`**: Next.js App Router (Layouts, pages, styles)
   - `globals.css`: Base styles, Tailwind configuration, color variables
 - **`src/components/`**: React Components
-  - `chart/`: Charting components (`PriceChart.tsx`, `SymbolSelector.tsx`, `IndicatorSettingsDialog.tsx`, etc.)
+  - `chart/`: Charting components
+    - `PriceChart.tsx`: Orchestrator ~100 líneas — solo compone hooks y overlay components
+    - `overlay/`: Componentes de presentación del chart (`SymbolHeader`, `ChartLegend`, `SubPaneLegend`)
+    - `SymbolSelector.tsx`, `TimeframeSelector.tsx`, `IndicatorMenu.tsx`, `IndicatorPill.tsx`, `IndicatorSettingsDialog.tsx`, `MeasureOverlay.tsx`
   - `watchlist/`: Watchlist UI (`Watchlist.tsx`)
   - `layout/`: Shared layouts
   - `ui/`: Reusable primitive components (shadcn-inspired)
+- **`src/hooks/chart/`**: Hooks especializados del chart (separación de responsabilidades)
+  - `useChartInit.ts`: `createChart`, theme, ResizeObserver, cleanup
+  - `usePaneLayout.ts`: offsets de panes para posicionar overlays
+  - `useCandleSeries.ts`: CandlestickSeries + 3 EMA LineSeries + `updateEMAs()`
+  - `useVolumeSeries.ts`: HistogramSeries de volumen (add/remove reactivo)
+  - `useRSIPane.ts`, `useMACDPane.ts`, `useSQZPane.ts`, `useADXPane.ts`: un hook por indicador de sub-pane
+  - `useVRVPSeries.ts`: VRVP custom series + gestión de `rightOffset`
+  - `useKlineData.ts`: fetch inicial, WebSocket subscription, lazy history load
+  - `usePriceLines.ts`: sincroniza `store.priceLines` con el chart
+  - `useMeasureTool.tsx`: state machine de la herramienta de medición + render del overlay
+  - `useChartInteraction.ts`: click (hline/measure), crosshair hover, cursor style
 - **`src/lib/`**: Custom core logic
   - `binance/`: Binance API client (`rest.ts`, `ws.ts`)
-  - `indicators/`: Custom technical indicators (SMA, EMA, MACD, RSI, ADX, Squeeze Momentum)
+  - `chart/chart-colors.ts`: `TV_COLORS`, `TV_COLORS_LIGHT`, `getChartColors(theme)`
+  - `indicators/`: Custom technical indicators (SMA, EMA, MACD, RSI, ADX, Squeeze Momentum, VRVP)
   - `store/`: Zustand global store (`chart-store.ts`)
 
 ---
@@ -70,9 +85,12 @@ Run these commands from the workspace root (ensure Node 24+):
 - Avoid duplicate state. Sync components to the store instead of passing deep nested callbacks.
 
 ### 3. Charting (`lightweight-charts`)
-- Maintain logic modularity inside `src/components/chart/PriceChart.tsx`.
+- `PriceChart.tsx` es un **orchestrator** (~100 líneas). Toda la lógica vive en los hooks de `src/hooks/chart/`.
+- Cada hook es responsable de **una sola cosa** (un indicador, un tipo de interacción, la inicialización del chart).
+- Para agregar un nuevo indicador: crear un hook `useXxxPane.ts` siguiendo el patrón de `useRSIPane.ts` y conectarlo en `PriceChart.tsx`.
 - Safely initialize, update, and remove chart series and markers.
 - Implement robust cleanup (`chart.remove()`) when components unmount to prevent canvas leaks or multiple instances.
+- Los hooks usan el patrón `ref.current = value` durante render para mantener callbacks frescos en efectos de larga vida (suscripciones WS). Suprimir `react-hooks/refs` con `// eslint-disable-next-line react-hooks/refs` en esas líneas — es intencional.
 
 ### 4. Technical Indicators
 - All technical indicators are calculated on custom data arrays.
