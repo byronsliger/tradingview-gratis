@@ -88,7 +88,7 @@ const TV_COLORS = {
   text: "#d1d4dc",
   textMuted: "#787b86",
   green: "#26a69a",
-  red: "#ef5350",
+  red: "#008eff",
   blue: "#2962ff",
   yellow: "#ffb74d",
   purple: "#ab47bc",
@@ -102,7 +102,7 @@ const TV_COLORS_LIGHT = {
   text: "#131722",
   textMuted: "#787b86",
   green: "#26a69a",
-  red: "#ef5350",
+  red: "#008eff",
   blue: "#2962ff",
   yellow: "#f57c00",
   purple: "#ab47bc",
@@ -199,7 +199,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
 
   // When ADX is active the chart reserves ~60 px for the left price scale.
   // Shift overlays past it so they appear inside the chart content area.
-  const leftOffset = indicators.adx ? 72 : 12;
+  const leftOffset = indicators.adx ? 64 : 12;
   measureRef.current = measure;
 
   // Helper — compute pane top offsets from chart layout
@@ -266,6 +266,9 @@ export function PriceChart({ symbol, timeframe }: Props) {
       wickDownColor: TV_COLORS.red,
       priceLineColor: TV_COLORS.textMuted,
       priceLineStyle: 2,
+    });
+    candleSeriesRef.current.priceScale().applyOptions({
+      scaleMargins: { top: 0.05, bottom: 0.06 },
     });
 
     ema20Ref.current = chart.addSeries(LineSeries, {
@@ -524,6 +527,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
       rsiRef.current = r;
       rsi30Ref.current = r30;
       rsi70Ref.current = r70;
+      r.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 } });
       try {
         chartRef.current.panes()[1]?.setStretchFactor(1);
         chartRef.current.panes()[0]?.setStretchFactor(3);
@@ -574,6 +578,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
       macdRef.current = m;
       macdSignalRef.current = s;
       macdHistRef.current = h;
+      m.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 } });
       try {
         chartRef.current.panes()[paneIndex]?.setStretchFactor(1);
         chartRef.current.panes()[0]?.setStretchFactor(3);
@@ -615,6 +620,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
       );
       sqzmomHistRef.current = hist;
       sqzmomDotRef.current = dot;
+      hist.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 } });
       try {
         chartRef.current.panes()[paneIndex]?.setStretchFactor(1);
         chartRef.current.panes()[0]?.setStretchFactor(3);
@@ -650,7 +656,10 @@ export function PriceChart({ symbol, timeframe }: Props) {
       adxRef.current = aSeries;
 
       // Enable left price scale visibility for ADX and show left scale globally
-      aSeries.priceScale().applyOptions({ visible: true });
+      aSeries.priceScale().applyOptions({
+        visible: true,
+        scaleMargins: { top: 0.1, bottom: 0.1 },
+      });
       chartRef.current.applyOptions({
         leftPriceScale: { visible: true },
       });
@@ -715,6 +724,22 @@ export function PriceChart({ symbol, timeframe }: Props) {
   useEffect(() => {
     updateADX();
   }, [config.adxLen, config.adxDiLen, config.adxKeyLevel, config.adxStrengthLevel]);
+
+  // Adjust timeScale rightOffset so candles don't overlap VRVP bars on the right
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const active = indicators.vrvp && !hidden.vrvp && config.vrvpPlacement === "Right";
+    if (active) {
+      const range = chartRef.current.timeScale().getVisibleLogicalRange();
+      const visible = range ? Math.max(50, range.to - range.from) : 300;
+      const pct = Math.max(0.05, Math.min(0.5, config.vrvpWidth / 100));
+      const extraBars = Math.ceil(visible * pct / (1 - pct));
+      chartRef.current.applyOptions({ timeScale: { rightOffset: 12 + extraBars } });
+    } else {
+      chartRef.current.applyOptions({ timeScale: { rightOffset: 12 } });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [indicators.vrvp, hidden.vrvp, config.vrvpWidth, config.vrvpPlacement]);
 
   // Sync VRVP visibility changes
   useEffect(() => {
@@ -1069,8 +1094,22 @@ export function PriceChart({ symbol, timeframe }: Props) {
         updateMACD();
         updateSqueezeMom();
         updateADX();
-        chartRef.current?.timeScale().fitContent();
-        // Defer VRVP until after fitContent has set the visible range
+        // Auto-zoom to last 30% of loaded candles; account for VRVP right offset if active
+        if (chartRef.current && klines.length > 0) {
+          const visible = Math.round(klines.length * 0.3);
+          const storeState = useChartStore.getState();
+          const vrvpActive = storeState.indicators.vrvp && !storeState.hidden.vrvp
+            && storeState.config.vrvpPlacement === "Right";
+          const pct = Math.max(0.05, Math.min(0.5, storeState.config.vrvpWidth / 100));
+          const extraBars = vrvpActive ? Math.ceil(visible * pct / (1 - pct)) : 0;
+          const rightOffset = 12 + extraBars;
+          chartRef.current.applyOptions({ timeScale: { rightOffset } });
+          chartRef.current.timeScale().setVisibleLogicalRange({
+            from: klines.length - visible,
+            to: klines.length - 1 + rightOffset,
+          });
+        }
+        // Defer VRVP until after zoom has set the visible range
         requestAnimationFrame(() => {
           updateVRVP();
           recomputePaneOffsets();
@@ -1203,14 +1242,31 @@ export function PriceChart({ symbol, timeframe }: Props) {
   }
   void renderTick;
 
+  // Pane top positions — resolved before JSX so any section can reference them
+  const mainPaneTop = paneOffsets[0]?.top ?? 0;
+
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
       {measureRender}
 
+      {/* Main pane legend toggle — direct child of chart container so top is chart-relative */}
+      {Object.values(indicators).some(Boolean) && (
+        <div
+          style={{ top: mainPaneTop + 60, left: leftOffset - 5 }}
+          className="absolute z-30"
+        >
+          <LegendToggleButton
+            collapsed={legendCollapsed}
+            count={Object.values(indicators).filter(Boolean).length}
+            onClick={() => setLegendCollapsed((v) => !v)}
+          />
+        </div>
+      )}
+
       {/* Top-left of main pane: symbol info + OHLC + Volume pill + EMA pills */}
       <div
-        style={{ top: (paneOffsets[0]?.top ?? 0) + 16, left: leftOffset }}
+        style={{ top: mainPaneTop + 8, left: leftOffset }}
         className="pointer-events-none absolute z-10 flex flex-col gap-1 text-xs tabular-nums"
       >
         {/* Row 1: symbol info + OHLC stats inline on hover (fixed height, never wraps) */}
@@ -1266,14 +1322,6 @@ export function PriceChart({ symbol, timeframe }: Props) {
 
         {/* Indicator pills for the main pane (fixed position below price) */}
         <div className="mt-1 flex flex-col items-start gap-0.5">
-          {/* Toggle button always at top, above the pills */}
-          {Object.values(indicators).some(Boolean) && (
-            <LegendToggleButton
-              collapsed={legendCollapsed}
-              count={Object.values(indicators).filter(Boolean).length}
-              onClick={() => setLegendCollapsed((v) => !v)}
-            />
-          )}
           {!legendCollapsed && (
             <div className="mt-0.5 flex flex-col items-start gap-1">
               {indicators.ema20 && (
@@ -1348,7 +1396,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
         if (!firstPane) return null;
         return (
           <div
-            style={{ top: firstPane.top + 10, left: leftOffset }}
+            style={{ top: firstPane.top + 8, left: leftOffset - 10 }}
             className="absolute z-30"
           >
             <LegendToggleButton
@@ -1443,6 +1491,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
           />
         </div>
       )}
+
     </div>
   );
 }
