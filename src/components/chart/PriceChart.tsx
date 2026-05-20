@@ -23,11 +23,15 @@ import { useKlineData } from "@/hooks/chart/useKlineData";
 import { useTrendLineTool } from "@/hooks/chart/useTrendLineTool";
 import { useTrendLinePrimitives } from "@/hooks/chart/useTrendLinePrimitives";
 import { useTrendLineInteraction } from "@/hooks/chart/useTrendLineInteraction";
+import { useRectangleTool } from "@/hooks/chart/useRectangleTool";
+import { useRectanglePrimitives } from "@/hooks/chart/useRectanglePrimitives";
+import { useRectangleInteraction } from "@/hooks/chart/useRectangleInteraction";
 
 import { SymbolHeader } from "./overlay/SymbolHeader";
 import { ChartLegend } from "./overlay/ChartLegend";
 import { SubPaneLegend } from "./overlay/SubPaneLegend";
 import { TrendLinesLayer } from "./overlay/TrendLinesLayer";
+import { RectangleLayer } from "./overlay/RectangleLayer";
 
 interface Props {
   symbol: string;
@@ -63,6 +67,9 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const { inProgress } = useTrendLineTool(containerRef, chartRef, candleSeriesRef, candlesRef, tool, symbol);
   const { primitivesRef } = useTrendLinePrimitives(candleSeriesRef, symbol, candlesRef);
   useTrendLineInteraction(containerRef, chartRef, primitivesRef, candlesRef, symbol, tool);
+  const { inProgress: rectInProgress } = useRectangleTool(containerRef, chartRef, candleSeriesRef, candlesRef, tool, symbol);
+  const { primitivesRef: rectPrimitivesRef } = useRectanglePrimitives(candleSeriesRef, symbol, candlesRef);
+  useRectangleInteraction(containerRef, chartRef, rectPrimitivesRef, candlesRef, symbol, tool);
   usePriceLineDrag(containerRef, candleSeriesRef, symbol, tool);
   const { handleY } = useSelectedPriceLineHandle(chartRef, candleSeriesRef);
 
@@ -110,6 +117,14 @@ export function PriceChart({ symbol, timeframe }: Props) {
         candleSeriesRef={candleSeriesRef}
         candlesRef={candlesRef}
         inProgress={inProgress}
+        chartReady={chartReady}
+      />
+
+      <RectangleLayer
+        chartRef={chartRef}
+        candleSeriesRef={candleSeriesRef}
+        candlesRef={candlesRef}
+        inProgress={rectInProgress}
         chartReady={chartReady}
       />
 

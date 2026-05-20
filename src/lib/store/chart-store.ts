@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Timeframe } from "@/lib/binance/types";
-import type { Drawing, TrendLineDrawing } from "@/lib/drawings/types";
+import type { Drawing, TrendLineDrawing, RectangleDrawing } from "@/lib/drawings/types";
 
 export type IndicatorKey =
   | "ema20"
@@ -16,7 +16,7 @@ export type IndicatorKey =
   | "adx"
   | "vrvp";
 
-export type DrawingTool = "cursor" | "hline" | "measure" | "eraser" | "trendline";
+export type DrawingTool = "cursor" | "hline" | "measure" | "eraser" | "trendline" | "rectangle";
 export type Theme = "dark" | "light";
 
 export interface PriceLine {
@@ -221,7 +221,7 @@ interface ChartState {
   updatePriceLineOptions: (id: string, patch: Partial<Pick<PriceLine, "color" | "lineWidth" | "lineStyle" | "axisLabelVisible">>) => void;
   addDrawing: (d: Drawing) => void;
   removeDrawing: (id: string) => void;
-  updateDrawing: (id: string, patch: Partial<Omit<TrendLineDrawing, "id" | "symbol" | "type">>) => void;
+  updateDrawing: (id: string, patch: Partial<Omit<TrendLineDrawing | RectangleDrawing, "id" | "symbol" | "type">>) => void;
   setDrawingEditTarget: (id: string | null) => void;
   setSelectedDrawingId: (id: string | null) => void;
   toggleLegendCollapsed: () => void;

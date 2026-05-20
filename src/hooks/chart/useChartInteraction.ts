@@ -145,7 +145,7 @@ export function useChartInteraction(
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.style.cursor =
-        tool === "hline" || tool === "measure" || tool === "trendline" ? "crosshair" :
+        tool === "hline" || tool === "measure" || tool === "trendline" || tool === "rectangle" ? "crosshair" :
         tool === "eraser" ? "cell" : "";
     }
   }, [tool, containerRef]);

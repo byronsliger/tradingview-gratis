@@ -1,6 +1,6 @@
 "use client";
 
-import { MousePointer2, Minus, Ruler, Eraser, Trash2, Lock, TrendingUp } from "lucide-react";
+import { MousePointer2, Minus, Ruler, Eraser, Trash2, Lock, TrendingUp, RectangleHorizontal } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,12 @@ const TOOLS: ToolDef[] = [
     icon: TrendingUp,
     label: "Línea de tendencia",
     hint: "Click en dos puntos para trazar una línea de tendencia",
+  },
+  {
+    key: "rectangle",
+    icon: RectangleHorizontal,
+    label: "Rectángulo",
+    hint: "Click en dos puntos para dibujar un rectángulo",
   },
 ];
 
