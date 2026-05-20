@@ -15,6 +15,8 @@ import { useSQZPane } from "@/hooks/chart/useSQZPane";
 import { useADXPane } from "@/hooks/chart/useADXPane";
 import { useVRVPSeries } from "@/hooks/chart/useVRVPSeries";
 import { usePriceLines } from "@/hooks/chart/usePriceLines";
+import { usePriceLineDrag } from "@/hooks/chart/usePriceLineDrag";
+import { useSelectedPriceLineHandle } from "@/hooks/chart/useSelectedPriceLineHandle";
 import { useMeasureTool } from "@/hooks/chart/useMeasureTool";
 import { useChartInteraction } from "@/hooks/chart/useChartInteraction";
 import { useKlineData } from "@/hooks/chart/useKlineData";
@@ -51,6 +53,8 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const { updateVRVP } = useVRVPSeries(chartRef, candlesRef, indicators, hidden, config);
 
   usePriceLines(candleSeriesRef, symbol);
+  usePriceLineDrag(containerRef, candleSeriesRef, symbol, tool);
+  const { handleY } = useSelectedPriceLineHandle(chartRef, candleSeriesRef);
 
   const { setMeasure, measureRef, measureRender } = useMeasureTool(chartRef, candleSeriesRef, candlesRef, tool);
   const { hover } = useChartInteraction(containerRef, chartRef, candleSeriesRef, volumeSeriesRef, tool, symbol, measureRef, setMeasure, updateVRVP);
@@ -90,6 +94,15 @@ export function PriceChart({ symbol, timeframe }: Props) {
       <div ref={containerRef} className="h-full w-full" />
 
       {measureRender}
+
+      {handleY !== null && (
+        <div
+          className="pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 -translate-y-1/2"
+          style={{ top: handleY }}
+        >
+          <div className="h-2.5 w-2.5 rounded-sm border-2 border-[#2962ff] bg-tv-bg shadow-sm" />
+        </div>
+      )}
 
       {isLoadingHistory && (
         <div className="pointer-events-none absolute left-1/2 top-2 z-40 -translate-x-1/2 rounded bg-tv-panel/90 px-2.5 py-1 text-[10px] text-tv-text-muted backdrop-blur">

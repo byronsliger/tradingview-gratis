@@ -22,6 +22,10 @@ export interface PriceLine {
   id: string;
   symbol: string;
   price: number;
+  color?: string;
+  lineWidth?: 1 | 2 | 3 | 4;
+  lineStyle?: number;
+  axisLabelVisible?: boolean;
 }
 
 export interface IndicatorConfig {
@@ -145,6 +149,8 @@ interface ChartState {
   symbolDialogOpen: boolean;
   /** Which indicator's settings dialog is open (null = closed) */
   settingsTarget: IndicatorKey | null;
+  priceLineEditTarget: string | null;
+  selectedPriceLineId: string | null;
   /** Shared collapsed state for both ChartLegend and SubPaneLegend */
   legendCollapsed: boolean;
 
@@ -161,9 +167,13 @@ interface ChartState {
   setTool: (t: DrawingTool) => void;
   addPriceLine: (price: number, symbol: string) => void;
   removePriceLine: (id: string) => void;
+  updatePriceLine: (id: string, price: number) => void;
   clearPriceLines: (symbol?: string) => void;
   setSymbolDialogOpen: (v: boolean) => void;
   setSettingsTarget: (k: IndicatorKey | null) => void;
+  setPriceLineEditTarget: (id: string | null) => void;
+  setSelectedPriceLineId: (id: string | null) => void;
+  updatePriceLineOptions: (id: string, patch: Partial<Pick<PriceLine, "color" | "lineWidth" | "lineStyle" | "axisLabelVisible">>) => void;
   toggleLegendCollapsed: () => void;
 }
 
@@ -201,6 +211,8 @@ export const useChartStore = create<ChartState>()(
       priceLines: [],
       symbolDialogOpen: false,
       settingsTarget: null,
+      priceLineEditTarget: null,
+      selectedPriceLineId: null,
       legendCollapsed: true,
 
       setSymbol: (symbol) => set({ symbol }),
@@ -245,12 +257,20 @@ export const useChartStore = create<ChartState>()(
                   : `${Date.now()}-${Math.random()}`,
               symbol,
               price,
+              color: "#2962ff",
+              lineWidth: 1,
+              lineStyle: 2,
+              axisLabelVisible: true,
             },
           ],
         })),
       removePriceLine: (id) =>
         set((state) => ({
           priceLines: state.priceLines.filter((p) => p.id !== id),
+        })),
+      updatePriceLine: (id, price) =>
+        set((state) => ({
+          priceLines: state.priceLines.map((p) => p.id === id ? { ...p, price } : p),
         })),
       clearPriceLines: (symbol) =>
         set((state) => ({
@@ -260,6 +280,12 @@ export const useChartStore = create<ChartState>()(
         })),
       setSymbolDialogOpen: (symbolDialogOpen) => set({ symbolDialogOpen }),
       setSettingsTarget: (settingsTarget) => set({ settingsTarget }),
+      setPriceLineEditTarget: (priceLineEditTarget) => set({ priceLineEditTarget }),
+      setSelectedPriceLineId: (selectedPriceLineId) => set({ selectedPriceLineId }),
+      updatePriceLineOptions: (id, patch) =>
+        set((state) => ({
+          priceLines: state.priceLines.map((p) => p.id === id ? { ...p, ...patch } : p),
+        })),
       toggleLegendCollapsed: () => set((s) => ({ legendCollapsed: !s.legendCollapsed })),
     }),
     {
