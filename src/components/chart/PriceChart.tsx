@@ -1347,7 +1347,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
 
       {/* Top-left of main pane: symbol info + OHLC + Volume pill + EMA pills */}
       <div
-        style={{ top: mainPaneTop + 8, left: leftOffset }}
+        style={{ top: mainPaneTop + 16, left: leftOffset }}
         className="pointer-events-none absolute z-10 flex flex-col gap-1 text-xs tabular-nums"
       >
         {/* Row 1: symbol info + OHLC stats inline on hover (fixed height, never wraps) */}
