@@ -41,14 +41,14 @@ export function useADXPane(
       pts.map((p, i) => ({
         time: p.time as UTCTimestamp,
         value: p.adx,
-        color: i > 0 && p.adx > pts[i - 1].adx ? "#008eff" : "#f57f17",
+        color: i > 0 && p.adx > pts[i - 1].adx ? cfg.adxColorRising : cfg.adxColorFalling,
       })),
     );
 
     if (adxKeyLineRef.current) adxRef.current.removePriceLine(adxKeyLineRef.current);
     adxKeyLineRef.current = adxRef.current.createPriceLine({
       price: cfg.adxKeyLevel,
-      color: "#13172266",
+      color: cfg.adxColorKeyLevel,
       lineWidth: 2,
       lineStyle: 0,
       axisLabelVisible: false,
@@ -57,7 +57,7 @@ export function useADXPane(
     if (adxStrengthLineRef.current) adxRef.current.removePriceLine(adxStrengthLineRef.current);
     adxStrengthLineRef.current = adxRef.current.createPriceLine({
       price: cfg.adxStrengthLevel,
-      color: TV_COLORS.blue,
+      color: cfg.adxColorStrength,
       lineWidth: 1,
       lineStyle: 2,
       axisLabelVisible: false,
@@ -103,6 +103,8 @@ export function useADXPane(
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { updateADX(); }, [config.adxLen, config.adxDiLen, config.adxKeyLevel, config.adxStrengthLevel]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { updateADX(); }, [config.adxColorRising, config.adxColorFalling, config.adxColorKeyLevel, config.adxColorStrength]);
 
   return { updateADX, lastADX, lastPlusDI, lastMinusDI };
 }

@@ -33,14 +33,15 @@ export function useSQZPane(
     const cfg = configRef.current;
     const pts = squeezeMomentum(c, cfg.sqzmomBBLength, cfg.sqzmomBBMult, cfg.sqzmomKCLength, cfg.sqzmomKCMult);
 
+    const { sqzmomColorBullUp, sqzmomColorBullDn, sqzmomColorBearDn, sqzmomColorBearUp, sqzmomColorNoSqz, sqzmomColorSqzOff } = cfg;
     sqzmomHistRef.current.setData(
       pts.map((p, i) => {
         const prevVal = i > 0 ? pts[i - 1].val : p.val;
         let color = "#808080";
-        if (p.val > 0 && p.val > prevVal) color = "#00FF00";
-        else if (p.val > 0 && p.val < prevVal) color = "#008000";
-        else if (p.val < 0 && p.val < prevVal) color = "#008eff";
-        else if (p.val < 0 && p.val > prevVal) color = "#1848cc";
+        if (p.val > 0 && p.val > prevVal) color = sqzmomColorBullUp;
+        else if (p.val > 0 && p.val < prevVal) color = sqzmomColorBullDn;
+        else if (p.val < 0 && p.val < prevVal) color = sqzmomColorBearDn;
+        else if (p.val < 0 && p.val > prevVal) color = sqzmomColorBearUp;
         return { time: p.time as UTCTimestamp, value: p.val, color };
       }),
     );
@@ -49,7 +50,7 @@ export function useSQZPane(
       pts.map((p) => ({
         time: p.time as UTCTimestamp,
         value: 0,
-        color: p.noSqz ? "#2962ff" : p.sqzOn ? "#131722" : "#787b86",
+        color: p.noSqz ? sqzmomColorNoSqz : p.sqzOn ? "#131722" : sqzmomColorSqzOff,
       })),
     );
 
@@ -93,6 +94,8 @@ export function useSQZPane(
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { updateSQZ(); }, [config.sqzmomBBLength, config.sqzmomBBMult, config.sqzmomKCLength, config.sqzmomKCMult]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { updateSQZ(); }, [config.sqzmomColorBullUp, config.sqzmomColorBullDn, config.sqzmomColorBearDn, config.sqzmomColorBearUp, config.sqzmomColorNoSqz, config.sqzmomColorSqzOff]);
 
   return { updateSQZ, lastSQZ };
 }

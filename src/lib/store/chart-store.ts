@@ -45,6 +45,28 @@ export interface IndicatorConfig {
   adxDiLen: number;
   adxKeyLevel: number;
   adxStrengthLevel: number;
+  // EMA style
+  ema20Color: string;
+  ema20Width: 1 | 2 | 3 | 4;
+  ema20Style: number;
+  ema50Color: string;
+  ema50Width: 1 | 2 | 3 | 4;
+  ema50Style: number;
+  ema200Color: string;
+  ema200Width: 1 | 2 | 3 | 4;
+  ema200Style: number;
+  // SQZ style
+  sqzmomColorBullUp: string;
+  sqzmomColorBullDn: string;
+  sqzmomColorBearDn: string;
+  sqzmomColorBearUp: string;
+  sqzmomColorNoSqz: string;
+  sqzmomColorSqzOff: string;
+  // ADX style
+  adxColorRising: string;
+  adxColorFalling: string;
+  adxColorKeyLevel: string;
+  adxColorStrength: string;
   vrvpRowLayout: "rows" | "ticks";
   vrvpRowSize: number;
   vrvpVolume: "total" | "updown";
@@ -84,6 +106,25 @@ export const DEFAULT_CONFIG: IndicatorConfig = {
   adxDiLen: 14,
   adxKeyLevel: 23,
   adxStrengthLevel: 60,
+  ema20Color: "#2962ff",
+  ema20Width: 2,
+  ema20Style: 0,
+  ema50Color: "#ffb74d",
+  ema50Width: 2,
+  ema50Style: 0,
+  ema200Color: "#ab47bc",
+  ema200Width: 3,
+  ema200Style: 0,
+  sqzmomColorBullUp: "#00FF00",
+  sqzmomColorBullDn: "#008000",
+  sqzmomColorBearDn: "#008eff",
+  sqzmomColorBearUp: "#1848cc",
+  sqzmomColorNoSqz: "#2962ff",
+  sqzmomColorSqzOff: "#787b86",
+  adxColorRising: "#008eff",
+  adxColorFalling: "#f57f17",
+  adxColorKeyLevel: "#13172266",
+  adxColorStrength: "#2962ff",
   vrvpRowLayout: "rows",
   vrvpRowSize: 24,
   vrvpVolume: "total",

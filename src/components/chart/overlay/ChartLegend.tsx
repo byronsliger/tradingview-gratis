@@ -57,7 +57,7 @@ export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden,
             <IndicatorPill
               name={`EMA ${config.ema20}`}
               value={lastValues.ema20 !== undefined ? formatPrice(lastValues.ema20) : undefined}
-              color={INDICATOR_COLORS.ema20}
+              color={config.ema20Color}
               hidden={hidden.ema20}
               onToggleHide={() => toggleHidden("ema20")}
               onSettings={() => setSettingsTarget("ema20")}
@@ -68,7 +68,7 @@ export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden,
             <IndicatorPill
               name={`EMA ${config.ema50}`}
               value={lastValues.ema50 !== undefined ? formatPrice(lastValues.ema50) : undefined}
-              color={INDICATOR_COLORS.ema50}
+              color={config.ema50Color}
               hidden={hidden.ema50}
               onToggleHide={() => toggleHidden("ema50")}
               onSettings={() => setSettingsTarget("ema50")}
@@ -79,7 +79,7 @@ export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden,
             <IndicatorPill
               name={`EMA ${config.ema200}`}
               value={lastValues.ema200 !== undefined ? formatPrice(lastValues.ema200) : undefined}
-              color={INDICATOR_COLORS.ema200}
+              color={config.ema200Color}
               hidden={hidden.ema200}
               onToggleHide={() => toggleHidden("ema200")}
               onSettings={() => setSettingsTarget("ema200")}
