@@ -361,6 +361,7 @@ export const useChartStore = create<ChartState>()(
         watchlist: s.watchlist,
         priceLines: s.priceLines,
         drawings: s.drawings,
+        legendCollapsed: s.legendCollapsed,
       }),
       /**
        * Deep-merge persisted state into the current (default) state so that
