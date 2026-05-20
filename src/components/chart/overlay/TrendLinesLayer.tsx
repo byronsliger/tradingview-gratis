@@ -7,12 +7,13 @@ import type { TrendLineInProgress } from "@/hooks/chart/useTrendLineTool";
 interface Props {
   chartRef: RefObject<IChartApi | null>;
   candleSeriesRef: RefObject<ISeriesApi<"Candlestick"> | null>;
+  candlesRef: RefObject<import("@/lib/binance/types").Candle[]>;
   inProgress: TrendLineInProgress | null;
   chartReady: boolean;
 }
 
 export const TrendLinesLayer = React.memo(function TrendLinesLayer({
-  chartRef, candleSeriesRef, inProgress, chartReady,
+  chartRef, candleSeriesRef, candlesRef, inProgress, chartReady,
 }: Props) {
   // Force re-render on pan/zoom so the in-progress preview stays aligned
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
@@ -31,9 +32,31 @@ export const TrendLinesLayer = React.memo(function TrendLinesLayer({
   const series = candleSeriesRef.current;
   if (!chart || !series) return null;
 
-  const aX = chart.timeScale().timeToCoordinate(inProgress.a.time as Time);
+  const getCoordinateForTime = (time: number): number | null => {
+    const x = chart.timeScale().timeToCoordinate(time as Time);
+    if (x !== null) return x;
+
+    const candles = candlesRef.current;
+    if (!candles || candles.length < 2) return null;
+
+    const maxIdx = candles.length - 1;
+    const interval = candles[maxIdx].time - candles[maxIdx - 1].time;
+    if (interval === 0) return null;
+
+    if (time < candles[0].time) {
+      const bars = (candles[0].time - time) / interval;
+      return chart.timeScale().logicalToCoordinate(-bars as import("lightweight-charts").Logical);
+    }
+    if (time > candles[maxIdx].time) {
+      const bars = (time - candles[maxIdx].time) / interval;
+      return chart.timeScale().logicalToCoordinate((maxIdx + bars) as import("lightweight-charts").Logical);
+    }
+    return null;
+  };
+
+  const aX = getCoordinateForTime(inProgress.a.time as number);
   const aY = series.priceToCoordinate(inProgress.a.price);
-  const bX = chart.timeScale().timeToCoordinate(inProgress.b.time as Time);
+  const bX = getCoordinateForTime(inProgress.b.time as number);
   const bY = series.priceToCoordinate(inProgress.b.price);
   if (aX === null || aY === null || bX === null || bY === null) return null;
 

@@ -82,11 +82,25 @@ export function useTrendLineTool(
       if (time !== null) {
         return { time: time as number, price };
       }
-      // 2. Fall back to logical index lookup (e.g. in the rightOffset zone) clamped to the last candle
+      // 2. Fall back to logical index lookup (e.g. in the rightOffset zone) and extrapolate time
       const logical = chart.timeScale().coordinateToLogical(x);
       if (logical === null) return null;
-      const idx = Math.max(0, Math.min(Math.round(logical), candles.length - 1));
-      return { time: candles[idx].time, price };
+      
+      const maxIdx = candles.length - 1;
+      const logicalIndex = Math.round(logical);
+      let extTime: number;
+
+      if (logicalIndex >= 0 && logicalIndex <= maxIdx) {
+        extTime = candles[logicalIndex].time;
+      } else {
+        const interval = maxIdx >= 1 ? candles[maxIdx].time - candles[maxIdx - 1].time : 60;
+        if (logicalIndex < 0) {
+          extTime = candles[0].time - Math.abs(logicalIndex) * interval;
+        } else {
+          extTime = candles[maxIdx].time + (logicalIndex - maxIdx) * interval;
+        }
+      }
+      return { time: extTime, price };
     };
 
     const onPointerDown = (e: PointerEvent) => {

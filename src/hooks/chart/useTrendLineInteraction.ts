@@ -5,6 +5,7 @@ import { type IChartApi } from "lightweight-charts";
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import type { TrendLineDrawing } from "@/lib/drawings/types";
 import type { TrendLinePrimitive } from "@/lib/drawings/primitives/TrendLinePrimitive";
+import type { Candle } from "@/lib/binance/types";
 
 const DRAG_THRESHOLD_PX = 4;
 const DBLCLICK_MS = 400;
@@ -18,6 +19,7 @@ export function useTrendLineInteraction(
   containerRef: RefObject<HTMLDivElement | null>,
   chartRef: RefObject<IChartApi | null>,
   primitivesRef: RefObject<Map<string, TrendLinePrimitive>>,
+  candlesRef: RefObject<Candle[]>,
   symbol: string,
   tool: DrawingTool,
 ): void {
@@ -120,14 +122,44 @@ export function useTrendLineInteraction(
       const { px, py } = getCursorPos(e);
       const drag = dragRef.current;
 
+      const getExtrapolatedPoint = (px: number, py: number, prim: TrendLinePrimitive) => {
+        if (!chartRef.current || !prim._series) return null;
+        const price = prim._series.coordinateToPrice(py);
+        if (price === null || !isFinite(price)) return null;
+
+        let time = chartRef.current.timeScale().coordinateToTime(px);
+        if (time !== null) return { time: time as number, price };
+
+        const logical = chartRef.current.timeScale().coordinateToLogical(px);
+        if (logical === null) return null;
+        const candles = candlesRef.current;
+        if (!candles || candles.length === 0) return null;
+
+        const maxIdx = candles.length - 1;
+        const logicalIndex = Math.round(logical);
+        let extTime: number;
+
+        if (logicalIndex >= 0 && logicalIndex <= maxIdx) {
+          extTime = candles[logicalIndex].time;
+        } else {
+          const interval = maxIdx >= 1 ? candles[maxIdx].time - candles[maxIdx - 1].time : 60;
+          if (logicalIndex < 0) {
+            extTime = candles[0].time - Math.abs(logicalIndex) * interval;
+          } else {
+            extTime = candles[maxIdx].time + (logicalIndex - maxIdx) * interval;
+          }
+        }
+        return { time: extTime, price };
+      };
+
       if (drag.type === "line") {
         e.stopImmediatePropagation();
         const dx = px - drag.startPx;
         const dy = py - drag.startPy;
         const prim = primitivesRef.current.get(drag.id);
         if (!prim) return;
-        const newA = prim.pixelToPoint(drag.ax + dx, drag.ay + dy);
-        const newB = prim.pixelToPoint(drag.bx + dx, drag.by + dy);
+        const newA = getExtrapolatedPoint(drag.ax + dx, drag.ay + dy, prim);
+        const newB = getExtrapolatedPoint(drag.bx + dx, drag.by + dy, prim);
         if (!newA || !newB) return;
         updateDrawingRef.current(drag.id, { a: newA, b: newB });
         return;
@@ -137,7 +169,7 @@ export function useTrendLineInteraction(
         e.stopImmediatePropagation();
         const prim = primitivesRef.current.get(drag.id);
         if (!prim) return;
-        const newPt = prim.pixelToPoint(px, py);
+        const newPt = getExtrapolatedPoint(px, py, prim);
         if (!newPt) return;
         updateDrawingRef.current(drag.id, { [drag.endpoint]: newPt } as Partial<Omit<TrendLineDrawing, "id" | "symbol" | "type">>);
         return;

@@ -5,10 +5,12 @@ import { type ISeriesApi } from "lightweight-charts";
 import { useChartStore } from "@/lib/store/chart-store";
 import type { TrendLineDrawing } from "@/lib/drawings/types";
 import { TrendLinePrimitive } from "@/lib/drawings/primitives/TrendLinePrimitive";
+import type { Candle } from "@/lib/binance/types";
 
 export function useTrendLinePrimitives(
   candleSeriesRef: RefObject<ISeriesApi<"Candlestick"> | null>,
   symbol: string,
+  candlesRef: RefObject<Candle[]>,
 ): { primitivesRef: RefObject<Map<string, TrendLinePrimitive>> } {
   const drawings = useChartStore((s) => s.drawings);
   const selectedDrawingId = useChartStore((s) => s.selectedDrawingId);
@@ -38,7 +40,7 @@ export function useTrendLinePrimitives(
       const isSelected = d.id === selectedDrawingId;
       const prim = existing.get(d.id);
       if (!prim) {
-        const newPrim = new TrendLinePrimitive(d, isSelected);
+        const newPrim = new TrendLinePrimitive(d, isSelected, candlesRef);
         series.attachPrimitive(newPrim);
         existing.set(d.id, newPrim);
       } else {

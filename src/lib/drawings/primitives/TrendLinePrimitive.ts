@@ -10,6 +10,9 @@ import type {
   Time,
 } from "lightweight-charts";
 import type { TrendLineDrawing, TrendLinePoint } from "../types";
+import type { RefObject } from "react";
+import type { Candle } from "@/lib/binance/types";
+import type { Logical } from "lightweight-charts";
 
 type CanvasRenderingTarget2D = Parameters<IPrimitivePaneRenderer["draw"]>[0];
 
@@ -49,9 +52,9 @@ class TrendLinePaneRenderer implements IPrimitivePaneRenderer {
     const { _chart: chart, _series: series, drawing, selected } = this._primitive;
     if (!chart || !series) return;
 
-    const aX = chart.timeScale().timeToCoordinate(drawing.a.time as Time);
+    const aX = this._primitive.getCoordinateForTime(drawing.a.time as number);
     const aY = series.priceToCoordinate(drawing.a.price);
-    const bX = chart.timeScale().timeToCoordinate(drawing.b.time as Time);
+    const bX = this._primitive.getCoordinateForTime(drawing.b.time as number);
     const bY = series.priceToCoordinate(drawing.b.price);
     if (aX === null || aY === null || bX === null || bY === null) return;
 
@@ -113,12 +116,14 @@ export class TrendLinePrimitive {
 
   _chart: IChartApiBase<Time> | null = null;
   _series: ISeriesApi<SeriesType, Time> | null = null;
+  _candlesRef: RefObject<Candle[]> | null = null;
   private _requestUpdate: (() => void) | null = null;
   private readonly _paneViews: TrendLinePaneView[];
 
-  constructor(drawing: TrendLineDrawing, selected: boolean) {
+  constructor(drawing: TrendLineDrawing, selected: boolean, candlesRef?: RefObject<Candle[]>) {
     this.drawing = drawing;
     this.selected = selected;
+    this._candlesRef = candlesRef ?? null;
     this._paneViews = [new TrendLinePaneView(this)];
   }
 
@@ -180,9 +185,9 @@ export class TrendLinePrimitive {
 
   private _getEndpointPixels(): { ax: number; ay: number; bx: number; by: number } | null {
     if (!this._chart || !this._series) return null;
-    const aX = this._chart.timeScale().timeToCoordinate(this.drawing.a.time as Time);
+    const aX = this.getCoordinateForTime(this.drawing.a.time as number);
     const aY = this._series.priceToCoordinate(this.drawing.a.price);
-    const bX = this._chart.timeScale().timeToCoordinate(this.drawing.b.time as Time);
+    const bX = this.getCoordinateForTime(this.drawing.b.time as number);
     const bY = this._series.priceToCoordinate(this.drawing.b.price);
     if (aX === null || aY === null || bX === null || bY === null) return null;
     return { ax: aX, ay: aY, bx: bX, by: bY };
@@ -192,5 +197,29 @@ export class TrendLinePrimitive {
     const ab = this._getEndpointPixels();
     if (!ab) return null;
     return computeExtended(ab.ax, ab.ay, ab.bx, ab.by, containerWidth, this.drawing.extendLeft, this.drawing.extendRight);
+  }
+
+  getCoordinateForTime(time: number): number | null {
+    if (!this._chart) return null;
+    const x = this._chart.timeScale().timeToCoordinate(time as Time);
+    if (x !== null) return x;
+
+    if (!this._candlesRef) return null;
+    const candles = this._candlesRef.current;
+    if (!candles || candles.length < 2) return null;
+
+    const maxIdx = candles.length - 1;
+    const interval = candles[maxIdx].time - candles[maxIdx - 1].time;
+    if (interval === 0) return null;
+
+    if (time < candles[0].time) {
+      const bars = (candles[0].time - time) / interval;
+      return this._chart.timeScale().logicalToCoordinate(-bars as Logical);
+    }
+    if (time > candles[maxIdx].time) {
+      const bars = (time - candles[maxIdx].time) / interval;
+      return this._chart.timeScale().logicalToCoordinate((maxIdx + bars) as Logical);
+    }
+    return null;
   }
 }

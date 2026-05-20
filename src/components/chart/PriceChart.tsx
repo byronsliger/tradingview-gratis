@@ -61,8 +61,8 @@ export function PriceChart({ symbol, timeframe }: Props) {
   // useTrendLineInteraction.onPointerDown can call stopImmediatePropagation when a
   // line is hit, preventing usePriceLineDrag from deselecting drawings.
   const { inProgress } = useTrendLineTool(containerRef, chartRef, candleSeriesRef, candlesRef, tool, symbol);
-  const { primitivesRef } = useTrendLinePrimitives(candleSeriesRef, symbol);
-  useTrendLineInteraction(containerRef, chartRef, primitivesRef, symbol, tool);
+  const { primitivesRef } = useTrendLinePrimitives(candleSeriesRef, symbol, candlesRef);
+  useTrendLineInteraction(containerRef, chartRef, primitivesRef, candlesRef, symbol, tool);
   usePriceLineDrag(containerRef, candleSeriesRef, symbol, tool);
   const { handleY } = useSelectedPriceLineHandle(chartRef, candleSeriesRef);
 
@@ -108,6 +108,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
       <TrendLinesLayer
         chartRef={chartRef}
         candleSeriesRef={candleSeriesRef}
+        candlesRef={candlesRef}
         inProgress={inProgress}
         chartReady={chartReady}
       />
