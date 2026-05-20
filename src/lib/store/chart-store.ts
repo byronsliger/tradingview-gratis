@@ -103,8 +103,8 @@ export const DEFAULT_CONFIG: IndicatorConfig = {
 };
 
 export const INDICATOR_COLORS: Record<IndicatorKey, string> = {
-  ema20: "#ffb74d",
-  ema50: "#2962ff",
+  ema20: "#2962ff",
+  ema50: "#ffb74d",
   ema200: "#ab47bc",
   rsi: "#ab47bc",
   macd: "#2962ff",
@@ -277,7 +277,7 @@ export const useChartStore = create<ChartState>()(
           config: { ...DEFAULT_CONFIG, ...(p.config ?? {}) },
           // Same for indicator flags — new keys default to `false`
           indicators: { ...current.indicators, ...(p.indicators ?? {}) },
-          hidden:     { ...current.hidden,     ...(p.hidden     ?? {}) },
+          hidden: { ...current.hidden, ...(p.hidden ?? {}) },
         };
       },
     },

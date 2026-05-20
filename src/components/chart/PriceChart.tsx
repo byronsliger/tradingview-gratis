@@ -270,19 +270,19 @@ export function PriceChart({ symbol, timeframe }: Props) {
 
     ema20Ref.current = chart.addSeries(LineSeries, {
       color: INDICATOR_COLORS.ema20,
-      lineWidth: 1,
+      lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
     });
     ema50Ref.current = chart.addSeries(LineSeries, {
       color: INDICATOR_COLORS.ema50,
-      lineWidth: 1,
+      lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
     });
     ema200Ref.current = chart.addSeries(LineSeries, {
       color: INDICATOR_COLORS.ema200,
-      lineWidth: 2,
+      lineWidth: 3,
       priceLineVisible: false,
       lastValueVisible: false,
     });
