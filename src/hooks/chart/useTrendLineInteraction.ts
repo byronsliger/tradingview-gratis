@@ -224,7 +224,7 @@ export function useTrendLineInteraction(
         pendingRef.current = null;
         dragRef.current = { type: "none" };
         try { container.releasePointerCapture(e.pointerId); } catch {}
-        setEditTargetRef.current(hit.id);
+        setTimeout(() => setEditTargetRef.current(hit.id), 0);
         return;
       }
       lastDownRef.current = { id: hit.id, time: now };

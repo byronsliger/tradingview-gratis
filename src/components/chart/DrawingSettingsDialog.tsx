@@ -84,7 +84,7 @@ export function DrawingSettingsDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) setDrawingEditTarget(null); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) setDrawingEditTarget(null); }} disablePointerDismissal>
       <DialogContent className="max-w-xs bg-tv-panel">
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold text-tv-text">Línea de tendencia</DialogTitle>

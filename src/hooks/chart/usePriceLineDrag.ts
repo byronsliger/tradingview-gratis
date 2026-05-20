@@ -155,7 +155,7 @@ export function usePriceLineDrag(
         pendingRef.current = null;
         draggingIdRef.current = null;
         try { container.releasePointerCapture(e.pointerId); } catch {}
-        setPriceLineEditTargetRef.current(id);
+        setTimeout(() => setPriceLineEditTargetRef.current(id), 0);
         return;
       }
       lastDownRef.current = { id, time: now };
