@@ -22,6 +22,9 @@ const TITLES: Record<IndicatorKey, string> = {
   rsi: "RSI",
   macd: "MACD",
   volume: "Volumen",
+  sqzmom: "Squeeze Momentum [LazyBear]",
+  adx: "DMI / ADX / KEYLEVEL",
+  vrvp: "Perfil de Volumen Visible (VRVP)",
 };
 
 export function IndicatorSettingsDialog() {
@@ -72,27 +75,90 @@ interface FormProps {
 }
 
 function SettingsForm({ target, config, onSave, onReset }: FormProps) {
+  const [activeTab, setActiveTab] = useState<"inputs" | "style">("inputs");
+
   // Local draft state to avoid recalculating chart on every keystroke
   const [draft, setDraft] = useState({
-    ema20: config.ema20,
-    ema50: config.ema50,
-    ema200: config.ema200,
-    rsi: config.rsi,
-    macdFast: config.macdFast,
-    macdSlow: config.macdSlow,
-    macdSignal: config.macdSignal,
+    ema20:          config.ema20          ?? DEFAULT_CONFIG.ema20,
+    ema50:          config.ema50          ?? DEFAULT_CONFIG.ema50,
+    ema200:         config.ema200         ?? DEFAULT_CONFIG.ema200,
+    rsi:            config.rsi            ?? DEFAULT_CONFIG.rsi,
+    macdFast:       config.macdFast       ?? DEFAULT_CONFIG.macdFast,
+    macdSlow:       config.macdSlow       ?? DEFAULT_CONFIG.macdSlow,
+    macdSignal:     config.macdSignal     ?? DEFAULT_CONFIG.macdSignal,
+    sqzmomBBLength: config.sqzmomBBLength ?? DEFAULT_CONFIG.sqzmomBBLength,
+    sqzmomBBMult:   config.sqzmomBBMult   ?? DEFAULT_CONFIG.sqzmomBBMult,
+    sqzmomKCLength: config.sqzmomKCLength ?? DEFAULT_CONFIG.sqzmomKCLength,
+    sqzmomKCMult:   config.sqzmomKCMult   ?? DEFAULT_CONFIG.sqzmomKCMult,
+    adxLen:           config.adxLen           ?? DEFAULT_CONFIG.adxLen,
+    adxDiLen:         config.adxDiLen         ?? DEFAULT_CONFIG.adxDiLen,
+    adxKeyLevel:      config.adxKeyLevel      ?? DEFAULT_CONFIG.adxKeyLevel,
+    adxStrengthLevel: config.adxStrengthLevel ?? DEFAULT_CONFIG.adxStrengthLevel,
+    vrvpRowLayout:        config.vrvpRowLayout        ?? DEFAULT_CONFIG.vrvpRowLayout,
+    vrvpRowSize:          config.vrvpRowSize          ?? DEFAULT_CONFIG.vrvpRowSize,
+    vrvpVolume:           config.vrvpVolume           ?? DEFAULT_CONFIG.vrvpVolume,
+    vrvpValueAreaVolume:  config.vrvpValueAreaVolume  ?? DEFAULT_CONFIG.vrvpValueAreaVolume,
+    vrvpShowProfile:      config.vrvpShowProfile      ?? DEFAULT_CONFIG.vrvpShowProfile,
+    vrvpShowValues:       config.vrvpShowValues       ?? DEFAULT_CONFIG.vrvpShowValues,
+    vrvpWidth:            config.vrvpWidth            ?? DEFAULT_CONFIG.vrvpWidth,
+    vrvpPlacement:        config.vrvpPlacement        ?? DEFAULT_CONFIG.vrvpPlacement,
+    vrvpColorUpVol:       config.vrvpColorUpVol       ?? DEFAULT_CONFIG.vrvpColorUpVol,
+    vrvpColorDnVol:       config.vrvpColorDnVol       ?? DEFAULT_CONFIG.vrvpColorDnVol,
+    vrvpColorUpVolVA:     config.vrvpColorUpVolVA     ?? DEFAULT_CONFIG.vrvpColorUpVolVA,
+    vrvpColorDnVolVA:     config.vrvpColorDnVolVA     ?? DEFAULT_CONFIG.vrvpColorDnVolVA,
+    vrvpShowVAH:          config.vrvpShowVAH          ?? DEFAULT_CONFIG.vrvpShowVAH,
+    vrvpShowVAL:          config.vrvpShowVAL          ?? DEFAULT_CONFIG.vrvpShowVAL,
+    vrvpShowPOC:          config.vrvpShowPOC          ?? DEFAULT_CONFIG.vrvpShowPOC,
+    vrvpColorPOC:         config.vrvpColorPOC         ?? DEFAULT_CONFIG.vrvpColorPOC,
+    vrvpColorVAH:         config.vrvpColorVAH         ?? DEFAULT_CONFIG.vrvpColorVAH,
+    vrvpColorVAL:         config.vrvpColorVAL         ?? DEFAULT_CONFIG.vrvpColorVAL,
+    vrvpShowLabels:       config.vrvpShowLabels       ?? DEFAULT_CONFIG.vrvpShowLabels,
+    vrvpShowStatusValues: config.vrvpShowStatusValues ?? DEFAULT_CONFIG.vrvpShowStatusValues,
+    vrvpShowStatusInputs: config.vrvpShowStatusInputs ?? DEFAULT_CONFIG.vrvpShowStatusInputs,
   });
 
   useEffect(() => {
-    setDraft({
-      ema20: config.ema20,
-      ema50: config.ema50,
-      ema200: config.ema200,
-      rsi: config.rsi,
-      macdFast: config.macdFast,
-      macdSlow: config.macdSlow,
-      macdSignal: config.macdSignal,
-    });
+    const timer = setTimeout(() => {
+      setDraft({
+        ema20:          config.ema20          ?? DEFAULT_CONFIG.ema20,
+        ema50:          config.ema50          ?? DEFAULT_CONFIG.ema50,
+        ema200:         config.ema200         ?? DEFAULT_CONFIG.ema200,
+        rsi:            config.rsi            ?? DEFAULT_CONFIG.rsi,
+        macdFast:       config.macdFast       ?? DEFAULT_CONFIG.macdFast,
+        macdSlow:       config.macdSlow       ?? DEFAULT_CONFIG.macdSlow,
+        macdSignal:     config.macdSignal     ?? DEFAULT_CONFIG.macdSignal,
+        sqzmomBBLength: config.sqzmomBBLength ?? DEFAULT_CONFIG.sqzmomBBLength,
+        sqzmomBBMult:   config.sqzmomBBMult   ?? DEFAULT_CONFIG.sqzmomBBMult,
+        sqzmomKCLength: config.sqzmomKCLength ?? DEFAULT_CONFIG.sqzmomKCLength,
+        sqzmomKCMult:   config.sqzmomKCMult   ?? DEFAULT_CONFIG.sqzmomKCMult,
+        adxLen:           config.adxLen           ?? DEFAULT_CONFIG.adxLen,
+        adxDiLen:         config.adxDiLen         ?? DEFAULT_CONFIG.adxDiLen,
+        adxKeyLevel:      config.adxKeyLevel      ?? DEFAULT_CONFIG.adxKeyLevel,
+        adxStrengthLevel: config.adxStrengthLevel ?? DEFAULT_CONFIG.adxStrengthLevel,
+        vrvpRowLayout:        config.vrvpRowLayout        ?? DEFAULT_CONFIG.vrvpRowLayout,
+        vrvpRowSize:          config.vrvpRowSize          ?? DEFAULT_CONFIG.vrvpRowSize,
+        vrvpVolume:           config.vrvpVolume           ?? DEFAULT_CONFIG.vrvpVolume,
+        vrvpValueAreaVolume:  config.vrvpValueAreaVolume  ?? DEFAULT_CONFIG.vrvpValueAreaVolume,
+        vrvpShowProfile:      config.vrvpShowProfile      ?? DEFAULT_CONFIG.vrvpShowProfile,
+        vrvpShowValues:       config.vrvpShowValues       ?? DEFAULT_CONFIG.vrvpShowValues,
+        vrvpWidth:            config.vrvpWidth            ?? DEFAULT_CONFIG.vrvpWidth,
+        vrvpPlacement:        config.vrvpPlacement        ?? DEFAULT_CONFIG.vrvpPlacement,
+        vrvpColorUpVol:       config.vrvpColorUpVol       ?? DEFAULT_CONFIG.vrvpColorUpVol,
+        vrvpColorDnVol:       config.vrvpColorDnVol       ?? DEFAULT_CONFIG.vrvpColorDnVol,
+        vrvpColorUpVolVA:     config.vrvpColorUpVolVA     ?? DEFAULT_CONFIG.vrvpColorUpVolVA,
+        vrvpColorDnVolVA:     config.vrvpColorDnVolVA     ?? DEFAULT_CONFIG.vrvpColorDnVolVA,
+        vrvpShowVAH:          config.vrvpShowVAH          ?? DEFAULT_CONFIG.vrvpShowVAH,
+        vrvpShowVAL:          config.vrvpShowVAL          ?? DEFAULT_CONFIG.vrvpShowVAL,
+        vrvpShowPOC:          config.vrvpShowPOC          ?? DEFAULT_CONFIG.vrvpShowPOC,
+        vrvpColorPOC:         config.vrvpColorPOC         ?? DEFAULT_CONFIG.vrvpColorPOC,
+        vrvpColorVAH:         config.vrvpColorVAH         ?? DEFAULT_CONFIG.vrvpColorVAH,
+        vrvpColorVAL:         config.vrvpColorVAL         ?? DEFAULT_CONFIG.vrvpColorVAL,
+        vrvpShowLabels:       config.vrvpShowLabels       ?? DEFAULT_CONFIG.vrvpShowLabels,
+        vrvpShowStatusValues: config.vrvpShowStatusValues ?? DEFAULT_CONFIG.vrvpShowStatusValues,
+        vrvpShowStatusInputs: config.vrvpShowStatusInputs ?? DEFAULT_CONFIG.vrvpShowStatusInputs,
+      });
+    }, 0);
+    return () => clearTimeout(timer);
   }, [config, target]);
 
   function save() {
@@ -107,48 +173,365 @@ function SettingsForm({ target, config, onSave, onReset }: FormProps) {
         macdSignal: clamp(draft.macdSignal, 2, 100),
       });
     else if (target === "volume") onSave({});
+    else if (target === "sqzmom")
+      onSave({
+        sqzmomBBLength: clamp(draft.sqzmomBBLength, 2, 200),
+        sqzmomBBMult:   Math.max(0.1, draft.sqzmomBBMult),
+        sqzmomKCLength: clamp(draft.sqzmomKCLength, 2, 200),
+        sqzmomKCMult:   Math.max(0.1, draft.sqzmomKCMult),
+      });
+    else if (target === "adx")
+      onSave({
+        adxLen:           clamp(draft.adxLen, 2, 200),
+        adxDiLen:         clamp(draft.adxDiLen, 2, 200),
+        adxKeyLevel:      clamp(draft.adxKeyLevel, 0, 100),
+        adxStrengthLevel: clamp(draft.adxStrengthLevel, 0, 100),
+      });
+    else if (target === "vrvp")
+      onSave({
+        vrvpRowLayout:        draft.vrvpRowLayout,
+        vrvpRowSize:          clamp(draft.vrvpRowSize, 5, 1000),
+        vrvpVolume:           draft.vrvpVolume,
+        vrvpValueAreaVolume:  clamp(draft.vrvpValueAreaVolume, 0, 100),
+        vrvpShowProfile:      draft.vrvpShowProfile,
+        vrvpShowValues:       draft.vrvpShowValues,
+        vrvpWidth:            clamp(draft.vrvpWidth, 5, 100),
+        vrvpPlacement:        draft.vrvpPlacement,
+        vrvpColorUpVol:       draft.vrvpColorUpVol,
+        vrvpColorDnVol:       draft.vrvpColorDnVol,
+        vrvpColorUpVolVA:     draft.vrvpColorUpVolVA,
+        vrvpColorDnVolVA:     draft.vrvpColorDnVolVA,
+        vrvpShowVAH:          draft.vrvpShowVAH,
+        vrvpShowVAL:          draft.vrvpShowVAL,
+        vrvpShowPOC:          draft.vrvpShowPOC,
+        vrvpColorPOC:         draft.vrvpColorPOC,
+        vrvpColorVAH:         draft.vrvpColorVAH,
+        vrvpColorVAL:         draft.vrvpColorVAL,
+        vrvpShowLabels:       draft.vrvpShowLabels,
+        vrvpShowStatusValues: draft.vrvpShowStatusValues,
+        vrvpShowStatusInputs: draft.vrvpShowStatusInputs,
+      });
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {(target === "ema20" || target === "ema50" || target === "ema200") && (
-        <Field
-          label="Período"
-          value={draft[target]}
-          onChange={(n) => setDraft((d) => ({ ...d, [target]: n }))}
-        />
-      )}
-      {target === "rsi" && (
-        <Field
-          label="Período"
-          value={draft.rsi}
-          onChange={(n) => setDraft((d) => ({ ...d, rsi: n }))}
-        />
-      )}
-      {target === "macd" && (
-        <div className="grid grid-cols-3 gap-2">
-          <Field
-            label="Rápida"
-            value={draft.macdFast}
-            onChange={(n) => setDraft((d) => ({ ...d, macdFast: n }))}
-          />
-          <Field
-            label="Lenta"
-            value={draft.macdSlow}
-            onChange={(n) => setDraft((d) => ({ ...d, macdSlow: n }))}
-          />
-          <Field
-            label="Señal"
-            value={draft.macdSignal}
-            onChange={(n) => setDraft((d) => ({ ...d, macdSignal: n }))}
-          />
+      {target === "vrvp" && (
+        <div className="flex border-b border-tv-border -mx-6 px-6 pb-2 mb-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab("inputs")}
+            className={`px-3 py-1.5 font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === "inputs"
+                ? "border-tv-blue text-tv-text"
+                : "border-transparent text-tv-text-muted hover:text-tv-text"
+            }`}
+          >
+            Valores
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("style")}
+            className={`px-3 py-1.5 font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === "style"
+                ? "border-tv-blue text-tv-text"
+                : "border-transparent text-tv-text-muted hover:text-tv-text"
+            }`}
+          >
+            Estilo
+          </button>
         </div>
       )}
-      {target === "volume" && (
-        <p className="text-xs text-tv-text-muted">
-          El indicador de volumen no tiene parámetros configurables en esta
-          versión.
-        </p>
+
+      {/* Standard Indicators */}
+      {target !== "vrvp" && (
+        <div className="flex flex-col gap-3">
+          {(target === "ema20" || target === "ema50" || target === "ema200") && (
+            <Field
+              label="Período"
+              value={draft[target]}
+              onChange={(n) => setDraft((d) => ({ ...d, [target]: n }))}
+            />
+          )}
+          {target === "rsi" && (
+            <Field
+              label="Período"
+              value={draft.rsi}
+              onChange={(n) => setDraft((d) => ({ ...d, rsi: n }))}
+            />
+          )}
+          {target === "macd" && (
+            <div className="grid grid-cols-3 gap-2">
+              <Field
+                label="Rápida"
+                value={draft.macdFast}
+                onChange={(n) => setDraft((d) => ({ ...d, macdFast: n }))}
+              />
+              <Field
+                label="Lenta"
+                value={draft.macdSlow}
+                onChange={(n) => setDraft((d) => ({ ...d, macdSlow: n }))}
+              />
+              <Field
+                label="Señal"
+                value={draft.macdSignal}
+                onChange={(n) => setDraft((d) => ({ ...d, macdSignal: n }))}
+              />
+            </div>
+          )}
+          {target === "volume" && (
+            <p className="text-xs text-tv-text-muted">
+              El indicador de volumen no tiene parámetros configurables en esta
+              versión.
+            </p>
+          )}
+          {target === "sqzmom" && (
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-2">
+                <Field
+                  label="BB Length"
+                  value={draft.sqzmomBBLength}
+                  onChange={(n) => setDraft((d) => ({ ...d, sqzmomBBLength: n }))}
+                />
+                <FieldFloat
+                  label="BB Mult"
+                  value={draft.sqzmomBBMult}
+                  onChange={(n) => setDraft((d) => ({ ...d, sqzmomBBMult: n }))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field
+                  label="KC Length"
+                  value={draft.sqzmomKCLength}
+                  onChange={(n) => setDraft((d) => ({ ...d, sqzmomKCLength: n }))}
+                />
+                <FieldFloat
+                  label="KC Mult"
+                  value={draft.sqzmomKCMult}
+                  onChange={(n) => setDraft((d) => ({ ...d, sqzmomKCMult: n }))}
+                />
+              </div>
+              <p className="text-[10px] text-tv-text-muted">
+                Basado en el indicador original de LazyBear
+              </p>
+            </div>
+          )}
+          {target === "adx" && (
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-2">
+                <Field
+                  label="DI Length"
+                  value={draft.adxDiLen}
+                  onChange={(n) => setDraft((d) => ({ ...d, adxDiLen: n }))}
+                />
+                <Field
+                  label="ADX Smoothing"
+                  value={draft.adxLen}
+                  onChange={(n) => setDraft((d) => ({ ...d, adxLen: n }))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field
+                  label="Key Level"
+                  value={draft.adxKeyLevel}
+                  onChange={(n) => setDraft((d) => ({ ...d, adxKeyLevel: n }))}
+                />
+                <Field
+                  label="Strength Level"
+                  value={draft.adxStrengthLevel}
+                  onChange={(n) => setDraft((d) => ({ ...d, adxStrengthLevel: n }))}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* VRVP - Valores Tab */}
+      {target === "vrvp" && activeTab === "inputs" && (
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted">
+              Diseño de las filas
+            </span>
+            <select
+              value={draft.vrvpRowLayout}
+              onChange={(e) =>
+                setDraft((d) => ({
+                  ...d,
+                  vrvpRowLayout: e.target.value as "rows" | "ticks",
+                }))
+              }
+              className="bg-tv-bg text-xs border border-tv-border rounded-md px-2 py-1.5 focus:outline-none focus:border-tv-blue text-tv-text"
+            >
+              <option value="rows">Tamaño de filas</option>
+              <option value="ticks">Ticks por fila</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted">
+              Tamaño de la fila
+            </span>
+            <Input
+              type="number"
+              min={5}
+              max={1000}
+              value={draft.vrvpRowSize}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (!isNaN(n)) setDraft((d) => ({ ...d, vrvpRowSize: n }));
+              }}
+              className="bg-tv-bg tabular-nums text-xs"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted">
+              Volumen
+            </span>
+            <select
+              value={draft.vrvpVolume}
+              onChange={(e) =>
+                setDraft((d) => ({
+                  ...d,
+                  vrvpVolume: e.target.value as "total" | "updown",
+                }))
+              }
+              className="bg-tv-bg text-xs border border-tv-border rounded-md px-2 py-1.5 focus:outline-none focus:border-tv-blue text-tv-text"
+            >
+              <option value="total">Total</option>
+              <option value="updown">Arriba / Abajo</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted">
+              Volumen del área de valor (%)
+            </span>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              value={draft.vrvpValueAreaVolume}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (!isNaN(n)) setDraft((d) => ({ ...d, vrvpValueAreaVolume: n }));
+              }}
+              className="bg-tv-bg tabular-nums text-xs"
+            />
+          </label>
+        </div>
+      )}
+
+      {/* VRVP - Estilo Tab */}
+      {target === "vrvp" && activeTab === "style" && (
+        <div className="flex flex-col gap-2 max-h-[280px] overflow-y-auto pr-1">
+          <div className="border-b border-tv-border pb-2 mb-1">
+            <h4 className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted mb-2">
+              Perfil de Volumen
+            </h4>
+            <ColorRow
+              label="Volumen Ascendente"
+              checked={draft.vrvpShowProfile}
+              onCheckedChange={(v) => setDraft((d) => ({ ...d, vrvpShowProfile: v }))}
+              color={draft.vrvpColorUpVol}
+              onColorChange={(c) => setDraft((d) => ({ ...d, vrvpColorUpVol: c }))}
+              defaultAlpha="44"
+            />
+            <ColorRow
+              label="Volumen Descendente"
+              checked={draft.vrvpShowProfile}
+              onCheckedChange={(v) => setDraft((d) => ({ ...d, vrvpShowProfile: v }))}
+              color={draft.vrvpColorDnVol}
+              onColorChange={(c) => setDraft((d) => ({ ...d, vrvpColorDnVol: c }))}
+              defaultAlpha="44"
+            />
+            <ColorRow
+              label="VA Ascendente"
+              checked={draft.vrvpShowProfile}
+              onCheckedChange={(v) => setDraft((d) => ({ ...d, vrvpShowProfile: v }))}
+              color={draft.vrvpColorUpVolVA}
+              onColorChange={(c) => setDraft((d) => ({ ...d, vrvpColorUpVolVA: c }))}
+              defaultAlpha="bb"
+            />
+            <ColorRow
+              label="VA Descendente"
+              checked={draft.vrvpShowProfile}
+              onCheckedChange={(v) => setDraft((d) => ({ ...d, vrvpShowProfile: v }))}
+              color={draft.vrvpColorDnVolVA}
+              onColorChange={(c) => setDraft((d) => ({ ...d, vrvpColorDnVolVA: c }))}
+              defaultAlpha="bb"
+            />
+
+            <div className="grid grid-cols-2 gap-2 mt-2 pt-1">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted">
+                  Ubicación
+                </span>
+                <select
+                  value={draft.vrvpPlacement}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      vrvpPlacement: e.target.value as "Left" | "Right",
+                    }))
+                  }
+                  className="bg-tv-bg text-xs border border-tv-border rounded-md px-2 py-1.5 focus:outline-none focus:border-tv-blue text-tv-text"
+                >
+                  <option value="Left">Izquierda</option>
+                  <option value="Right">Derecha</option>
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted">
+                  Ancho (%)
+                </span>
+                <Input
+                  type="number"
+                  min={5}
+                  max={100}
+                  value={draft.vrvpWidth}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    if (!isNaN(n)) setDraft((d) => ({ ...d, vrvpWidth: n }));
+                  }}
+                  className="bg-tv-bg tabular-nums text-xs h-8"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted mb-2">
+              Líneas del Perfil
+            </h4>
+            <ColorRow
+              label="Punto de Control (POC)"
+              checked={draft.vrvpShowPOC}
+              onCheckedChange={(v) => setDraft((d) => ({ ...d, vrvpShowPOC: v }))}
+              color={draft.vrvpColorPOC}
+              onColorChange={(c) => setDraft((d) => ({ ...d, vrvpColorPOC: c }))}
+              defaultAlpha=""
+            />
+            <ColorRow
+              label="Value Area High (VAH)"
+              checked={draft.vrvpShowVAH}
+              onCheckedChange={(v) => setDraft((d) => ({ ...d, vrvpShowVAH: v }))}
+              color={draft.vrvpColorVAH}
+              onColorChange={(c) => setDraft((d) => ({ ...d, vrvpColorVAH: c }))}
+              defaultAlpha=""
+            />
+            <ColorRow
+              label="Value Area Low (VAL)"
+              checked={draft.vrvpShowVAL}
+              onCheckedChange={(v) => setDraft((d) => ({ ...d, vrvpShowVAL: v }))}
+              color={draft.vrvpColorVAL}
+              onColorChange={(c) => setDraft((d) => ({ ...d, vrvpColorVAL: c }))}
+              defaultAlpha=""
+            />
+          </div>
+        </div>
       )}
 
       <div className="mt-2 flex items-center justify-between">
@@ -197,6 +580,92 @@ function Field({
   );
 }
 
+function FieldFloat({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted">
+        {label}
+      </span>
+      <Input
+        type="number"
+        min={0.1}
+        max={10}
+        step={0.1}
+        value={value}
+        onChange={(e) => {
+          const n = parseFloat(e.target.value);
+          if (!isNaN(n)) onChange(n);
+        }}
+        className="bg-tv-bg tabular-nums"
+      />
+    </label>
+  );
+}
+
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
+
+function ColorRow({
+  label,
+  checked,
+  onCheckedChange,
+  color,
+  onColorChange,
+  defaultAlpha = "",
+}: {
+  label: string;
+  checked?: boolean;
+  onCheckedChange?: (v: boolean) => void;
+  color: string;
+  onColorChange: (c: string) => void;
+  defaultAlpha?: string;
+}) {
+  const hex6 = color ? color.slice(0, 7) : "#ffffff";
+  return (
+    <div className="flex items-center justify-between py-1 text-xs">
+      <div className="flex items-center gap-2">
+        {onCheckedChange !== undefined && (
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => onCheckedChange(e.target.checked)}
+            className="w-3.5 h-3.5 accent-tv-blue border border-tv-border bg-tv-bg text-tv-blue focus:ring-0 cursor-pointer rounded"
+          />
+        )}
+        <span className={checked === false ? "text-tv-text-dim" : "text-tv-text font-medium"}>
+          {label}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="color"
+          value={hex6}
+          disabled={checked === false}
+          onChange={(e) => {
+            const newHex6 = e.target.value;
+            const alpha = color && color.length === 9 ? color.slice(7, 9) : defaultAlpha;
+            onColorChange(newHex6 + alpha);
+          }}
+          className="w-6 h-5 rounded cursor-pointer border border-tv-border bg-transparent p-0 disabled:opacity-40 disabled:cursor-not-allowed"
+        />
+        <input
+          type="text"
+          value={color || ""}
+          disabled={checked === false}
+          onChange={(e) => onColorChange(e.target.value)}
+          className="w-20 bg-tv-bg text-[10px] border border-tv-border rounded px-1.5 py-0.5 font-mono text-tv-text disabled:opacity-40 focus:outline-none focus:border-tv-blue"
+        />
+      </div>
+    </div>
+  );
+}
+

@@ -13,7 +13,9 @@ export function BottomPanel() {
 
   useEffect(() => {
     let cancelled = false;
-    setT(null);
+    setTimeout(() => {
+      if (!cancelled) setT(null);
+    }, 0);
     const load = () => {
       fetchTicker24h(symbol)
         .then((x) => {

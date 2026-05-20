@@ -10,7 +10,10 @@ export type IndicatorKey =
   | "ema200"
   | "rsi"
   | "macd"
-  | "volume";
+  | "volume"
+  | "sqzmom"
+  | "adx"
+  | "vrvp";
 
 export type DrawingTool = "cursor" | "hline" | "measure" | "eraser";
 
@@ -28,6 +31,35 @@ export interface IndicatorConfig {
   macdFast: number;
   macdSlow: number;
   macdSignal: number;
+  sqzmomBBLength: number;
+  sqzmomBBMult: number;
+  sqzmomKCLength: number;
+  sqzmomKCMult: number;
+  adxLen: number;
+  adxDiLen: number;
+  adxKeyLevel: number;
+  adxStrengthLevel: number;
+  vrvpRowLayout: "rows" | "ticks";
+  vrvpRowSize: number;
+  vrvpVolume: "total" | "updown";
+  vrvpValueAreaVolume: number;
+  vrvpShowProfile: boolean;
+  vrvpShowValues: boolean;
+  vrvpWidth: number;
+  vrvpPlacement: "Left" | "Right";
+  vrvpColorUpVol: string;
+  vrvpColorDnVol: string;
+  vrvpColorUpVolVA: string;
+  vrvpColorDnVolVA: string;
+  vrvpShowVAH: boolean;
+  vrvpShowVAL: boolean;
+  vrvpShowPOC: boolean;
+  vrvpColorPOC: string;
+  vrvpColorVAH: string;
+  vrvpColorVAL: string;
+  vrvpShowLabels: boolean;
+  vrvpShowStatusValues: boolean;
+  vrvpShowStatusInputs: boolean;
 }
 
 export const DEFAULT_CONFIG: IndicatorConfig = {
@@ -38,6 +70,35 @@ export const DEFAULT_CONFIG: IndicatorConfig = {
   macdFast: 12,
   macdSlow: 26,
   macdSignal: 9,
+  sqzmomBBLength: 20,
+  sqzmomBBMult: 2.0,
+  sqzmomKCLength: 20,
+  sqzmomKCMult: 1.5,
+  adxLen: 14,
+  adxDiLen: 14,
+  adxKeyLevel: 23,
+  adxStrengthLevel: 60,
+  vrvpRowLayout: "rows",
+  vrvpRowSize: 24,
+  vrvpVolume: "total",
+  vrvpValueAreaVolume: 70,
+  vrvpShowProfile: true,
+  vrvpShowValues: false,
+  vrvpWidth: 20,
+  vrvpPlacement: "Right",
+  vrvpColorUpVol: "#2962ff44",
+  vrvpColorDnVol: "#ff6d0044",
+  vrvpColorUpVolVA: "#2962ffbb",
+  vrvpColorDnVolVA: "#ff6d00bb",
+  vrvpShowVAH: false,
+  vrvpShowVAL: false,
+  vrvpShowPOC: true,
+  vrvpColorPOC: "#455a64",
+  vrvpColorVAH: "#787b86",
+  vrvpColorVAL: "#787b86",
+  vrvpShowLabels: true,
+  vrvpShowStatusValues: true,
+  vrvpShowStatusInputs: true,
 };
 
 export const INDICATOR_COLORS: Record<IndicatorKey, string> = {
@@ -47,6 +108,9 @@ export const INDICATOR_COLORS: Record<IndicatorKey, string> = {
   rsi: "#ab47bc",
   macd: "#2962ff",
   volume: "#787b86",
+  sqzmom: "#ff6d00",
+  adx: "#ffffff",
+  vrvp: "#2962ff",
 };
 
 export const DEFAULT_WATCHLIST = [
@@ -108,6 +172,9 @@ export const useChartStore = create<ChartState>()(
         rsi: true,
         macd: false,
         volume: true,
+        sqzmom: false,
+        adx: false,
+        vrvp: false,
       },
       hidden: {
         ema20: false,
@@ -116,6 +183,9 @@ export const useChartStore = create<ChartState>()(
         rsi: false,
         macd: false,
         volume: false,
+        sqzmom: false,
+        adx: false,
+        vrvp: false,
       },
       config: { ...DEFAULT_CONFIG },
       watchlist: DEFAULT_WATCHLIST,
@@ -187,6 +257,23 @@ export const useChartStore = create<ChartState>()(
         config: s.config,
         watchlist: s.watchlist,
       }),
+      /**
+       * Deep-merge persisted state into the current (default) state so that
+       * any new fields added after the user's first save always get their
+       * default values instead of coming back as `undefined`.
+       */
+      merge: (persisted, current) => {
+        const p = persisted as Partial<typeof current>;
+        return {
+          ...current,
+          ...p,
+          // Spread DEFAULT_CONFIG first so new keys are never undefined
+          config: { ...DEFAULT_CONFIG, ...(p.config ?? {}) },
+          // Same for indicator flags — new keys default to `false`
+          indicators: { ...current.indicators, ...(p.indicators ?? {}) },
+          hidden:     { ...current.hidden,     ...(p.hidden     ?? {}) },
+        };
+      },
     },
   ),
 );

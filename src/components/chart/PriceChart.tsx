@@ -11,10 +11,13 @@ import {
   type ISeriesApi,
   type IPriceLine,
   type UTCTimestamp,
+  type Time,
+  type WhitespaceData,
 } from "lightweight-charts";
 import { fetchKlines } from "@/lib/binance/rest";
 import { getBinanceWS } from "@/lib/binance/ws";
-import { ema, rsi, macd } from "@/lib/indicators";
+import { ema, rsi, macd, squeezeMomentum, adx, calculateVRVP } from "@/lib/indicators";
+import { VRVPSeriesPaneView, type VRVPBarData } from "@/lib/indicators/vrvp-series";
 import type { Candle, Timeframe } from "@/lib/binance/types";
 import {
   INDICATOR_COLORS,
@@ -84,6 +87,10 @@ interface LastValues {
   macdSignal?: number;
   macdHist?: number;
   volume?: number;
+  sqzmom?: number;
+  adx?: number;
+  plusDI?: number;
+  minusDI?: number;
 }
 
 interface PaneOffset {
@@ -105,8 +112,14 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const macdRef = useRef<ISeriesApi<"Line"> | null>(null);
   const macdSignalRef = useRef<ISeriesApi<"Line"> | null>(null);
   const macdHistRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const sqzmomHistRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const sqzmomDotRef  = useRef<ISeriesApi<"Line"> | null>(null);
+  const adxRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const adxKeyLineRef = useRef<IPriceLine | null>(null);
+  const adxStrengthLineRef = useRef<IPriceLine | null>(null);
   const candlesRef = useRef<Candle[]>([]);
   const priceLinesMapRef = useRef<Map<string, IPriceLine>>(new Map());
+  const vrvpSeriesRef = useRef<ISeriesApi<"Custom", Time, VRVPBarData | WhitespaceData<Time>> | null>(null);
 
   const indicators = useChartStore((s) => s.indicators);
   const hidden = useChartStore((s) => s.hidden);
@@ -176,6 +189,11 @@ export function PriceChart({ symbol, timeframe }: Props) {
         borderColor: TV_COLORS.border,
         textColor: TV_COLORS.textMuted,
       },
+      leftPriceScale: {
+        borderColor: TV_COLORS.border,
+        textColor: TV_COLORS.textMuted,
+        visible: false,
+      },
       timeScale: {
         borderColor: TV_COLORS.border,
         timeVisible: true,
@@ -218,6 +236,17 @@ export function PriceChart({ symbol, timeframe }: Props) {
     });
 
     chartRef.current = chart;
+
+    // Instantiate VRVP Custom Series
+    try {
+      const vrvpPaneView = new VRVPSeriesPaneView();
+      vrvpSeriesRef.current = chart.addCustomSeries(vrvpPaneView, {
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+    } catch (e) {
+      console.error("Failed to add custom VRVP series:", e);
+    }
 
     // Click handler — add horizontal price line when hline tool is active
     chart.subscribeClick((param) => {
@@ -300,7 +329,10 @@ export function PriceChart({ symbol, timeframe }: Props) {
     // Re-render measure overlay on pan / zoom so pixel coords stay in sync
     const tsRangeHandler = () => setRenderTick((t) => t + 1);
     chart.timeScale().subscribeVisibleTimeRangeChange(tsRangeHandler);
-    const logicalRangeHandler = () => setRenderTick((t) => t + 1);
+    const logicalRangeHandler = () => {
+      setRenderTick((t) => t + 1);
+      updateVRVP();
+    };
     chart.timeScale().subscribeVisibleLogicalRangeChange(logicalRangeHandler);
 
     // ResizeObserver — recompute pane offsets when chart container resizes
@@ -328,6 +360,12 @@ export function PriceChart({ symbol, timeframe }: Props) {
       macdRef.current = null;
       macdSignalRef.current = null;
       macdHistRef.current = null;
+      sqzmomHistRef.current = null;
+      sqzmomDotRef.current  = null;
+      adxRef.current = null;
+      adxKeyLineRef.current = null;
+      adxStrengthLineRef.current = null;
+      vrvpSeriesRef.current = null;
     };
   }, []);
 
@@ -468,7 +506,93 @@ export function PriceChart({ symbol, timeframe }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [indicators.macd, indicators.rsi]);
 
-  // Visibility — eye toggle (hidden state) + enabled state combined
+  // Squeeze Momentum pane
+  useEffect(() => {
+    if (!chartRef.current) return;
+    if (indicators.sqzmom && !sqzmomHistRef.current) {
+      const paneIndex = (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1;
+      const hist = chartRef.current.addSeries(
+        HistogramSeries,
+        { priceLineVisible: false, lastValueVisible: false },
+        paneIndex,
+      );
+      const dot = chartRef.current.addSeries(
+        LineSeries,
+        {
+          lineWidth: 4,
+          pointMarkersVisible: true,
+          pointMarkersRadius: 2,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          lineVisible: false,
+        },
+        paneIndex,
+      );
+      sqzmomHistRef.current = hist;
+      sqzmomDotRef.current  = dot;
+      try {
+        chartRef.current.panes()[paneIndex]?.setStretchFactor(1);
+        chartRef.current.panes()[0]?.setStretchFactor(3);
+      } catch {}
+      updateSqueezeMom();
+    } else if (!indicators.sqzmom && sqzmomHistRef.current && chartRef.current) {
+      if (sqzmomHistRef.current) chartRef.current.removeSeries(sqzmomHistRef.current);
+      if (sqzmomDotRef.current)  chartRef.current.removeSeries(sqzmomDotRef.current);
+      sqzmomHistRef.current = null;
+      sqzmomDotRef.current  = null;
+    }
+    requestAnimationFrame(() => recomputePaneOffsets());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [indicators.sqzmom, indicators.rsi, indicators.macd]);
+
+  // ADX pane
+  useEffect(() => {
+    if (!chartRef.current) return;
+    if (indicators.adx && !adxRef.current) {
+      const paneIndex = (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1;
+      
+      const aSeries = chartRef.current.addSeries(
+        LineSeries,
+        { 
+          color: TV_COLORS.text, 
+          lineWidth: 2, 
+          priceLineVisible: false, 
+          lastValueVisible: false,
+          priceScaleId: "left",
+        },
+        paneIndex,
+      );
+      adxRef.current = aSeries;
+
+      // Enable left price scale visibility for ADX and show left scale globally
+      aSeries.priceScale().applyOptions({ visible: true });
+      chartRef.current.applyOptions({
+        leftPriceScale: { visible: true },
+      });
+
+      try {
+        chartRef.current.panes()[paneIndex]?.setStretchFactor(1);
+        chartRef.current.panes()[0]?.setStretchFactor(3);
+      } catch {}
+      updateADX();
+    } else if (!indicators.adx && adxRef.current && chartRef.current) {
+      // Disable left price scale visibility when ADX is removed
+      try {
+        adxRef.current.priceScale().applyOptions({ visible: false });
+      } catch {}
+      chartRef.current.applyOptions({
+        leftPriceScale: { visible: false },
+      });
+
+      if (adxRef.current) chartRef.current.removeSeries(adxRef.current);
+      adxRef.current = null;
+      adxKeyLineRef.current = null;
+      adxStrengthLineRef.current = null;
+    }
+    requestAnimationFrame(() => recomputePaneOffsets());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [indicators.adx, indicators.rsi, indicators.macd, indicators.sqzmom]);
+
   useEffect(() => {
     const v = (key: IndicatorKey) => indicators[key] && !hidden[key];
     ema20Ref.current?.applyOptions({ visible: v("ema20") });
@@ -481,6 +605,9 @@ export function PriceChart({ symbol, timeframe }: Props) {
     if (macdSignalRef.current) macdSignalRef.current.applyOptions({ visible: v("macd") });
     if (macdHistRef.current) macdHistRef.current.applyOptions({ visible: v("macd") });
     if (volumeSeriesRef.current) volumeSeriesRef.current.applyOptions({ visible: v("volume") });
+    if (sqzmomHistRef.current) sqzmomHistRef.current.applyOptions({ visible: v("sqzmom") });
+    if (sqzmomDotRef.current)  sqzmomDotRef.current.applyOptions({  visible: v("sqzmom") });
+    if (adxRef.current) adxRef.current.applyOptions({ visible: v("adx") });
   }, [indicators, hidden]);
 
   // Recompute indicators when config changes (periods)
@@ -495,6 +622,45 @@ export function PriceChart({ symbol, timeframe }: Props) {
   useEffect(() => {
     updateMACD();
   }, [config.macdFast, config.macdSlow, config.macdSignal]);
+
+  useEffect(() => {
+    updateSqueezeMom();
+  }, [config.sqzmomBBLength, config.sqzmomBBMult, config.sqzmomKCLength, config.sqzmomKCMult]);
+
+  useEffect(() => {
+    updateADX();
+  }, [config.adxLen, config.adxDiLen, config.adxKeyLevel, config.adxStrengthLevel]);
+
+  // Sync VRVP visibility changes
+  useEffect(() => {
+    updateVRVP();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [indicators.vrvp, hidden.vrvp]);
+
+  // Sync VRVP configuration adjustments
+  useEffect(() => {
+    updateVRVP();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    config.vrvpRowLayout,
+    config.vrvpRowSize,
+    config.vrvpVolume,
+    config.vrvpValueAreaVolume,
+    config.vrvpShowProfile,
+    config.vrvpShowValues,
+    config.vrvpWidth,
+    config.vrvpPlacement,
+    config.vrvpColorUpVol,
+    config.vrvpColorDnVol,
+    config.vrvpColorUpVolVA,
+    config.vrvpColorDnVolVA,
+    config.vrvpShowVAH,
+    config.vrvpShowVAL,
+    config.vrvpShowPOC,
+    config.vrvpColorPOC,
+    config.vrvpColorVAH,
+    config.vrvpColorVAL,
+  ]);
 
   // Sync price lines from store to the candle series
   useEffect(() => {
@@ -533,7 +699,11 @@ export function PriceChart({ symbol, timeframe }: Props) {
       containerRef.current.style.cursor =
         tool === "hline" || tool === "measure" ? "crosshair" : "";
     }
-    if (tool !== "measure") setMeasure(INITIAL_MEASURE);
+    if (tool !== "measure") {
+      setTimeout(() => {
+        setMeasure(INITIAL_MEASURE);
+      }, 0);
+    }
   }, [tool]);
 
   function updateEMAs() {
@@ -624,6 +794,158 @@ export function PriceChart({ symbol, timeframe }: Props) {
     }));
   }
 
+
+  function updateSqueezeMom() {
+    const c = candlesRef.current;
+    if (c.length === 0 || !sqzmomHistRef.current) return;
+    const cfg = configRef.current;
+    const pts = squeezeMomentum(
+      c,
+      cfg.sqzmomBBLength,
+      cfg.sqzmomBBMult,
+      cfg.sqzmomKCLength,
+      cfg.sqzmomKCMult,
+    );
+
+    // Histogram bars (momentum value)
+    sqzmomHistRef.current.setData(
+      pts.map((p) => ({
+        time:  p.time as UTCTimestamp,
+        value: p.val,
+        color: p.val > 0
+          ? (pts[pts.indexOf(p) - 1]?.val ?? p.val) <= p.val
+            ? "#26a69a"   // lime  — growing positive
+            : "#1a6e65"   // green — shrinking positive
+          : (pts[pts.indexOf(p) - 1]?.val ?? p.val) >= p.val
+            ? "#ef5350"   // red    — growing negative
+            : "#9b1c1a",  // maroon — shrinking negative
+      })),
+    );
+
+    // Zero-line dots coloured by squeeze state
+    sqzmomDotRef.current?.setData(
+      pts.map((p) => ({
+        time:  p.time as UTCTimestamp,
+        value: 0,
+        color: p.noSqz ? "#2962ff" : p.sqzOn ? "#131722" : "#787b86",
+      })),
+    );
+
+    setLastValues((prev) => ({ ...prev, sqzmom: pts.at(-1)?.val }));
+  }
+
+  function updateADX() {
+    const c = candlesRef.current;
+    if (c.length === 0 || !adxRef.current) return;
+    const cfg = configRef.current;
+    const pts = adx(c, cfg.adxLen, cfg.adxDiLen);
+
+    adxRef.current.setData(
+      pts.map((p, i) => ({
+        time: p.time as UTCTimestamp,
+        value: p.adx,
+        color: i > 0 && p.adx > pts[i - 1].adx ? "#ffffff" : "#a09a9a",
+      })),
+    );
+
+    if (adxKeyLineRef.current) {
+      adxRef.current.removePriceLine(adxKeyLineRef.current);
+    }
+    adxKeyLineRef.current = adxRef.current.createPriceLine({
+      price: cfg.adxKeyLevel,
+      color: "#ffffff",
+      lineWidth: 1,
+      lineStyle: 2,
+      axisLabelVisible: false,
+      title: "Key Level",
+    });
+
+    if (adxStrengthLineRef.current) {
+      adxRef.current.removePriceLine(adxStrengthLineRef.current);
+    }
+    adxStrengthLineRef.current = adxRef.current.createPriceLine({
+      price: cfg.adxStrengthLevel,
+      color: TV_COLORS.blue,
+      lineWidth: 1,
+      lineStyle: 2,
+      axisLabelVisible: false,
+      title: "Strength Level",
+    });
+
+    const last = pts.at(-1);
+    setLastValues((prev) => ({
+      ...prev,
+      adx: last?.adx,
+      plusDI: last?.plusDI,
+      minusDI: last?.minusDI,
+    }));
+  }
+
+  function updateVRVP() {
+    if (!chartRef.current || !vrvpSeriesRef.current) return;
+
+    const showIndicator = indicators.vrvp && !hidden.vrvp;
+    if (!showIndicator) {
+      vrvpSeriesRef.current.setData([]);
+      return;
+    }
+
+    const range = chartRef.current.timeScale().getVisibleLogicalRange();
+    if (range === null || candlesRef.current.length === 0) {
+      vrvpSeriesRef.current.setData([]);
+      return;
+    }
+
+    const logicalFrom = Math.max(0, Math.floor(range.from));
+    const logicalTo = Math.min(candlesRef.current.length - 1, Math.ceil(range.to));
+
+    if (logicalFrom > logicalTo) {
+      vrvpSeriesRef.current.setData([]);
+      return;
+    }
+
+    const visibleCandles = candlesRef.current.slice(logicalFrom, logicalTo + 1);
+    if (visibleCandles.length === 0) {
+      vrvpSeriesRef.current.setData([]);
+      return;
+    }
+
+    const cfg = configRef.current;
+    const vrvpResult = calculateVRVP(
+      visibleCandles,
+      cfg.vrvpRowLayout,
+      cfg.vrvpRowSize,
+      cfg.vrvpValueAreaVolume
+    );
+
+    const lastVisibleCandle = visibleCandles[visibleCandles.length - 1];
+    if (!lastVisibleCandle) return;
+
+    vrvpSeriesRef.current.setData([
+      {
+        time: lastVisibleCandle.time as UTCTimestamp,
+        vrvp: vrvpResult,
+        rowLayout: cfg.vrvpRowLayout,
+        rowSize: cfg.vrvpRowSize,
+        valueAreaVolumePct: cfg.vrvpValueAreaVolume,
+        widthPercent: cfg.vrvpWidth,
+        placement: cfg.vrvpPlacement,
+        volumeType: cfg.vrvpVolume,
+        showProfile: cfg.vrvpShowProfile,
+        showPOC: cfg.vrvpShowPOC,
+        showVAH: cfg.vrvpShowVAH,
+        showVAL: cfg.vrvpShowVAL,
+        colorUpVol: cfg.vrvpColorUpVol,
+        colorDnVol: cfg.vrvpColorDnVol,
+        colorUpVolVA: cfg.vrvpColorUpVolVA,
+        colorDnVolVA: cfg.vrvpColorDnVolVA,
+        colorPOC: cfg.vrvpColorPOC,
+        colorVAH: cfg.vrvpColorVAH,
+        colorVAL: cfg.vrvpColorVAL,
+      }
+    ]);
+  }
+
   // Load historical data + subscribe live
   useEffect(() => {
     let unsub: (() => void) | null = null;
@@ -657,8 +979,14 @@ export function PriceChart({ symbol, timeframe }: Props) {
         updateEMAs();
         updateRSI();
         updateMACD();
+        updateSqueezeMom();
+        updateADX();
         chartRef.current?.timeScale().fitContent();
-        requestAnimationFrame(() => recomputePaneOffsets());
+        // Defer VRVP until after fitContent has set the visible range
+        requestAnimationFrame(() => {
+          updateVRVP();
+          recomputePaneOffsets();
+        });
 
         if (klines.length > 0) {
           const last = klines[klines.length - 1];
@@ -702,6 +1030,9 @@ export function PriceChart({ symbol, timeframe }: Props) {
             updateEMAs();
             updateRSI();
             updateMACD();
+            updateSqueezeMom();
+            updateADX();
+            updateVRVP();
             const prev = arr[arr.length - 2] ?? lastCandle;
             setLastPrice({
               value: k.close,
@@ -720,6 +1051,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
       cancelled = true;
       if (unsub) unsub();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol, timeframe]);
 
   const greenOrRed = (n: number) =>
@@ -733,6 +1065,9 @@ export function PriceChart({ symbol, timeframe }: Props) {
   // Determine which pane each indicator lives in (based on current layout)
   const rsiPaneIdx = 1;
   const macdPaneIdx = indicators.rsi ? 2 : 1;
+  const sqzmomAdxPaneIdx = (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1;
+  const sqzmomPaneIdx = sqzmomAdxPaneIdx;
+  const adxPaneIdx = sqzmomAdxPaneIdx;
 
   let measureRender: React.ReactNode = null;
   if (
@@ -887,6 +1222,17 @@ export function PriceChart({ symbol, timeframe }: Props) {
               onRemove={() => removeIndicator("volume")}
             />
           )}
+          {indicators.vrvp && (
+            <IndicatorPill
+              name="VRVP"
+              value={undefined}
+              color={INDICATOR_COLORS.vrvp}
+              hidden={hidden.vrvp}
+              onToggleHide={() => toggleHidden("vrvp")}
+              onSettings={() => setSettingsTarget("vrvp")}
+              onRemove={() => removeIndicator("vrvp")}
+            />
+          )}
         </div>
       </div>
 
@@ -926,6 +1272,50 @@ export function PriceChart({ symbol, timeframe }: Props) {
             onToggleHide={() => toggleHidden("macd")}
             onSettings={() => setSettingsTarget("macd")}
             onRemove={() => removeIndicator("macd")}
+          />
+        </div>
+      )}
+
+      {/* Squeeze Momentum pane label */}
+      {indicators.sqzmom && paneOffsets[sqzmomPaneIdx] && (
+        <div
+          style={{ top: paneOffsets[sqzmomPaneIdx].top + 6, left: 12 }}
+          className="pointer-events-none absolute z-10"
+        >
+          <IndicatorPill
+            name={`SQZ MOM (${config.sqzmomBBLength}, ${config.sqzmomKCLength})`}
+            value={
+              lastValues.sqzmom !== undefined
+                ? lastValues.sqzmom.toFixed(4)
+                : undefined
+            }
+            color={INDICATOR_COLORS.sqzmom}
+            hidden={hidden.sqzmom}
+            onToggleHide={() => toggleHidden("sqzmom")}
+            onSettings={() => setSettingsTarget("sqzmom")}
+            onRemove={() => removeIndicator("sqzmom")}
+          />
+        </div>
+      )}
+
+      {/* ADX pane label */}
+      {indicators.adx && paneOffsets[adxPaneIdx] && (
+        <div
+          style={{ top: paneOffsets[adxPaneIdx].top + (indicators.sqzmom ? 28 : 6), left: 12 }}
+          className="pointer-events-none absolute z-10"
+        >
+          <IndicatorPill
+            name={`DMI/ADX (${config.adxDiLen}, ${config.adxLen})`}
+            value={
+              lastValues.adx !== undefined
+                ? lastValues.adx.toFixed(2)
+                : undefined
+            }
+            color={INDICATOR_COLORS.adx}
+            hidden={hidden.adx}
+            onToggleHide={() => toggleHidden("adx")}
+            onSettings={() => setSettingsTarget("adx")}
+            onRemove={() => removeIndicator("adx")}
           />
         </div>
       )}

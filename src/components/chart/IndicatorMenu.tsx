@@ -22,6 +22,10 @@ interface Entry {
     macdFast: number;
     macdSlow: number;
     macdSignal: number;
+    sqzmomBBLength: number;
+    sqzmomKCLength: number;
+    adxLen: number;
+    adxDiLen: number;
   }) => string;
   group: string;
 }
@@ -31,11 +35,22 @@ const ENTRIES: Entry[] = [
   { key: "ema50", group: "Medias móviles", label: (c) => `EMA ${c.ema50}` },
   { key: "ema200", group: "Medias móviles", label: (c) => `EMA ${c.ema200}` },
   { key: "volume", group: "Volumen", label: () => "Volumen" },
+  { key: "vrvp", group: "Volumen", label: () => "Vol. Profile Visible Range (VRVP)" },
   { key: "rsi", group: "Osciladores", label: (c) => `RSI (${c.rsi})` },
   {
     key: "macd",
     group: "Osciladores",
     label: (c) => `MACD (${c.macdFast}, ${c.macdSlow}, ${c.macdSignal})`,
+  },
+  {
+    key: "sqzmom",
+    group: "Osciladores",
+    label: (c) => `Squeeze Mom (${c.sqzmomBBLength}, ${c.sqzmomKCLength})`,
+  },
+  {
+    key: "adx",
+    group: "Osciladores",
+    label: (c) => `DMI/ADX (${c.adxDiLen}, ${c.adxLen})`,
   },
 ];
 
