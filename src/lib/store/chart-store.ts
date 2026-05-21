@@ -91,15 +91,15 @@ export interface IndicatorConfig {
 }
 
 export const DEFAULT_CONFIG: IndicatorConfig = {
-  ema20: 20,
-  ema50: 50,
+  ema20: 10,
+  ema50: 55,
   ema200: 200,
   rsi: 14,
   macdFast: 12,
   macdSlow: 26,
   macdSignal: 9,
   sqzmomBBLength: 20,
-  sqzmomBBMult: 2.0,
+  sqzmomBBMult: 2,
   sqzmomKCLength: 20,
   sqzmomKCMult: 1.5,
   adxLen: 14,
@@ -126,12 +126,12 @@ export const DEFAULT_CONFIG: IndicatorConfig = {
   adxColorKeyLevel: "#13172266",
   adxColorStrength: "#2962ff",
   vrvpRowLayout: "rows",
-  vrvpRowSize: 24,
+  vrvpRowSize: 1000,
   vrvpVolume: "total",
-  vrvpValueAreaVolume: 70,
+  vrvpValueAreaVolume: 100,
   vrvpShowProfile: true,
   vrvpShowValues: false,
-  vrvpWidth: 20,
+  vrvpWidth: 15,
   vrvpPlacement: "Right",
   vrvpColorUpVol: "#2962ff44",
   vrvpColorDnVol: "#ff6d0044",
@@ -140,7 +140,7 @@ export const DEFAULT_CONFIG: IndicatorConfig = {
   vrvpShowVAH: false,
   vrvpShowVAL: false,
   vrvpShowPOC: true,
-  vrvpColorPOC: "#455a64",
+  vrvpColorPOC: "#000000",
   vrvpColorVAH: "#787b86",
   vrvpColorVAL: "#787b86",
   vrvpShowLabels: true,
@@ -177,6 +177,7 @@ interface ChartState {
   symbol: string;
   timeframe: Timeframe;
   theme: Theme;
+  initialZoom: number;
   /** Indicator is added to the chart (appears in pill + renders unless hidden) */
   indicators: Record<IndicatorKey, boolean>;
   /** Indicator is hidden (eye icon off) — kept in pill list, just not rendered */
@@ -203,6 +204,7 @@ interface ChartState {
   setSymbol: (s: string) => void;
   setTimeframe: (t: Timeframe) => void;
   setTheme: (t: Theme) => void;
+  setInitialZoom: (z: number) => void;
   toggleIndicator: (key: IndicatorKey) => void;
   removeIndicator: (key: IndicatorKey) => void;
   toggleHidden: (key: IndicatorKey) => void;
@@ -232,18 +234,19 @@ export const useChartStore = create<ChartState>()(
   persist(
     (set) => ({
       symbol: "BTCUSDT",
-      timeframe: "15m" as Timeframe,
-      theme: "dark" as Theme,
+      timeframe: "4h" as Timeframe,
+      theme: "light" as Theme,
+      initialZoom: 40,
       indicators: {
         ema20: true,
         ema50: true,
         ema200: false,
-        rsi: true,
+        rsi: false,
         macd: false,
-        volume: true,
-        sqzmom: false,
-        adx: false,
-        vrvp: false,
+        volume: false,
+        sqzmom: true,
+        adx: true,
+        vrvp: true,
       },
       hidden: {
         ema20: false,
@@ -272,6 +275,7 @@ export const useChartStore = create<ChartState>()(
       setSymbol: (symbol) => set({ symbol }),
       setTimeframe: (timeframe) => set({ timeframe }),
       setTheme: (theme) => set({ theme }),
+      setInitialZoom: (initialZoom) => set({ initialZoom }),
       toggleIndicator: (key) =>
         set((s) => ({
           indicators: { ...s.indicators, [key]: !s.indicators[key] },
@@ -362,6 +366,7 @@ export const useChartStore = create<ChartState>()(
         symbol: s.symbol,
         timeframe: s.timeframe,
         theme: s.theme,
+        initialZoom: s.initialZoom,
         indicators: s.indicators,
         hidden: s.hidden,
         config: s.config,

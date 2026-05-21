@@ -87,17 +87,30 @@ export function useKlineData(
     }
   }, [chartRef, candlesRef]);
 
-  // Subscribe to logical range for lazy loading
+  // Subscribe to logical range for lazy loading and zoom saving
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!chartRef.current) return;
     const chart = chartRef.current;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
     const handler = () => {
       const range = chart.timeScale().getVisibleLogicalRange();
-      if (range && range.from < 10) loadMoreHistory();
+      if (!range) return;
+      if (range.from < 10) loadMoreHistory();
+
+      // Debounce saving zoom state
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const visibleBars = Math.max(10, Math.round(range.to - range.from));
+        useChartStore.getState().setInitialZoom(visibleBars);
+      }, 500);
     };
     chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
-    return () => chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
+    return () => {
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
+      clearTimeout(timeoutId);
+    };
   }, [loadMoreHistory]);
 
   // Load initial data and subscribe WS
@@ -133,10 +146,10 @@ export function useKlineData(
         updateSQZ();
         updateADX();
 
-        // Auto-zoom to last 30% of loaded candles
+        // Auto-zoom based on user preference
         if (chartRef.current && klines.length > 0) {
-          const visible = Math.round(klines.length * 0.3);
           const storeState = useChartStore.getState();
+          const visible = Math.min(klines.length, storeState.initialZoom);
           const vrvpActive = storeState.indicators.vrvp && !storeState.hidden.vrvp && storeState.config.vrvpPlacement === "Right";
           const pct = Math.max(0.05, Math.min(0.5, storeState.config.vrvpWidth / 100));
           const extraBars = vrvpActive ? Math.ceil((visible * pct) / (1 - pct)) : 0;
