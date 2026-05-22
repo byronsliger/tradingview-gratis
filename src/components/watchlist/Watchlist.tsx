@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, PanelRightClose } from "lucide-react";
 import { fetchTickers24h } from "@/lib/binance/rest";
 import { getBinanceWS } from "@/lib/binance/ws";
 import { useChartStore } from "@/lib/store/chart-store";
@@ -21,6 +21,7 @@ export function Watchlist() {
   const setSymbol = useChartStore((s) => s.setSymbol);
   const removeFromWatchlist = useChartStore((s) => s.removeFromWatchlist);
   const openSymbolDialog = useChartStore((s) => s.setSymbolDialogOpen);
+  const toggleWatchlistCollapsed = useChartStore((s) => s.toggleWatchlistCollapsed);
   const [rows, setRows] = useState<Record<string, Row>>({});
   const [flash, setFlash] = useState<Record<string, "up" | "down" | null>>({});
 
@@ -87,14 +88,24 @@ export function Watchlist() {
         <h2 className="text-[11px] font-semibold uppercase tracking-wider text-tv-text-muted">
           Watchlist
         </h2>
-        <button
-          onClick={() => openSymbolDialog(true)}
-          className="rounded p-1 text-tv-text-muted hover:bg-tv-panel-hover hover:text-tv-text"
-          title="Agregar símbolo"
-          aria-label="Agregar al watchlist"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => openSymbolDialog(true)}
+            className="rounded p-1 text-tv-text-muted hover:bg-tv-panel-hover hover:text-tv-text"
+            title="Agregar símbolo"
+            aria-label="Agregar al watchlist"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            onClick={toggleWatchlistCollapsed}
+            className="rounded p-1 text-tv-text-muted hover:bg-tv-panel-hover hover:text-tv-text"
+            title="Ocultar Watchlist"
+            aria-label="Ocultar Watchlist"
+          >
+            <PanelRightClose className="h-4 w-4" />
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-tv-border px-3 py-1.5 text-[10px] uppercase tracking-wider text-tv-text-dim">
         <span>Símbolo</span>

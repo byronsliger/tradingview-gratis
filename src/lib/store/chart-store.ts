@@ -199,6 +199,7 @@ interface ChartState {
   selectedDrawingId: string | null;
   /** Shared collapsed state for both ChartLegend and SubPaneLegend */
   legendCollapsed: boolean;
+  watchlistCollapsed: boolean;
 
   // Actions
   setSymbol: (s: string) => void;
@@ -228,15 +229,16 @@ interface ChartState {
   setDrawingEditTarget: (id: string | null) => void;
   setSelectedDrawingId: (id: string | null) => void;
   toggleLegendCollapsed: () => void;
+  toggleWatchlistCollapsed: () => void;
 }
 
 export const useChartStore = create<ChartState>()(
   persist(
     (set) => ({
       symbol: "BTCUSDT",
-      timeframe: "4h" as Timeframe,
+      timeframe: "1d" as Timeframe,
       theme: "light" as Theme,
-      initialZoom: 40,
+      initialZoom: 105,
       indicators: {
         ema20: true,
         ema50: true,
@@ -271,6 +273,7 @@ export const useChartStore = create<ChartState>()(
       drawingEditTarget: null,
       selectedDrawingId: null,
       legendCollapsed: true,
+      watchlistCollapsed: true,
 
       setSymbol: (symbol) => set({ symbol }),
       setTimeframe: (timeframe) => set({ timeframe }),
@@ -359,6 +362,7 @@ export const useChartStore = create<ChartState>()(
       setDrawingEditTarget: (drawingEditTarget) => set({ drawingEditTarget }),
       setSelectedDrawingId: (selectedDrawingId) => set({ selectedDrawingId }),
       toggleLegendCollapsed: () => set((s) => ({ legendCollapsed: !s.legendCollapsed })),
+      toggleWatchlistCollapsed: () => set((s) => ({ watchlistCollapsed: !s.watchlistCollapsed })),
     }),
     {
       name: "tv-gratis-chart-state",
@@ -374,6 +378,7 @@ export const useChartStore = create<ChartState>()(
         priceLines: s.priceLines,
         drawings: s.drawings,
         legendCollapsed: s.legendCollapsed,
+        watchlistCollapsed: s.watchlistCollapsed,
       }),
       /**
        * Deep-merge persisted state into the current (default) state so that
