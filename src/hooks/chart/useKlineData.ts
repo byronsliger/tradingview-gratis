@@ -149,16 +149,15 @@ export function useKlineData(
         // Auto-zoom based on user preference
         if (chartRef.current && klines.length > 0) {
           const storeState = useChartStore.getState();
-          const visible = Math.min(klines.length, storeState.initialZoom);
+          const zoom = storeState.initialZoom;
           const vrvpActive = storeState.indicators.vrvp && !storeState.hidden.vrvp && storeState.config.vrvpPlacement === "Right";
           const pct = Math.max(0.05, Math.min(0.5, storeState.config.vrvpWidth / 100));
-          const extraBars = vrvpActive ? Math.ceil((visible * pct) / (1 - pct)) : 0;
+          const extraBars = vrvpActive ? Math.ceil(zoom * pct) : 0;
           const rightOffset = 12 + extraBars;
           chartRef.current.applyOptions({ timeScale: { rightOffset } });
-          chartRef.current.timeScale().setVisibleLogicalRange({
-            from: klines.length - visible,
-            to: klines.length - 1 + rightOffset,
-          });
+          const to = klines.length - 1 + rightOffset;
+          const from = to - zoom;
+          chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
         }
 
         requestAnimationFrame(() => {
