@@ -4,7 +4,7 @@ import { useChartStore } from "@/lib/store/chart-store";
 import type { Timeframe } from "@/lib/binance/types";
 import { cn } from "@/lib/utils";
 
-const TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"];
+const TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"];
 
 export function TimeframeSelector() {
   const tf = useChartStore((s) => s.timeframe);
