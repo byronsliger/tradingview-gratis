@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useChartStore } from "@/lib/store/chart-store";
+import { roundPrice } from "@/lib/format";
 import type { TrendLineDrawing, RectangleDrawing } from "@/lib/drawings/types";
 import type { TrendLineDefaults, RectangleDefaults } from "@/lib/store/chart-store";
 
@@ -62,8 +63,8 @@ function TrendLineSettings({ drawing, onSave, onDelete, onClose }: {
         lineStyle: drawing.lineStyle,
         extendLeft: drawing.extendLeft,
         extendRight: drawing.extendRight,
-        priceA: drawing.a.price,
-        priceB: drawing.b.price,
+        priceA: roundPrice(drawing.a.price),
+        priceB: roundPrice(drawing.b.price),
       });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -221,8 +222,8 @@ function RectangleSettings({ drawing, onSave, onDelete, onClose }: {
         fillVisible: drawing.fillVisible,
         fillColor: fc.slice(0, 7),
         fillAlpha: Math.round(parseInt(fc.slice(7, 9) || "22", 16) / 255 * 100),
-        priceTop: top,
-        priceBottom: bot,
+        priceTop: roundPrice(top),
+        priceBottom: roundPrice(bot),
         timeLeft: Math.min(drawing.a.time, drawing.b.time),
         timeRight: Math.max(drawing.a.time, drawing.b.time),
       });

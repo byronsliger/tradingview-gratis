@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useChartStore } from "@/lib/store/chart-store";
+import { roundPrice } from "@/lib/format";
 
 type Tab = "estilo" | "coordenadas";
 
@@ -62,7 +63,7 @@ export function PriceLineSettingsDialog() {
           lineWidth: (line.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           lineStyle: line.lineStyle ?? 2,
           axisLabelVisible: line.axisLabelVisible ?? true,
-          price: line.price,
+          price: roundPrice(line.price),
         });
       });
     }

@@ -15,6 +15,7 @@ import {
 } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import { ema } from "@/lib/indicators";
+import { formatPrice } from "@/lib/format";
 
 export function useCandleSeries(
   chartRef: RefObject<IChartApi | null>,
@@ -50,6 +51,11 @@ export function useCandleSeries(
       wickDownColor: c.red,
       priceLineColor: c.textMuted,
       priceLineStyle: 2,
+      priceFormat: {
+        type: "custom",
+        minMove: 0.00000001,
+        formatter: (price: number) => formatPrice(price),
+      },
     });
     cs.priceScale().applyOptions({ scaleMargins: { top: 0.05, bottom: 0.06 } });
     candleSeriesRef.current = cs;

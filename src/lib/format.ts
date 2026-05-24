@@ -6,6 +6,15 @@ export function formatPrice(n: number): string {
   return n.toFixed(6);
 }
 
+export function roundPrice(n: number): number {
+  if (!isFinite(n)) return 0;
+  const abs = Math.abs(n);
+  if (abs >= 1000) return Number(n.toFixed(2));
+  if (abs >= 1) return Number(n.toFixed(4));
+  if (abs >= 0.01) return Number(n.toFixed(6));
+  return Number(n.toFixed(8));
+}
+
 export function formatPct(n: number): string {
   if (!isFinite(n)) return "—";
   const sign = n >= 0 ? "+" : "";
