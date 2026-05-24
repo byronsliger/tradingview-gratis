@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Pencil,
   X,
@@ -9,15 +9,17 @@ import {
   Slash,
   RectangleHorizontal,
   Moon,
-  Plus,
   MoreHorizontal,
   Search,
   Trash2,
 } from "lucide-react";
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
-import type { Timeframe } from "@/lib/binance/types";
+import type { Timeframe, SymbolInfo } from "@/lib/binance/types";
+import { fetchExchangeSymbols } from "@/lib/binance/rest";
 import { IndicatorMenu, ENTRIES } from "@/components/chart/IndicatorMenu";
 import { Watchlist } from "@/components/watchlist/Watchlist";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Check, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +32,7 @@ const DRAWING_TOOLS: { key: DrawingTool; icon: any; label: string }[] = [
   { key: "rectangle", icon: RectangleHorizontal, label: "Rectángulo" },
 ];
 
-type SheetType = "timeframe" | "drawings" | "more" | "watchlist" | "indicators" | null;
+type SheetType = "timeframe" | "drawings" | "more" | "watchlist" | "indicators" | "search" | null;
 
 export function MobileChartTools() {
   const [activeSheet, setActiveSheet] = useState<SheetType>(null);
@@ -49,12 +51,31 @@ export function MobileChartTools() {
   const setTheme = useChartStore((s) => s.setTheme);
 
   const symbol = useChartStore((s) => s.symbol);
+  const setSymbol = useChartStore((s) => s.setSymbol);
   const setSymbolDialogOpen = useChartStore((s) => s.setSymbolDialogOpen);
+
+  const [allSymbols, setAllSymbols] = useState<SymbolInfo[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const indicators = useChartStore((s) => s.indicators);
   const config = useChartStore((s) => s.config);
   const toggleIndicator = useChartStore((s) => s.toggleIndicator);
   const clearDrawings = useChartStore((s) => s.clearDrawings);
   const clearPriceLines = useChartStore((s) => s.clearPriceLines);
+
+  useEffect(() => {
+    if (activeSheet === "search" && allSymbols.length === 0) {
+      fetchExchangeSymbols().then(setAllSymbols).catch(console.error);
+    }
+    if (activeSheet !== "search") setSearchQuery("");
+  }, [activeSheet, allSymbols.length]);
+
+  const filteredSymbols = useMemo(() => {
+    const q = searchQuery.trim().toUpperCase();
+    if (!q) return allSymbols.slice(0, 100);
+    return allSymbols
+      .filter((s) => s.symbol.includes(q) || s.baseAsset.includes(q) || s.quoteAsset.includes(q))
+      .slice(0, 100);
+  }, [searchQuery, allSymbols]);
 
   // Close sheet when symbol changes
   const [prevSymbol, setPrevSymbol] = useState(symbol);
@@ -83,10 +104,11 @@ export function MobileChartTools() {
       <div
         className={cn(
           "fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl border-t border-tv-border bg-tv-panel shadow-2xl transition-transform duration-300 ease-out md:hidden",
-          activeSheet ? "translate-y-0" : "translate-y-full"
+          activeSheet ? "translate-y-0" : "translate-y-full",
+          (renderedSheet === "watchlist" || renderedSheet === "search") && "h-[80vh]"
         )}
       >
-        {renderedSheet !== "watchlist" && (
+        {renderedSheet !== "watchlist" && renderedSheet !== "search" && (
           <div className="flex items-center justify-between border-b border-tv-border px-3 py-2.5">
             <h3 className="text-sm font-semibold text-tv-text">
               {renderedSheet === "timeframe" && "Temporalidad"}
@@ -103,7 +125,7 @@ export function MobileChartTools() {
           </div>
         )}
 
-        <div className={cn("p-3 pb-safe", renderedSheet === "watchlist" && "p-0")}>
+        <div className={cn("p-3 pb-safe", (renderedSheet === "watchlist" || renderedSheet === "search") && "p-0 flex-1 min-h-0 flex flex-col")}>
           {renderedSheet === "timeframe" && (
             <div className="grid grid-cols-4 gap-2">
               {TIMEFRAMES.map((t) => (
@@ -188,8 +210,54 @@ export function MobileChartTools() {
             </div>
           )}
 
+          {renderedSheet === "search" && (
+            <div className="flex flex-col flex-1 min-h-0 overflow-hidden rounded-t-2xl">
+              <div className="flex items-center justify-between border-b border-tv-border px-3 py-2.5 shrink-0">
+                <h3 className="text-sm font-semibold text-tv-text">Buscar símbolo</h3>
+                <button
+                  onClick={closeSheet}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-tv-bg text-tv-text-muted hover:text-tv-text"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="border-b border-tv-border p-3 shrink-0">
+                <Input
+                  autoFocus
+                  placeholder="BTC, ETH, SOL…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-tv-bg"
+                />
+              </div>
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="flex flex-col pb-safe">
+                  {filteredSymbols.length === 0 && (
+                    <div className="p-4 text-center text-xs text-tv-text-muted">Sin resultados</div>
+                  )}
+                  {filteredSymbols.map((s) => (
+                    <button
+                      key={s.symbol}
+                      onClick={() => { setSymbol(s.symbol); closeSheet(); }}
+                      className={cn(
+                        "flex cursor-pointer items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-tv-panel-hover",
+                        s.symbol === symbol && "bg-tv-panel-hover",
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-tv-text">{s.baseAsset}</span>
+                        <span className="text-[10px] text-tv-text-dim">{s.quoteAsset}</span>
+                      </div>
+                      <span className="text-tv-text-muted">{s.symbol}</span>
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
           {renderedSheet === "watchlist" && (
-            <div className="h-[80vh] flex flex-col overflow-hidden bg-tv-panel">
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-tv-panel">
               <Watchlist onClose={closeSheet} />
             </div>
           )}
@@ -271,7 +339,7 @@ export function MobileChartTools() {
             <Pencil className="h-4 w-4" />
           </button>
           <button
-            onClick={() => setSymbolDialogOpen(true, "search")}
+            onClick={() => setActiveSheet("search")}
             className="flex h-8 w-8 items-center justify-center rounded-md text-tv-text hover:bg-tv-panel-hover"
           >
             <Search className="h-4 w-4" />

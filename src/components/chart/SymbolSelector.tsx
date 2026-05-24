@@ -28,8 +28,11 @@ export function SymbolSelector() {
   const [allSymbols, setAllSymbols] = useState<SymbolInfo[]>([]);
 
   useEffect(() => {
-    if (open && allSymbols.length === 0) {
-      fetchExchangeSymbols().then(setAllSymbols).catch(console.error);
+    if (open) {
+      setQuery("");
+      if (allSymbols.length === 0) {
+        fetchExchangeSymbols().then(setAllSymbols).catch(console.error);
+      }
     }
   }, [open, allSymbols.length]);
 
@@ -47,7 +50,7 @@ export function SymbolSelector() {
   }, [query, allSymbols]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => setOpen(v)}>
       <DialogTrigger className="group flex items-center gap-2 rounded px-3 py-1.5 text-sm font-semibold hover:bg-tv-panel-hover">
         <Search className="h-3.5 w-3.5 text-tv-text-muted group-hover:text-tv-text" />
         <span className="tabular-nums">{symbol}</span>
@@ -90,7 +93,6 @@ export function SymbolSelector() {
                     addToWatchlist(s.symbol);
                   }
                   setOpen(false);
-                  setQuery("");
                 }}
                 className={cn(
                   "flex cursor-pointer items-center justify-between px-3 py-1.5 text-left text-xs transition-colors hover:bg-tv-panel-hover",
