@@ -85,6 +85,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
     ema20: 0,
     ema50: 0,
     ema200: 0,
+    volume: 0,
     vrvp: 0,
     rsi: rsiPaneIdx,
     macd: macdPaneIdx,
