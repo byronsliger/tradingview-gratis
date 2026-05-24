@@ -9,7 +9,7 @@ export function RightSidebar() {
   const toggle = useChartStore((s) => s.toggleWatchlistCollapsed);
 
   return (
-    <div className="flex h-full">
+    <div className="hidden h-full md:flex">
       {!collapsed ? (
         <aside className="flex w-64 flex-shrink-0 flex-col border-l border-tv-border bg-tv-panel">
           <Watchlist />

@@ -152,8 +152,18 @@ export function useKlineData(
           const zoom = storeState.initialZoom;
           const vrvpActive = storeState.indicators.vrvp && !storeState.hidden.vrvp && storeState.config.vrvpPlacement === "Right";
           const pct = Math.max(0.05, Math.min(0.5, storeState.config.vrvpWidth / 100));
-          const extraBars = vrvpActive ? Math.ceil(zoom * pct) : 0;
-          const rightOffset = 12 + extraBars;
+          const isMobile = window.innerWidth < 768;
+
+          let rightOffset = 0;
+          if (vrvpActive) {
+            // Initial math: exactly pct of the intended initial zoom
+            const extraBars = Math.ceil(zoom * pct);
+            const padding = isMobile ? 0 : 2;
+            rightOffset = extraBars + padding;
+          } else {
+            rightOffset = isMobile ? 1 : 4;
+          }
+
           chartRef.current.applyOptions({ timeScale: { rightOffset } });
           const to = klines.length - 1 + rightOffset;
           const from = to - zoom;

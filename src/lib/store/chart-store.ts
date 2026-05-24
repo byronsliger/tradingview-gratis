@@ -200,6 +200,7 @@ interface ChartState {
   /** Shared collapsed state for both ChartLegend and SubPaneLegend */
   legendCollapsed: boolean;
   watchlistCollapsed: boolean;
+  mobileTab: "chart" | "watchlist";
 
   // Actions
   setSymbol: (s: string) => void;
@@ -230,6 +231,7 @@ interface ChartState {
   setSelectedDrawingId: (id: string | null) => void;
   toggleLegendCollapsed: () => void;
   toggleWatchlistCollapsed: () => void;
+  setMobileTab: (tab: "chart" | "watchlist") => void;
 }
 
 export const useChartStore = create<ChartState>()(
@@ -274,6 +276,7 @@ export const useChartStore = create<ChartState>()(
       selectedDrawingId: null,
       legendCollapsed: true,
       watchlistCollapsed: true,
+      mobileTab: "chart",
 
       setSymbol: (symbol) => set({ symbol }),
       setTimeframe: (timeframe) => set({ timeframe }),
@@ -363,6 +366,7 @@ export const useChartStore = create<ChartState>()(
       setSelectedDrawingId: (selectedDrawingId) => set({ selectedDrawingId }),
       toggleLegendCollapsed: () => set((s) => ({ legendCollapsed: !s.legendCollapsed })),
       toggleWatchlistCollapsed: () => set((s) => ({ watchlistCollapsed: !s.watchlistCollapsed })),
+      setMobileTab: (mobileTab) => set({ mobileTab }),
     }),
     {
       name: "tv-gratis-chart-state",
@@ -379,6 +383,7 @@ export const useChartStore = create<ChartState>()(
         drawings: s.drawings,
         legendCollapsed: s.legendCollapsed,
         watchlistCollapsed: s.watchlistCollapsed,
+        mobileTab: s.mobileTab,
       }),
       /**
        * Deep-merge persisted state into the current (default) state so that

@@ -82,13 +82,13 @@ export function useADXPane(
         paneIndex,
       );
       adxRef.current = aSeries;
-      aSeries.priceScale().applyOptions({ visible: true, scaleMargins: { top: 0.1, bottom: 0.1 } });
-      chart.applyOptions({ leftPriceScale: { visible: true } });
+      // Keep the series scale active, but hide the global left scale so it doesn't take up width
+      aSeries.priceScale().applyOptions({ visible: false, scaleMargins: { top: 0.1, bottom: 0.1 } });
+      chart.applyOptions({ leftPriceScale: { visible: false } });
       try { chart.panes()[paneIndex]?.setStretchFactor(1); chart.panes()[0]?.setStretchFactor(3); } catch {}
       updateADX();
     } else if (!indicators.adx && adxRef.current && chartRef.current) {
       try { adxRef.current.priceScale().applyOptions({ visible: false }); } catch {}
-      chartRef.current.applyOptions({ leftPriceScale: { visible: false } });
       chartRef.current.removeSeries(adxRef.current);
       adxRef.current = null;
       adxKeyLineRef.current = null;

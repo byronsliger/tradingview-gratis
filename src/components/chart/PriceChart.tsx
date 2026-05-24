@@ -103,7 +103,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
     minusDI: lastMinusDI,
   };
 
-  const leftOffset = indicators.adx ? 64 : 12;
+  const leftOffset = 12;
   const mainPaneTop = paneOffsets[0]?.top ?? 0;
 
   return (

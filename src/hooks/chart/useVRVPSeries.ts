@@ -10,7 +10,7 @@ import {
 } from "lightweight-charts";
 import { VRVPSeriesPaneView, type VRVPBarData } from "@/lib/indicators/vrvp-series";
 import { calculateVRVP } from "@/lib/indicators";
-import { type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
+import { type IndicatorConfig, type IndicatorKey, useChartStore } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 
 export function useVRVPSeries(
@@ -101,16 +101,48 @@ export function useVRVPSeries(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!chartRef.current) return;
-    const active = indicators.vrvp && !hidden.vrvp && config.vrvpPlacement === "Right";
-    if (active) {
-      const range = chartRef.current.timeScale().getVisibleLogicalRange();
-      const visible = range ? Math.max(50, range.to - range.from) : 300;
+    const chart = chartRef.current;
+
+    const handler = () => {
+      const active = indicators.vrvp && !hidden.vrvp && config.vrvpPlacement === "Right";
+      const currentOffset = chart.options().timeScale.rightOffset;
+
+      if (!active) {
+        const isMobile = window.innerWidth < 768;
+        const defaultOffset = isMobile ? 1 : 4;
+        // Only apply if different to avoid blocking pan interactions
+        if (Math.abs(currentOffset - defaultOffset) > 0.1) {
+          chart.applyOptions({ timeScale: { rightOffset: defaultOffset } });
+        }
+        return;
+      }
+
+      const range = chart.timeScale().getVisibleLogicalRange();
+      if (!range) return;
+
+      const visibleBars = range.to - range.from;
       const pct = Math.max(0.05, Math.min(0.5, config.vrvpWidth / 100));
-      const extraBars = Math.ceil((visible * pct) / (1 - pct));
-      chartRef.current.applyOptions({ timeScale: { rightOffset: 12 + extraBars } });
-    } else {
-      chartRef.current.applyOptions({ timeScale: { rightOffset: 12 } });
-    }
+      const isMobile = window.innerWidth < 768;
+      // Correct math: rightOffset should be exactly pct of the total visible viewport bars.
+      const extraBars = Math.ceil(visibleBars * pct);
+
+      // Gap padding to prevent candles from sticking completely to the VRVP
+      const padding = isMobile ? 0 : 2; 
+      const newOffset = extraBars + padding;
+
+      // Only apply if the difference is significant (e.g. > 1 bar) to avoid infinite loops and micro-jitters
+      if (Math.abs(currentOffset - newOffset) > 1) {
+        chart.applyOptions({ timeScale: { rightOffset: newOffset } });
+      }
+    };
+
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
+    // Initial application
+    handler();
+
+    return () => {
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
+    };
   }, [indicators.vrvp, hidden.vrvp, config.vrvpWidth, config.vrvpPlacement]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
