@@ -12,7 +12,7 @@ import { TV_COLORS } from "@/lib/chart/chart-colors";
 import { type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import { adx } from "@/lib/indicators";
-import { formatPrice, getSeriesPriceFormat } from "@/lib/format";
+import { getSeriesPriceFormat } from "@/lib/format";
 
 export function useADXPane(
   chartRef: RefObject<IChartApi | null>,

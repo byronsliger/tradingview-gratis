@@ -11,7 +11,7 @@ import {
 import { type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import { squeezeMomentum } from "@/lib/indicators";
-import { formatPrice, getSeriesPriceFormat } from "@/lib/format";
+import { getSeriesPriceFormat } from "@/lib/format";
 
 export function useSQZPane(
   chartRef: RefObject<IChartApi | null>,

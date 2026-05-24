@@ -18,7 +18,7 @@ if (typeof window !== "undefined" && typeof Element !== "undefined") {
       if (this.hasPointerCapture(pointerId)) {
         originalReleasePointerCapture.call(this, pointerId);
       }
-    } catch (e) {
+    } catch {
       // Ignore NotFoundError thrown by third-party libs like Base UI ScrollArea
     }
   };

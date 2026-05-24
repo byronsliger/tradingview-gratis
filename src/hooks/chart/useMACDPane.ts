@@ -12,7 +12,7 @@ import { TV_COLORS } from "@/lib/chart/chart-colors";
 import { INDICATOR_COLORS, type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import { macd } from "@/lib/indicators";
-import { formatPrice, getSeriesPriceFormat } from "@/lib/format";
+import { getSeriesPriceFormat } from "@/lib/format";
 
 export function useMACDPane(
   chartRef: RefObject<IChartApi | null>,
