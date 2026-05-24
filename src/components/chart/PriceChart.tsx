@@ -57,7 +57,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const { volumeSeriesRef } = useVolumeSeries(chartRef, candlesRef, indicators, hidden, recomputePaneOffsets);
   const { updateRSI, rsiRef, lastRSI } = useRSIPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
   const { updateMACD, macdRef, macdSignalRef, macdHistRef, lastMACD, lastMACDSignal, lastMACDHist } = useMACDPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
-  const { updateSQZ, sqzmomHistRef, lastSQZ } = useSQZPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
+  const { updateSQZ, sqzmomHistRef, sqzmomDotRef, lastSQZ } = useSQZPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
   const { updateADX, adxRef, lastADX, lastPlusDI, lastMinusDI } = useADXPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
   const { updateVRVP, vrvpSeriesRef } = useVRVPSeries(chartRef, candlesRef, indicators, hidden, config);
 
@@ -94,7 +94,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
 
   const { selectedIndicatorKey } = useIndicatorDoubleClick(
     chartRef, containerRef, tool,
-    { ema20Ref, ema50Ref, ema200Ref, rsiRef, macdRef, macdSignalRef, macdHistRef, sqzmomHistRef, adxRef, vrvpSeriesRef },
+    { ema20Ref, ema50Ref, ema200Ref, rsiRef, macdRef, macdSignalRef, macdHistRef, sqzmomHistRef, sqzmomDotRef, adxRef, vrvpSeriesRef },
     paneOffsets,
     seriesPaneIndices
   );

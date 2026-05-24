@@ -101,5 +101,5 @@ export function useSQZPane(
     sqzmomHistRef.current?.applyOptions({ lastValueVisible: config.sqzmomAxisLabel ?? true });
   }, [config.sqzmomAxisLabel]);
 
-  return { updateSQZ, sqzmomHistRef, lastSQZ };
+  return { updateSQZ, sqzmomHistRef, sqzmomDotRef, lastSQZ };
 }

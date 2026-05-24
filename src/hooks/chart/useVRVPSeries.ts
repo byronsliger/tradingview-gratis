@@ -157,5 +157,5 @@ export function useVRVPSeries(
     config.vrvpColorPOC, config.vrvpColorVAH, config.vrvpColorVAL,
   ]);
 
-  return { updateVRVP };
+  return { updateVRVP, vrvpSeriesRef };
 }
