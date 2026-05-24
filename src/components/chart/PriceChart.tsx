@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { useChartStore } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import type { Timeframe } from "@/lib/binance/types";
+import { fetchExchangeSymbols } from "@/lib/binance/rest";
 
 import { useChartInit } from "@/hooks/chart/useChartInit";
 import { usePaneLayout } from "@/hooks/chart/usePaneLayout";
@@ -48,6 +49,11 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const config = useChartStore((s) => s.config);
   const tool = useChartStore((s) => s.tool);
   const theme = useChartStore((s) => s.theme);
+
+  useEffect(() => {
+    // Prefetch symbol dictionary in the background on load
+    fetchExchangeSymbols().catch(console.error);
+  }, []);
 
   const { chartRef, chartReady } = useChartInit(containerRef, theme);
   const { paneOffsets, recomputePaneOffsets } = usePaneLayout(chartRef, containerRef);
