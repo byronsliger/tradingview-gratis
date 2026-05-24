@@ -2,10 +2,7 @@ version: '3.8'
 
 services:
   tradingview-gratis:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: tradingview-gratis:latest
+    image: ghcr.io/byronsliger/tradingview-gratis:latest
     container_name: tradingview-gratis
     restart: unless-stopped
     ports:

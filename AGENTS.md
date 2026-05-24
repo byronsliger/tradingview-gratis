@@ -29,8 +29,9 @@ Welcome! This file provides comprehensive instructions, context, rules, and comm
 ---
 
 ## 🗂️ Core Repository Structure
-- **`src/app/`**: Next.js App Router (Layouts, pages, styles)
+- **`src/app/`**: Next.js App Router (Layouts, pages, styles, API routes)
   - `globals.css`: Base styles, Tailwind configuration, color variables
+  - `api/agent-data/route.ts`: Endpoint that returns current indicator values in JSON format for AI agent consumption.
 - **`src/components/`**: React Components
   - `chart/`: Charting components
     - `PriceChart.tsx`: Orchestrator ~100 líneas — solo compone hooks y overlay components
@@ -64,6 +65,7 @@ Run these commands from the workspace root (ensure Node 24+):
 - **Development Server**: `npm run dev`
 - **Build Production Bundle**: `npm run build`
 - **Code Linting**: `npm run lint`
+- **Docker Deployment**: `docker compose up -d --build` (Builds and runs the optimized Next.js standalone container)
 
 ---
 

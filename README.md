@@ -11,12 +11,12 @@ Plataforma de charts crypto construida sobre los datos públicos de **Binance** 
 
 - 📊 **Velas en vivo** vía WebSocket de Binance (sin API key)
 - 🔍 **Búsqueda de símbolo** sobre todos los pares USDT del exchange
-- ⏱️ **Multi-timeframe**: 1m / 5m / 15m / 1h / 4h / 1d / 1w
+- ⏱️ **Multi-timeframe**: 1m / 5m / 15m / 1h / 4h / 1d / 1w / 1M (Mensual)
 - 📐 **Indicadores client-side**: EMA 20/50/200, RSI 14, MACD 12/26/9, ADX/DMI, Squeeze Momentum, VRVP, Volumen
 - 🎯 **Estrategia TradingLatino**: todos los indicadores usados en la metodología de [@TradingLatino](https://www.youtube.com/@TradingLatino) están incluidos (EMA 10/55, MACD, Squeeze Momentum, ADX)
-- 👁️ **Watchlist** con precios y cambio 24h actualizándose en tiempo real
+- 👁️ **Watchlist Expandible** con precios y cambio 24h actualizándose en tiempo real
 - 🎨 **Visual idéntica a TradingView** (paleta, fuentes, layout)
-- 💾 **Persistencia** en localStorage (símbolo, timeframe, indicadores)
+- 💾 **Persistencia** en localStorage (símbolo, timeframe, indicadores, y nivel de zoom)
 - 🔌 **Reconexión robusta** del WebSocket con backoff exponencial
 - 🌐 100% client-side — deploy estático en Vercel/Cloudflare
 
@@ -46,6 +46,8 @@ Abrí [http://localhost:3000](http://localhost:3000).
 ```
 src/
 ├── app/
+│   ├── api/
+│   │   └── agent-data/         # API endpoint para valores de indicadores en JSON
 │   ├── layout.tsx              # Root, fuente Inter, TooltipProvider, dark
 │   ├── page.tsx                # Dashboard armando el layout
 │   └── globals.css             # Paleta TradingView
@@ -108,6 +110,21 @@ vercel
 
 O conectá el repo en [vercel.com/new](https://vercel.com/new) y deploy automático. No hay variables de entorno — todo es cliente.
 
+## 🐳 Deploy con Docker / Portainer
+
+El proyecto incluye configuración lista para producción usando Docker Compose y Next.js en modo `standalone`, lo que resulta en una imagen final ultra-liviana.
+
+```bash
+# Levantar el contenedor por primera vez (o tras hacer cambios)
+docker compose up -d --build
+```
+
+**Para actualizar luego de cambios de código (Portainer):**
+1. Ve a la sección **Stacks** > selecciona tu stack.
+2. Ve a la pestaña **Editor**.
+3. Activa la opción **"Re-pull image and redeploy"** al final de la página.
+4. Haz clic en **Update the stack**.
+
 ## 🧠 Cómo funciona
 
 ### Datos históricos
@@ -119,6 +136,9 @@ Una única conexión WebSocket multiplexada (`stream.binance.com`) recibe:
 - `<symbol>@miniTicker` → tickers del watchlist
 
 Al reconectarse (Binance corta el WS cada 24h) se vuelven a suscribir todos los streams activos con backoff exponencial.
+
+### API de Datos / Integración con Agentes
+Existe un endpoint `GET /api/agent-data` que sirve los valores actuales de los indicadores calculados en formato JSON, diseñado para ser consumido por agentes de IA o integraciones externas.
 
 ### Indicadores
 Se calculan **client-side** sobre el array de velas en cada update. Implementaciones puras de TypeScript:
