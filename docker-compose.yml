@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  tradingview-gratis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tradingview-gratis:latest
+    container_name: tradingview-gratis
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    networks:
+      - web
+
+networks:
+  web:
+    driver: bridge
