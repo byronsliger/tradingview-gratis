@@ -11,7 +11,7 @@ import {
 import { type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import { squeezeMomentum } from "@/lib/indicators";
-import { formatPrice } from "@/lib/format";
+import { formatPrice, getSeriesPriceFormat } from "@/lib/format";
 
 export function useSQZPane(
   chartRef: RefObject<IChartApi | null>,
@@ -57,6 +57,11 @@ export function useSQZPane(
     );
 
     setLastSQZ(pts.at(-1)?.val);
+
+    const maxAbs = Math.max(...pts.map(p => Math.abs(p.val)), 0.000001);
+    const fmt = getSeriesPriceFormat(maxAbs);
+    sqzmomHistRef.current.applyOptions({ priceFormat: fmt });
+    sqzmomDotRef.current?.applyOptions({ priceFormat: fmt });
   }, [candlesRef]);
 
    
@@ -78,7 +83,6 @@ export function useSQZPane(
       const hist = chart.addSeries(HistogramSeries, { 
         priceLineVisible: false, 
         lastValueVisible: configRef.current.sqzmomAxisLabel ?? true,
-        priceFormat: { type: "custom", minMove: 0.00000001, formatter: (price: number) => formatPrice(price) }
       }, paneIndex);
       const dot = chart.addSeries(LineSeries, {
         lineWidth: 4,
@@ -87,7 +91,6 @@ export function useSQZPane(
         priceLineVisible: false,
         lastValueVisible: false,
         lineVisible: false,
-        priceFormat: { type: "custom", minMove: 0.00000001, formatter: (price: number) => formatPrice(price) }
       }, paneIndex);
       sqzmomHistRef.current = hist;
       sqzmomDotRef.current = dot;

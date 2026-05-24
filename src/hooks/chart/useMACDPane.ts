@@ -12,7 +12,7 @@ import { TV_COLORS } from "@/lib/chart/chart-colors";
 import { INDICATOR_COLORS, type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import { macd } from "@/lib/indicators";
-import { formatPrice } from "@/lib/format";
+import { formatPrice, getSeriesPriceFormat } from "@/lib/format";
 
 export function useMACDPane(
   chartRef: RefObject<IChartApi | null>,
@@ -51,6 +51,12 @@ export function useMACDPane(
     setLastMACD(last?.macd);
     setLastMACDSignal(last?.signal);
     setLastMACDHist(last?.histogram);
+
+    const maxAbs = Math.max(...m.map(p => Math.max(Math.abs(p.macd), Math.abs(p.histogram))), 0.000001);
+    const fmt = getSeriesPriceFormat(maxAbs);
+    macdRef.current.applyOptions({ priceFormat: fmt });
+    macdSignalRef.current?.applyOptions({ priceFormat: fmt });
+    macdHistRef.current?.applyOptions({ priceFormat: fmt });
   }, [candlesRef]);
 
    
@@ -76,19 +82,16 @@ export function useMACDPane(
         lineWidth: 1, 
         priceLineVisible: false, 
         lastValueVisible: configRef.current.macdAxisLabel ?? true,
-        priceFormat: { type: "custom", minMove: 0.00000001, formatter: (price: number) => formatPrice(price) }
       }, paneIndex);
       const s = chart.addSeries(LineSeries, { 
         color: TV_COLORS.yellow, 
         lineWidth: 1, 
         priceLineVisible: false, 
         lastValueVisible: configRef.current.macdAxisLabel ?? true,
-        priceFormat: { type: "custom", minMove: 0.00000001, formatter: (price: number) => formatPrice(price) }
       }, paneIndex);
       const h = chart.addSeries(HistogramSeries, { 
         priceLineVisible: false, 
         lastValueVisible: false,
-        priceFormat: { type: "custom", minMove: 0.00000001, formatter: (price: number) => formatPrice(price) }
       }, paneIndex);
       macdRef.current = m;
       macdSignalRef.current = s;

@@ -16,6 +16,19 @@ export function roundPrice(n: number): number {
   return Number(n.toFixed(8));
 }
 
+export function getSeriesPriceFormat(maxAbs: number) {
+  let precision = 2;
+  if (maxAbs < 0.0001) precision = 8;
+  else if (maxAbs < 0.01) precision = 6;
+  else if (maxAbs < 1) precision = 4;
+  
+  return {
+    type: "price" as const,
+    precision,
+    minMove: 1 / Math.pow(10, precision),
+  };
+}
+
 export function formatPct(n: number): string {
   if (!isFinite(n)) return "—";
   const sign = n >= 0 ? "+" : "";

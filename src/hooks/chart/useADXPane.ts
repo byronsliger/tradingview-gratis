@@ -12,7 +12,7 @@ import { TV_COLORS } from "@/lib/chart/chart-colors";
 import { type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import { adx } from "@/lib/indicators";
-import { formatPrice } from "@/lib/format";
+import { formatPrice, getSeriesPriceFormat } from "@/lib/format";
 
 export function useADXPane(
   chartRef: RefObject<IChartApi | null>,
@@ -70,6 +70,9 @@ export function useADXPane(
     setLastADX(last?.adx);
     setLastPlusDI(last?.plusDI);
     setLastMinusDI(last?.minusDI);
+
+    const maxAbs = Math.max(...pts.map(p => Math.abs(p.adx)), 0.000001);
+    adxRef.current.applyOptions({ priceFormat: getSeriesPriceFormat(maxAbs) });
   }, [candlesRef]);
 
    
@@ -98,11 +101,6 @@ export function useADXPane(
           priceLineVisible: false,
           lastValueVisible: showLabel,
           priceScaleId: "adx-right",
-          priceFormat: {
-            type: "custom",
-            minMove: 0.00000001,
-            formatter: (price: number) => formatPrice(price),
-          },
         },
         paneIndex,
       );
