@@ -84,12 +84,19 @@ export interface IndicatorConfig {
   ema20Color: string;
   ema20Width: 1 | 2 | 3 | 4;
   ema20Style: number;
+  ema20AxisLabel: boolean;
   ema50Color: string;
   ema50Width: 1 | 2 | 3 | 4;
   ema50Style: number;
+  ema50AxisLabel: boolean;
   ema200Color: string;
   ema200Width: 1 | 2 | 3 | 4;
   ema200Style: number;
+  ema200AxisLabel: boolean;
+  rsiAxisLabel: boolean;
+  macdAxisLabel: boolean;
+  sqzmomAxisLabel: boolean;
+  adxAxisLabel: boolean;
   // SQZ style
   sqzmomColorBullUp: string;
   sqzmomColorBullDn: string;
@@ -144,12 +151,19 @@ export const DEFAULT_CONFIG: IndicatorConfig = {
   ema20Color: "#2962ff",
   ema20Width: 2,
   ema20Style: 0,
+  ema20AxisLabel: true,
   ema50Color: "#ffb74d",
   ema50Width: 2,
   ema50Style: 0,
+  ema50AxisLabel: true,
   ema200Color: "#ab47bc",
   ema200Width: 3,
   ema200Style: 0,
+  ema200AxisLabel: true,
+  rsiAxisLabel: true,
+  macdAxisLabel: true,
+  sqzmomAxisLabel: true,
+  adxAxisLabel: true,
   sqzmomColorBullUp: "#00FF00",
   sqzmomColorBullDn: "#008000",
   sqzmomColorBearDn: "#008eff",

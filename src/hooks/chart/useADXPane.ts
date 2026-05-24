@@ -76,15 +76,14 @@ export function useADXPane(
     if (indicators.adx && !adxRef.current) {
       const chart = chartRef.current;
       const paneIndex = (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1;
+      const showLabel = configRef.current.adxAxisLabel ?? true;
       const aSeries = chart.addSeries(
         LineSeries,
-        { color: TV_COLORS.text, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, priceScaleId: "left" },
+        { color: TV_COLORS.text, lineWidth: 2, priceLineVisible: false, lastValueVisible: showLabel, priceScaleId: "adx-right" },
         paneIndex,
       );
       adxRef.current = aSeries;
-      // Keep the series scale active, but hide the global left scale so it doesn't take up width
       aSeries.priceScale().applyOptions({ visible: false, scaleMargins: { top: 0.1, bottom: 0.1 } });
-      chart.applyOptions({ leftPriceScale: { visible: false } });
       try { chart.panes()[paneIndex]?.setStretchFactor(1); chart.panes()[0]?.setStretchFactor(3); } catch {}
       updateADX();
     } else if (!indicators.adx && adxRef.current && chartRef.current) {
@@ -105,6 +104,12 @@ export function useADXPane(
   useEffect(() => { updateADX(); }, [config.adxLen, config.adxDiLen, config.adxKeyLevel, config.adxStrengthLevel]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { updateADX(); }, [config.adxColorRising, config.adxColorFalling, config.adxColorKeyLevel, config.adxColorStrength]);
+
+  useEffect(() => {
+    if (!adxRef.current || !chartRef.current) return;
+    adxRef.current.applyOptions({ lastValueVisible: config.adxAxisLabel ?? true });
+    adxRef.current.priceScale().applyOptions({ visible: false });
+  }, [config.adxAxisLabel]);
 
   return { updateADX, lastADX, lastPlusDI, lastMinusDI };
 }

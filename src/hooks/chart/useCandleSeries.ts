@@ -60,21 +60,21 @@ export function useCandleSeries(
       lineWidth: cfg0.ema20Width,
       lineStyle: cfg0.ema20Style,
       priceLineVisible: false,
-      lastValueVisible: false,
+      lastValueVisible: cfg0.ema20AxisLabel ?? true,
     });
     ema50Ref.current = chartRef.current.addSeries(LineSeries, {
       color: cfg0.ema50Color,
       lineWidth: cfg0.ema50Width,
       lineStyle: cfg0.ema50Style,
       priceLineVisible: false,
-      lastValueVisible: false,
+      lastValueVisible: cfg0.ema50AxisLabel ?? true,
     });
     ema200Ref.current = chartRef.current.addSeries(LineSeries, {
       color: cfg0.ema200Color,
       lineWidth: cfg0.ema200Width,
       lineStyle: cfg0.ema200Style,
       priceLineVisible: false,
-      lastValueVisible: false,
+      lastValueVisible: cfg0.ema200AxisLabel ?? true,
     });
 
     return () => {
@@ -133,16 +133,16 @@ export function useCandleSeries(
   useEffect(() => { updateEMAs(); }, [config.ema20, config.ema50, config.ema200]);
 
   useEffect(() => {
-    ema20Ref.current?.applyOptions({ color: config.ema20Color, lineWidth: config.ema20Width, lineStyle: config.ema20Style });
-  }, [config.ema20Color, config.ema20Width, config.ema20Style]);
+    ema20Ref.current?.applyOptions({ color: config.ema20Color, lineWidth: config.ema20Width, lineStyle: config.ema20Style, lastValueVisible: config.ema20AxisLabel ?? true });
+  }, [config.ema20Color, config.ema20Width, config.ema20Style, config.ema20AxisLabel]);
 
   useEffect(() => {
-    ema50Ref.current?.applyOptions({ color: config.ema50Color, lineWidth: config.ema50Width, lineStyle: config.ema50Style });
-  }, [config.ema50Color, config.ema50Width, config.ema50Style]);
+    ema50Ref.current?.applyOptions({ color: config.ema50Color, lineWidth: config.ema50Width, lineStyle: config.ema50Style, lastValueVisible: config.ema50AxisLabel ?? true });
+  }, [config.ema50Color, config.ema50Width, config.ema50Style, config.ema50AxisLabel]);
 
   useEffect(() => {
-    ema200Ref.current?.applyOptions({ color: config.ema200Color, lineWidth: config.ema200Width, lineStyle: config.ema200Style });
-  }, [config.ema200Color, config.ema200Width, config.ema200Style]);
+    ema200Ref.current?.applyOptions({ color: config.ema200Color, lineWidth: config.ema200Width, lineStyle: config.ema200Style, lastValueVisible: config.ema200AxisLabel ?? true });
+  }, [config.ema200Color, config.ema200Width, config.ema200Style, config.ema200AxisLabel]);
 
   return { candleSeriesRef, updateEMAs, lastEMA20, lastEMA50, lastEMA200, lastVolume };
 }

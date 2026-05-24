@@ -63,7 +63,7 @@ export function useSQZPane(
     if (indicators.sqzmom && !sqzmomHistRef.current) {
       const chart = chartRef.current;
       const paneIndex = (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1;
-      const hist = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, paneIndex);
+      const hist = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: configRef.current.sqzmomAxisLabel ?? true }, paneIndex);
       const dot = chart.addSeries(LineSeries, {
         lineWidth: 4,
         pointMarkersVisible: true,
@@ -96,6 +96,10 @@ export function useSQZPane(
   useEffect(() => { updateSQZ(); }, [config.sqzmomBBLength, config.sqzmomBBMult, config.sqzmomKCLength, config.sqzmomKCMult]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { updateSQZ(); }, [config.sqzmomColorBullUp, config.sqzmomColorBullDn, config.sqzmomColorBearDn, config.sqzmomColorBearUp, config.sqzmomColorNoSqz, config.sqzmomColorSqzOff]);
+
+  useEffect(() => {
+    sqzmomHistRef.current?.applyOptions({ lastValueVisible: config.sqzmomAxisLabel ?? true });
+  }, [config.sqzmomAxisLabel]);
 
   return { updateSQZ, lastSQZ };
 }

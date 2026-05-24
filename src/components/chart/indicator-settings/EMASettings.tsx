@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DEFAULT_CONFIG, type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
-import { Tabs, Field, SimpleColorRow, LineStylePicker, WidthPicker, clamp } from "./shared";
+import { Tabs, Field, SimpleColorRow, LineStylePicker, WidthPicker, clamp, AxisLabelToggle } from "./shared";
 
 type EMAKey = "ema20" | "ema50" | "ema200";
+type EMAAxisLabelKey = `${EMAKey}AxisLabel`;
 
 interface Props {
   target: EMAKey;
@@ -19,14 +20,17 @@ export function EMASettings({ target, config, onSave, onReset }: Props) {
   const widthKey = `${target}Width` as `${EMAKey}Width`;
   const styleKey = `${target}Style` as `${EMAKey}Style`;
 
+  const axisLabelKey = `${target}AxisLabel` as EMAAxisLabelKey;
+
   const [tab, setTab] = useState<"inputs" | "style">("inputs");
-  const [period, setPeriod] = useState(config[target] ?? DEFAULT_CONFIG[target]);
-  const [color,  setColor]  = useState(config[colorKey] ?? DEFAULT_CONFIG[colorKey]);
-  const [width,  setWidth]  = useState<1|2|3|4>(config[widthKey] ?? DEFAULT_CONFIG[widthKey]);
-  const [style,  setStyle]  = useState(config[styleKey] ?? DEFAULT_CONFIG[styleKey]);
+  const [period,     setPeriod]     = useState(config[target]        ?? DEFAULT_CONFIG[target]);
+  const [color,      setColor]      = useState(config[colorKey]      ?? DEFAULT_CONFIG[colorKey]);
+  const [width,      setWidth]      = useState<1|2|3|4>(config[widthKey] ?? DEFAULT_CONFIG[widthKey]);
+  const [style,      setStyle]      = useState(config[styleKey]      ?? DEFAULT_CONFIG[styleKey]);
+  const [axisLabel,  setAxisLabel]  = useState(config[axisLabelKey]  ?? true);
 
   function save() {
-    onSave({ [target]: clamp(period, 2, 500), [colorKey]: color, [widthKey]: width, [styleKey]: style });
+    onSave({ [target]: clamp(period, 2, 500), [colorKey]: color, [widthKey]: width, [styleKey]: style, [axisLabelKey]: axisLabel });
   }
 
   return (
@@ -56,6 +60,15 @@ export function EMASettings({ target, config, onSave, onReset }: Props) {
             <span className="w-14 text-xs text-tv-text-muted">Estilo</span>
             <LineStylePicker value={style} color={color} onChange={setStyle} />
           </div>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={axisLabel}
+              onChange={(e) => setAxisLabel(e.target.checked)}
+              className="h-3.5 w-3.5 cursor-pointer rounded border border-tv-border bg-tv-bg accent-tv-blue"
+            />
+            <span className="text-xs text-tv-text">Etiqueta en eje de precio</span>
+          </label>
         </div>
       )}
 

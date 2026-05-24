@@ -55,7 +55,7 @@ export function useRSIPane(
     if (indicators.rsi && !rsiRef.current) {
       const chart = chartRef.current;
       const paneIndex = 1;
-      const r = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.rsi, lineWidth: 1, priceLineVisible: false, lastValueVisible: false }, paneIndex);
+      const r = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.rsi, lineWidth: 1, priceLineVisible: false, lastValueVisible: configRef.current.rsiAxisLabel ?? true }, paneIndex);
       const r30 = chart.addSeries(LineSeries, { color: TV_COLORS.textMuted, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }, paneIndex);
       const r70 = chart.addSeries(LineSeries, { color: TV_COLORS.textMuted, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }, paneIndex);
       rsiRef.current = r;
@@ -84,6 +84,10 @@ export function useRSIPane(
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { updateRSI(); }, [config.rsi]);
+
+  useEffect(() => {
+    rsiRef.current?.applyOptions({ lastValueVisible: config.rsiAxisLabel ?? true });
+  }, [config.rsiAxisLabel]);
 
   return { updateRSI, lastRSI };
 }
