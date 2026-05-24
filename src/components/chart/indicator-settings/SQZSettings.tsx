@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DEFAULT_CONFIG, type IndicatorConfig } from "@/lib/store/chart-store";
-import { Tabs, Field, FieldFloat, SimpleColorRow, SectionLabel, clamp } from "./shared";
+import { Tabs, Field, FieldFloat, SimpleColorRow, SectionLabel, clamp, AxisLabelToggle } from "./shared";
 
 interface Props {
   config: IndicatorConfig;
@@ -14,10 +14,11 @@ interface Props {
 export function SQZSettings({ config, onSave, onReset }: Props) {
   const [tab, setTab] = useState<"inputs" | "style">("inputs");
 
-  const [bbLength, setBBLength] = useState(config.sqzmomBBLength ?? DEFAULT_CONFIG.sqzmomBBLength);
-  const [bbMult,   setBBMult]   = useState(config.sqzmomBBMult   ?? DEFAULT_CONFIG.sqzmomBBMult);
-  const [kcLength, setKCLength] = useState(config.sqzmomKCLength ?? DEFAULT_CONFIG.sqzmomKCLength);
-  const [kcMult,   setKCMult]   = useState(config.sqzmomKCMult   ?? DEFAULT_CONFIG.sqzmomKCMult);
+  const [bbLength,  setBBLength]  = useState(config.sqzmomBBLength   ?? DEFAULT_CONFIG.sqzmomBBLength);
+  const [bbMult,    setBBMult]    = useState(config.sqzmomBBMult     ?? DEFAULT_CONFIG.sqzmomBBMult);
+  const [kcLength,  setKCLength]  = useState(config.sqzmomKCLength   ?? DEFAULT_CONFIG.sqzmomKCLength);
+  const [kcMult,    setKCMult]    = useState(config.sqzmomKCMult     ?? DEFAULT_CONFIG.sqzmomKCMult);
+  const [axisLabel, setAxisLabel] = useState(config.sqzmomAxisLabel  ?? true);
 
   const [bullUp,  setBullUp]  = useState(config.sqzmomColorBullUp ?? DEFAULT_CONFIG.sqzmomColorBullUp);
   const [bullDn,  setBullDn]  = useState(config.sqzmomColorBullDn ?? DEFAULT_CONFIG.sqzmomColorBullDn);
@@ -38,6 +39,7 @@ export function SQZSettings({ config, onSave, onReset }: Props) {
       sqzmomColorBearUp: bearUp,
       sqzmomColorNoSqz:  noSqz,
       sqzmomColorSqzOff: sqzOff,
+      sqzmomAxisLabel:   axisLabel,
     });
   }
 
@@ -61,6 +63,7 @@ export function SQZSettings({ config, onSave, onReset }: Props) {
 
       {tab === "style" && (
         <div className="flex flex-col gap-1">
+          <AxisLabelToggle value={axisLabel} onChange={setAxisLabel} />
           <SectionLabel>Histograma</SectionLabel>
           <SimpleColorRow label="Alcista subiendo" color={bullUp} onColorChange={setBullUp} />
           <SimpleColorRow label="Alcista bajando"  color={bullDn} onColorChange={setBullDn} />

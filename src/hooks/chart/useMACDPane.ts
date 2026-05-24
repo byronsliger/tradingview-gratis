@@ -57,8 +57,8 @@ export function useMACDPane(
     if (indicators.macd && !macdRef.current) {
       const chart = chartRef.current;
       const paneIndex = indicators.rsi ? 2 : 1;
-      const m = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.macd, lineWidth: 1, priceLineVisible: false, lastValueVisible: false }, paneIndex);
-      const s = chart.addSeries(LineSeries, { color: TV_COLORS.yellow, lineWidth: 1, priceLineVisible: false, lastValueVisible: false }, paneIndex);
+      const m = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.macd, lineWidth: 1, priceLineVisible: false, lastValueVisible: configRef.current.macdAxisLabel ?? true }, paneIndex);
+      const s = chart.addSeries(LineSeries, { color: TV_COLORS.yellow, lineWidth: 1, priceLineVisible: false, lastValueVisible: configRef.current.macdAxisLabel ?? true }, paneIndex);
       const h = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, paneIndex);
       macdRef.current = m;
       macdSignalRef.current = s;
@@ -87,5 +87,11 @@ export function useMACDPane(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { updateMACD(); }, [config.macdFast, config.macdSlow, config.macdSignal]);
 
-  return { updateMACD, lastMACD, lastMACDSignal, lastMACDHist };
+  useEffect(() => {
+    const v = config.macdAxisLabel ?? true;
+    macdRef.current?.applyOptions({ lastValueVisible: v });
+    macdSignalRef.current?.applyOptions({ lastValueVisible: v });
+  }, [config.macdAxisLabel]);
+
+  return { updateMACD, macdRef, macdSignalRef, macdHistRef, lastMACD, lastMACDSignal, lastMACDHist };
 }

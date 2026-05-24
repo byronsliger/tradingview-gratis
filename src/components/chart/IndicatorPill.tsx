@@ -8,6 +8,7 @@ interface Props {
   value?: string;
   color: string;
   hidden: boolean;
+  selected?: boolean;
   onToggleHide: () => void;
   onSettings: () => void;
   onRemove: () => void;
@@ -18,15 +19,18 @@ export function IndicatorPill({
   value,
   color,
   hidden,
+  selected,
   onToggleHide,
   onSettings,
   onRemove,
 }: Props) {
   return (
     <div
+      onDoubleClick={onSettings}
       className={cn(
-        "group/pill pointer-events-auto flex items-center gap-1.5 rounded bg-tv-panel/95 px-1.5 py-0.5 text-[11px] shadow-sm ring-1 ring-tv-border backdrop-blur",
-        hidden && "opacity-50",
+        "group/pill pointer-events-auto flex cursor-pointer items-center gap-1 rounded px-1 py-px text-[11px] transition-colors bg-tv-panel/50 hover:bg-tv-panel/80",
+        selected && "outline outline-1 outline-tv-blue/60",
+        hidden && "opacity-40",
       )}
     >
       <span
@@ -37,32 +41,28 @@ export function IndicatorPill({
       {value !== undefined && (
         <span className="tabular-nums text-tv-text-muted">{value}</span>
       )}
-      <div className="ml-1 flex items-center gap-0.5">
+      <div className="ml-0.5 flex items-center gap-0.5 md:hidden md:group-hover/pill:flex">
         <button
-          onClick={onToggleHide}
+          onClick={(e) => { e.stopPropagation(); onToggleHide(); }}
           title={hidden ? "Mostrar" : "Ocultar"}
           aria-label={hidden ? "Mostrar" : "Ocultar"}
-          className="rounded p-0.5 text-tv-text-dim transition-colors hover:bg-tv-panel-hover hover:text-tv-text"
+          className="rounded p-0.5 text-tv-text-dim transition-colors hover:text-tv-text"
         >
-          {hidden ? (
-            <EyeOff className="h-3 w-3" />
-          ) : (
-            <Eye className="h-3 w-3" />
-          )}
+          {hidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
         </button>
         <button
-          onClick={onSettings}
+          onClick={(e) => { e.stopPropagation(); onSettings(); }}
           title="Configurar"
           aria-label="Configurar"
-          className="rounded p-0.5 text-tv-text-dim transition-colors hover:bg-tv-panel-hover hover:text-tv-text"
+          className="rounded p-0.5 text-tv-text-dim transition-colors hover:text-tv-text"
         >
           <Settings className="h-3 w-3" />
         </button>
         <button
-          onClick={onRemove}
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
           title="Eliminar"
           aria-label="Eliminar"
-          className="rounded p-0.5 text-tv-text-dim transition-colors hover:bg-tv-panel-hover hover:text-tv-red"
+          className="rounded p-0.5 text-tv-text-dim transition-colors hover:text-tv-red"
         >
           <X className="h-3 w-3" />
         </button>

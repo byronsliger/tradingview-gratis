@@ -9,6 +9,8 @@ import { IndicatorSettingsDialog } from "@/components/chart/IndicatorSettingsDia
 import { PriceLineSettingsDialog } from "@/components/chart/PriceLineSettingsDialog";
 import { DrawingSettingsDialog } from "@/components/chart/DrawingSettingsDialog";
 import { useChartStore } from "@/lib/store/chart-store";
+import { MobileChartTools } from "@/components/layout/MobileChartTools";
+import { cn } from "@/lib/utils";
 
 export default function HomePage() {
   const symbol = useChartStore((s) => s.symbol);
@@ -19,14 +21,19 @@ export default function HomePage() {
       <Header />
       <div className="flex min-h-0 flex-1">
         <LeftSidebar />
-        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        
+        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-10 md:pb-0">
           <div className="min-h-0 flex-1">
             <PriceChart symbol={symbol} timeframe={timeframe} />
           </div>
         </main>
+
         <RightSidebar />
       </div>
-      <BottomPanel />
+      <div className="hidden md:block">
+        <BottomPanel />
+      </div>
+      <MobileChartTools />
       <IndicatorSettingsDialog />
       <PriceLineSettingsDialog />
       <DrawingSettingsDialog />

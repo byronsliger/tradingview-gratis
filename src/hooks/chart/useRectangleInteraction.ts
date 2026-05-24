@@ -6,6 +6,7 @@ import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import type { RectangleDrawing } from "@/lib/drawings/types";
 import type { RectanglePrimitive, RectHandle } from "@/lib/drawings/primitives/RectanglePrimitive";
 import type { Candle } from "@/lib/binance/types";
+import { registerLegacyEventBlockers, toggleChartScroll } from "@/lib/chart/event-utils";
 
 const DRAG_THRESHOLD_PX = 4;
 const DBLCLICK_MS = 400;
@@ -203,9 +204,13 @@ export function useRectangleInteraction(
       if (hit) {
         hoveredIdRef.current = hit.id;
         container.style.cursor = hit.type === "corner" ? "crosshair" : "move";
+        toggleChartScroll(chartRef.current, false);
       } else {
         hoveredIdRef.current = null;
         container.style.cursor = "";
+        if (dragRef.current.type === "none" && pendingRef.current === null) {
+          toggleChartScroll(chartRef.current, true);
+        }
       }
     };
 
@@ -230,7 +235,9 @@ export function useRectangleInteraction(
       }
       lastDownRef.current = { id: hit.id, time: now };
       setSelectedRef.current(hit.id);
-      container.setPointerCapture(e.pointerId);
+      try { container.setPointerCapture(e.pointerId); } catch {}
+
+      toggleChartScroll(chartRef.current, false);
 
       if (hit.type === "corner") {
         dragRef.current = { type: "corner", id: hit.id, handle: hit.handle };
@@ -249,7 +256,13 @@ export function useRectangleInteraction(
       dragRef.current = { type: "none" };
       pendingRef.current = null;
       try { container.releasePointerCapture(e.pointerId); } catch {}
-      if (wasDragging) container.style.cursor = "";
+      if (wasDragging) {
+        container.style.cursor = "";
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+
+      toggleChartScroll(chartRef.current, true);
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -268,6 +281,12 @@ export function useRectangleInteraction(
       removeDrawingRef.current(id);
     };
 
+    const cleanLegacyBlockers = registerLegacyEventBlockers(container, (e) => {
+      const isDragging = dragRef.current.type !== "none" || pendingRef.current !== null;
+      const isHovering = hoveredIdRef.current !== null;
+      return isDragging || (isHovering && (e.type === "mousedown" || e.type === "touchstart"));
+    });
+
     container.addEventListener("pointermove", onPointerMove, true);
     container.addEventListener("pointerdown", onPointerDown, true);
     container.addEventListener("pointerup", onPointerUp, true);
@@ -279,7 +298,19 @@ export function useRectangleInteraction(
       container.removeEventListener("pointerdown", onPointerDown, true);
       container.removeEventListener("pointerup", onPointerUp, true);
       container.removeEventListener("pointercancel", onPointerUp, true);
+      cleanLegacyBlockers();
       window.removeEventListener("keydown", onKeyDown);
+      if (chartRef.current) {
+        try {
+          chartRef.current.applyOptions({
+            handleScroll: {
+              pressedMouseMove: true,
+              horzTouchDrag: true,
+              vertTouchDrag: true,
+            },
+          });
+        } catch (_) {}
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

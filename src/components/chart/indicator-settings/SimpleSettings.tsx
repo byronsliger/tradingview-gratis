@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DEFAULT_CONFIG, type IndicatorConfig } from "@/lib/store/chart-store";
-import { Field, clamp } from "./shared";
+import { Field, clamp, AxisLabelToggle } from "./shared";
 
 interface Props {
   config: IndicatorConfig;
@@ -13,26 +13,30 @@ interface Props {
 
 export function RSISettings({ config, onSave, onReset }: Props) {
   const [period, setPeriod] = useState(config.rsi ?? DEFAULT_CONFIG.rsi);
+  const [axisLabel, setAxisLabel] = useState(config.rsiAxisLabel ?? true);
   return (
-    <SimpleForm onReset={onReset} onSave={() => onSave({ rsi: clamp(period, 2, 100) })}>
+    <SimpleForm onReset={onReset} onSave={() => onSave({ rsi: clamp(period, 2, 100), rsiAxisLabel: axisLabel })}>
       <Field label="Período" value={period} onChange={setPeriod} max={100} />
+      <AxisLabelToggle value={axisLabel} onChange={setAxisLabel} />
     </SimpleForm>
   );
 }
 
 export function MACDSettings({ config, onSave, onReset }: Props) {
-  const [fast,   setFast]   = useState(config.macdFast   ?? DEFAULT_CONFIG.macdFast);
-  const [slow,   setSlow]   = useState(config.macdSlow   ?? DEFAULT_CONFIG.macdSlow);
-  const [signal, setSignal] = useState(config.macdSignal ?? DEFAULT_CONFIG.macdSignal);
+  const [fast,      setFast]      = useState(config.macdFast   ?? DEFAULT_CONFIG.macdFast);
+  const [slow,      setSlow]      = useState(config.macdSlow   ?? DEFAULT_CONFIG.macdSlow);
+  const [signal,    setSignal]    = useState(config.macdSignal ?? DEFAULT_CONFIG.macdSignal);
+  const [axisLabel, setAxisLabel] = useState(config.macdAxisLabel ?? true);
   return (
     <SimpleForm onReset={onReset} onSave={() => onSave({
-      macdFast: clamp(fast, 2, 100), macdSlow: clamp(slow, 2, 200), macdSignal: clamp(signal, 2, 100),
+      macdFast: clamp(fast, 2, 100), macdSlow: clamp(slow, 2, 200), macdSignal: clamp(signal, 2, 100), macdAxisLabel: axisLabel,
     })}>
       <div className="grid grid-cols-3 gap-2">
         <Field label="Rápida" value={fast}   onChange={setFast}   max={100} />
         <Field label="Lenta"  value={slow}   onChange={setSlow}   max={200} />
         <Field label="Señal"  value={signal} onChange={setSignal} max={100} />
       </div>
+      <AxisLabelToggle value={axisLabel} onChange={setAxisLabel} />
     </SimpleForm>
   );
 }

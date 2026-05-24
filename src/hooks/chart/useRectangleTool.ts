@@ -5,6 +5,7 @@ import { type IChartApi, type ISeriesApi } from "lightweight-charts";
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import type { TrendLinePoint } from "@/lib/drawings/types";
 import type { Candle } from "@/lib/binance/types";
+import { registerLegacyEventBlockers } from "@/lib/chart/event-utils";
 
 export interface RectangleInProgress {
   a: TrendLinePoint;
@@ -21,6 +22,7 @@ export function useRectangleTool(
 ): { inProgress: RectangleInProgress | null } {
   const addDrawing = useChartStore((s) => s.addDrawing);
   const setTool = useChartStore((s) => s.setTool);
+  const drawingDefaults = useChartStore((s) => s.drawingDefaults);
 
   const addDrawingRef = useRef(addDrawing);
   // eslint-disable-next-line react-hooks/refs
@@ -34,6 +36,9 @@ export function useRectangleTool(
   const symbolRef = useRef(symbol);
   // eslint-disable-next-line react-hooks/refs
   symbolRef.current = symbol;
+  const drawingDefaultsRef = useRef(drawingDefaults);
+  // eslint-disable-next-line react-hooks/refs
+  drawingDefaultsRef.current = drawingDefaults;
 
   const phaseRef = useRef<"idle" | "placing_b">("idle");
   const pointARef = useRef<TrendLinePoint | null>(null);
@@ -109,11 +114,7 @@ export function useRectangleTool(
           type: "rectangle",
           a,
           b: point,
-          color: "#2962ff",
-          lineWidth: 1,
-          lineStyle: 0,
-          fillColor: "#2962ff22",
-          fillVisible: true,
+          ...drawingDefaultsRef.current.rectangle,
         });
         setToolRef.current("cursor");
       }
@@ -136,6 +137,8 @@ export function useRectangleTool(
       setToolRef.current("cursor");
     };
 
+    const cleanLegacyBlockers = registerLegacyEventBlockers(container, () => toolRef.current === "rectangle");
+
     container.addEventListener("pointerdown", onPointerDown, true);
     container.addEventListener("pointermove", onPointerMove);
     window.addEventListener("keydown", onKeyDown);
@@ -143,6 +146,7 @@ export function useRectangleTool(
     return () => {
       container.removeEventListener("pointerdown", onPointerDown, true);
       container.removeEventListener("pointermove", onPointerMove);
+      cleanLegacyBlockers();
       window.removeEventListener("keydown", onKeyDown);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

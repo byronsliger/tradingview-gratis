@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DEFAULT_CONFIG, type IndicatorConfig } from "@/lib/store/chart-store";
-import { Tabs, Field, SimpleColorRow, SectionLabel, clamp } from "./shared";
+import { Tabs, Field, SimpleColorRow, SectionLabel, clamp, AxisLabelToggle } from "./shared";
 
 interface Props {
   config: IndicatorConfig;
@@ -14,10 +14,11 @@ interface Props {
 export function ADXSettings({ config, onSave, onReset }: Props) {
   const [tab, setTab] = useState<"inputs" | "style">("inputs");
 
-  const [adxLen,         setAdxLen]         = useState(config.adxLen           ?? DEFAULT_CONFIG.adxLen);
-  const [diLen,          setDiLen]          = useState(config.adxDiLen         ?? DEFAULT_CONFIG.adxDiLen);
-  const [keyLevel,       setKeyLevel]       = useState(config.adxKeyLevel      ?? DEFAULT_CONFIG.adxKeyLevel);
-  const [strengthLevel,  setStrengthLevel]  = useState(config.adxStrengthLevel ?? DEFAULT_CONFIG.adxStrengthLevel);
+  const [adxLen,        setAdxLen]        = useState(config.adxLen           ?? DEFAULT_CONFIG.adxLen);
+  const [diLen,         setDiLen]         = useState(config.adxDiLen         ?? DEFAULT_CONFIG.adxDiLen);
+  const [keyLevel,      setKeyLevel]      = useState(config.adxKeyLevel      ?? DEFAULT_CONFIG.adxKeyLevel);
+  const [strengthLevel, setStrengthLevel] = useState(config.adxStrengthLevel ?? DEFAULT_CONFIG.adxStrengthLevel);
+  const [axisLabel,     setAxisLabel]     = useState(config.adxAxisLabel     ?? true);
 
   const [colorRising,   setColorRising]   = useState(config.adxColorRising   ?? DEFAULT_CONFIG.adxColorRising);
   const [colorFalling,  setColorFalling]  = useState(config.adxColorFalling  ?? DEFAULT_CONFIG.adxColorFalling);
@@ -34,6 +35,7 @@ export function ADXSettings({ config, onSave, onReset }: Props) {
       adxColorFalling:  colorFalling,
       adxColorKeyLevel: colorKeyLevel,
       adxColorStrength: colorStrength,
+      adxAxisLabel:     axisLabel,
     });
   }
 
@@ -56,6 +58,7 @@ export function ADXSettings({ config, onSave, onReset }: Props) {
 
       {tab === "style" && (
         <div className="flex flex-col gap-1">
+          <AxisLabelToggle value={axisLabel} onChange={setAxisLabel} />
           <SectionLabel>ADX</SectionLabel>
           <SimpleColorRow label="Subiendo"       color={colorRising}   onColorChange={setColorRising} />
           <SimpleColorRow label="Bajando"        color={colorFalling}  onColorChange={setColorFalling} />

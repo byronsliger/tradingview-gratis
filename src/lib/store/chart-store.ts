@@ -29,6 +29,41 @@ export interface PriceLine {
   axisLabelVisible?: boolean;
 }
 
+export interface TrendLineDefaults {
+  color: string;
+  lineWidth: 1 | 2 | 3 | 4;
+  lineStyle: number;
+  extendLeft: boolean;
+  extendRight: boolean;
+}
+
+export interface RectangleDefaults {
+  color: string;
+  lineWidth: 1 | 2 | 3 | 4;
+  lineStyle: number;
+  fillColor: string;
+  fillVisible: boolean;
+}
+
+export interface HLineDefaults {
+  color: string;
+  lineWidth: 1 | 2 | 3 | 4;
+  lineStyle: number;
+  axisLabelVisible: boolean;
+}
+
+export interface DrawingDefaults {
+  trendline: TrendLineDefaults;
+  rectangle: RectangleDefaults;
+  hline: HLineDefaults;
+}
+
+export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = {
+  trendline: { color: "#2962ff", lineWidth: 1, lineStyle: 0, extendLeft: false, extendRight: false },
+  rectangle: { color: "#2962ff", lineWidth: 1, lineStyle: 0, fillColor: "#2962ff22", fillVisible: true },
+  hline: { color: "#2962ff", lineWidth: 1, lineStyle: 2, axisLabelVisible: true },
+};
+
 export interface IndicatorConfig {
   ema20: number;
   ema50: number;
@@ -49,12 +84,19 @@ export interface IndicatorConfig {
   ema20Color: string;
   ema20Width: 1 | 2 | 3 | 4;
   ema20Style: number;
+  ema20AxisLabel: boolean;
   ema50Color: string;
   ema50Width: 1 | 2 | 3 | 4;
   ema50Style: number;
+  ema50AxisLabel: boolean;
   ema200Color: string;
   ema200Width: 1 | 2 | 3 | 4;
   ema200Style: number;
+  ema200AxisLabel: boolean;
+  rsiAxisLabel: boolean;
+  macdAxisLabel: boolean;
+  sqzmomAxisLabel: boolean;
+  adxAxisLabel: boolean;
   // SQZ style
   sqzmomColorBullUp: string;
   sqzmomColorBullDn: string;
@@ -109,12 +151,19 @@ export const DEFAULT_CONFIG: IndicatorConfig = {
   ema20Color: "#2962ff",
   ema20Width: 2,
   ema20Style: 0,
+  ema20AxisLabel: true,
   ema50Color: "#ffb74d",
   ema50Width: 2,
   ema50Style: 0,
+  ema50AxisLabel: true,
   ema200Color: "#ab47bc",
   ema200Width: 3,
   ema200Style: 0,
+  ema200AxisLabel: true,
+  rsiAxisLabel: true,
+  macdAxisLabel: true,
+  sqzmomAxisLabel: true,
+  adxAxisLabel: true,
   sqzmomColorBullUp: "#00FF00",
   sqzmomColorBullDn: "#008000",
   sqzmomColorBearDn: "#008eff",
@@ -190,6 +239,7 @@ interface ChartState {
   tool: DrawingTool;
   priceLines: PriceLine[];
   symbolDialogOpen: boolean;
+  symbolDialogMode: "search" | "add";
   /** Which indicator's settings dialog is open (null = closed) */
   settingsTarget: IndicatorKey | null;
   priceLineEditTarget: string | null;
@@ -200,6 +250,7 @@ interface ChartState {
   /** Shared collapsed state for both ChartLegend and SubPaneLegend */
   legendCollapsed: boolean;
   watchlistCollapsed: boolean;
+  mobileTab: "chart" | "watchlist";
 
   // Actions
   setSymbol: (s: string) => void;
@@ -217,11 +268,13 @@ interface ChartState {
   removePriceLine: (id: string) => void;
   updatePriceLine: (id: string, price: number) => void;
   clearPriceLines: (symbol?: string) => void;
-  setSymbolDialogOpen: (v: boolean) => void;
+  setSymbolDialogOpen: (v: boolean, mode?: "search" | "add") => void;
   setSettingsTarget: (k: IndicatorKey | null) => void;
   setPriceLineEditTarget: (id: string | null) => void;
   setSelectedPriceLineId: (id: string | null) => void;
   updatePriceLineOptions: (id: string, patch: Partial<Pick<PriceLine, "color" | "lineWidth" | "lineStyle" | "axisLabelVisible">>) => void;
+  drawingDefaults: DrawingDefaults;
+  setDrawingDefault: <K extends keyof DrawingDefaults>(type: K, patch: Partial<DrawingDefaults[K]>) => void;
   addDrawing: (d: Drawing) => void;
   removeDrawing: (id: string) => void;
   updateDrawing: (id: string, patch: Partial<Omit<TrendLineDrawing | RectangleDrawing, "id" | "symbol" | "type">>) => void;
@@ -230,6 +283,7 @@ interface ChartState {
   setSelectedDrawingId: (id: string | null) => void;
   toggleLegendCollapsed: () => void;
   toggleWatchlistCollapsed: () => void;
+  setMobileTab: (tab: "chart" | "watchlist") => void;
 }
 
 export const useChartStore = create<ChartState>()(
@@ -266,14 +320,17 @@ export const useChartStore = create<ChartState>()(
       tool: "cursor",
       priceLines: [],
       symbolDialogOpen: false,
+      symbolDialogMode: "search",
       settingsTarget: null,
       priceLineEditTarget: null,
       selectedPriceLineId: null,
       drawings: [],
+      drawingDefaults: { ...DEFAULT_DRAWING_DEFAULTS },
       drawingEditTarget: null,
       selectedDrawingId: null,
       legendCollapsed: true,
       watchlistCollapsed: true,
+      mobileTab: "chart",
 
       setSymbol: (symbol) => set({ symbol }),
       setTimeframe: (timeframe) => set({ timeframe }),
@@ -318,10 +375,10 @@ export const useChartStore = create<ChartState>()(
                   : `${Date.now()}-${Math.random()}`,
               symbol,
               price,
-              color: "#2962ff",
-              lineWidth: 1,
-              lineStyle: 2,
-              axisLabelVisible: true,
+              color: state.drawingDefaults.hline.color,
+              lineWidth: state.drawingDefaults.hline.lineWidth,
+              lineStyle: state.drawingDefaults.hline.lineStyle,
+              axisLabelVisible: state.drawingDefaults.hline.axisLabelVisible,
             },
           ],
         })),
@@ -339,13 +396,20 @@ export const useChartStore = create<ChartState>()(
             ? state.priceLines.filter((p) => p.symbol !== symbol)
             : [],
         })),
-      setSymbolDialogOpen: (symbolDialogOpen) => set({ symbolDialogOpen }),
+      setSymbolDialogOpen: (symbolDialogOpen, mode) => set((state) => ({ symbolDialogOpen, symbolDialogMode: mode ?? state.symbolDialogMode })),
       setSettingsTarget: (settingsTarget) => set({ settingsTarget }),
       setPriceLineEditTarget: (priceLineEditTarget) => set({ priceLineEditTarget }),
       setSelectedPriceLineId: (selectedPriceLineId) => set({ selectedPriceLineId }),
       updatePriceLineOptions: (id, patch) =>
         set((state) => ({
           priceLines: state.priceLines.map((p) => p.id === id ? { ...p, ...patch } : p),
+        })),
+      setDrawingDefault: (type, patch) =>
+        set((s) => ({
+          drawingDefaults: {
+            ...s.drawingDefaults,
+            [type]: { ...s.drawingDefaults[type], ...(patch as object) },
+          },
         })),
       addDrawing: (d) => set((s) => ({ drawings: [...s.drawings, d] })),
       removeDrawing: (id) => set((s) => ({ drawings: s.drawings.filter((d) => d.id !== id) })),
@@ -363,6 +427,7 @@ export const useChartStore = create<ChartState>()(
       setSelectedDrawingId: (selectedDrawingId) => set({ selectedDrawingId }),
       toggleLegendCollapsed: () => set((s) => ({ legendCollapsed: !s.legendCollapsed })),
       toggleWatchlistCollapsed: () => set((s) => ({ watchlistCollapsed: !s.watchlistCollapsed })),
+      setMobileTab: (mobileTab) => set({ mobileTab }),
     }),
     {
       name: "tv-gratis-chart-state",
@@ -377,8 +442,10 @@ export const useChartStore = create<ChartState>()(
         watchlist: s.watchlist,
         priceLines: s.priceLines,
         drawings: s.drawings,
+        drawingDefaults: s.drawingDefaults,
         legendCollapsed: s.legendCollapsed,
         watchlistCollapsed: s.watchlistCollapsed,
+        mobileTab: s.mobileTab,
       }),
       /**
        * Deep-merge persisted state into the current (default) state so that
@@ -395,6 +462,11 @@ export const useChartStore = create<ChartState>()(
           // Same for indicator flags — new keys default to `false`
           indicators: { ...current.indicators, ...(p.indicators ?? {}) },
           hidden: { ...current.hidden, ...(p.hidden ?? {}) },
+          drawingDefaults: {
+            trendline: { ...DEFAULT_DRAWING_DEFAULTS.trendline, ...(p.drawingDefaults?.trendline ?? {}) },
+            rectangle: { ...DEFAULT_DRAWING_DEFAULTS.rectangle, ...(p.drawingDefaults?.rectangle ?? {}) },
+            hline: { ...DEFAULT_DRAWING_DEFAULTS.hline, ...(p.drawingDefaults?.hline ?? {}) },
+          },
         };
       },
     },

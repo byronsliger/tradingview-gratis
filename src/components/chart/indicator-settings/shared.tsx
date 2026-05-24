@@ -178,3 +178,17 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
 export function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
+
+export function AxisLabelToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 py-1">
+      <input
+        type="checkbox"
+        checked={value}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-3.5 w-3.5 cursor-pointer rounded border border-tv-border bg-tv-bg accent-tv-blue"
+      />
+      <span className="text-xs text-tv-text">Etiqueta en eje de precio</span>
+    </label>
+  );
+}

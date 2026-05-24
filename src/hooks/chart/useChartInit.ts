@@ -20,7 +20,7 @@ export function useChartInit(
         background: { color: c.bg },
         textColor: c.text,
         fontFamily: "var(--font-sans), Inter, system-ui, sans-serif",
-        fontSize: 11,
+        fontSize: window.innerWidth < 768 ? 6 : 11,
         panes: { separatorColor: c.border, separatorHoverColor: c.border },
       },
       grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },

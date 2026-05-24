@@ -7,7 +7,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -22,13 +21,17 @@ export function SymbolSelector() {
   const addToWatchlist = useChartStore((s) => s.addToWatchlist);
   const open = useChartStore((s) => s.symbolDialogOpen);
   const setOpen = useChartStore((s) => s.setSymbolDialogOpen);
+  const mode = useChartStore((s) => s.symbolDialogMode);
 
   const [query, setQuery] = useState("");
   const [allSymbols, setAllSymbols] = useState<SymbolInfo[]>([]);
 
   useEffect(() => {
-    if (open && allSymbols.length === 0) {
-      fetchExchangeSymbols().then(setAllSymbols).catch(console.error);
+    if (open) {
+      setQuery("");
+      if (allSymbols.length === 0) {
+        fetchExchangeSymbols().then(setAllSymbols).catch(console.error);
+      }
     }
   }, [open, allSymbols.length]);
 
@@ -46,56 +49,70 @@ export function SymbolSelector() {
   }, [query, allSymbols]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="group flex items-center gap-2 rounded px-3 py-1.5 text-sm font-semibold hover:bg-tv-panel-hover">
+    <>
+      <button
+        onClick={() => setOpen(true, "search")}
+        className="group flex items-center gap-2 rounded px-3 py-1.5 text-sm font-semibold hover:bg-tv-panel-hover"
+      >
         <Search className="h-3.5 w-3.5 text-tv-text-muted group-hover:text-tv-text" />
         <span className="tabular-nums">{symbol}</span>
         <ChevronDown className="h-3.5 w-3.5 text-tv-text-muted" />
-      </DialogTrigger>
-      <DialogContent className="max-w-md gap-0 bg-tv-panel p-0">
-        <DialogHeader className="border-b border-tv-border px-4 py-3">
-          <DialogTitle className="text-sm font-medium">Buscar símbolo</DialogTitle>
-        </DialogHeader>
-        <div className="border-b border-tv-border p-3">
-          <Input
-            autoFocus
-            placeholder="BTC, ETH, SOL…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="bg-tv-bg"
-          />
-        </div>
-        <ScrollArea className="h-[400px]">
-          <div className="flex flex-col">
-            {filtered.length === 0 && (
-              <div className="p-4 text-center text-xs text-tv-text-muted">
-                Sin resultados
-              </div>
-            )}
-            {filtered.map((s) => (
-              <button
-                key={s.symbol}
-                onClick={() => {
-                  setSymbol(s.symbol);
-                  addToWatchlist(s.symbol);
-                  setOpen(false);
-                  setQuery("");
-                }}
-                className={cn(
-                  "flex items-center justify-between border-b border-tv-border px-4 py-2 text-left text-xs hover:bg-tv-panel-hover",
-                  s.symbol === symbol && "bg-tv-panel-hover",
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-tv-text">{s.baseAsset}</span>
-                  <span className="text-tv-text-muted">/ {s.quoteAsset}</span>
-                </div>
-                <span className="text-tv-text-muted">{s.symbol}</span>
-              </button>
-            ))}
+      </button>
+      <Dialog open={open} onOpenChange={(v) => setOpen(v)}>
+        <DialogContent
+          centered={mode === "add"}
+          className={cn(
+            "gap-0 bg-tv-panel p-0 sm:p-0 overflow-hidden flex flex-col",
+            mode === "add" ? "max-w-md w-[95vw] h-[90vh]" : "max-w-md w-full"
+          )}
+        >
+          <DialogHeader className="border-b border-tv-border px-4 py-3">
+            <DialogTitle className="text-sm font-medium">
+              {mode === "add" ? "Agregar a Watchlist" : "Buscar símbolo"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="border-b border-tv-border p-3">
+            <Input
+              autoFocus
+              placeholder="BTC, ETH, SOL…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="bg-tv-bg"
+            />
           </div>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
+          <ScrollArea className={mode === "add" ? "flex-1 min-h-0" : "h-[400px]"}>
+            <div className="flex flex-col">
+              {filtered.length === 0 && (
+                <div className="p-4 text-center text-xs text-tv-text-muted">
+                  Sin resultados
+                </div>
+              )}
+              {filtered.map((s) => (
+                <button
+                  key={s.symbol}
+                  onClick={() => {
+                    setSymbol(s.symbol);
+                    if (mode === "add") {
+                      addToWatchlist(s.symbol);
+                    }
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "flex cursor-pointer items-center justify-between px-3 py-1.5 text-left text-xs transition-colors hover:bg-tv-panel-hover",
+                    s.symbol === symbol && "bg-tv-panel-hover",
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-tv-text">{s.baseAsset}</span>
+                    <span className="text-[10px] text-tv-text-dim">{s.quoteAsset}</span>
+                  </div>
+                  <span className="text-tv-text-muted">{s.symbol}</span>
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

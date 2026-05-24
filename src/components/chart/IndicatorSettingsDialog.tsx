@@ -45,7 +45,7 @@ export function IndicatorSettingsDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) setTarget(null); }}>
-      <DialogContent className="max-w-sm bg-tv-panel">
+      <DialogContent className="max-w-none sm:max-w-sm bg-tv-panel">
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold">
             {target ? TITLES[target] : ""} — Configuración

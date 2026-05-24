@@ -26,6 +26,7 @@ import { useTrendLineInteraction } from "@/hooks/chart/useTrendLineInteraction";
 import { useRectangleTool } from "@/hooks/chart/useRectangleTool";
 import { useRectanglePrimitives } from "@/hooks/chart/useRectanglePrimitives";
 import { useRectangleInteraction } from "@/hooks/chart/useRectangleInteraction";
+import { useIndicatorDoubleClick } from "@/hooks/chart/useIndicatorDoubleClick";
 
 import { SymbolHeader } from "./overlay/SymbolHeader";
 import { ChartLegend } from "./overlay/ChartLegend";
@@ -51,14 +52,14 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const { chartRef, chartReady } = useChartInit(containerRef, theme);
   const { paneOffsets, recomputePaneOffsets } = usePaneLayout(chartRef, containerRef);
 
-  const { candleSeriesRef, updateEMAs, lastEMA20, lastEMA50, lastEMA200, lastVolume } =
+  const { candleSeriesRef, ema20Ref, ema50Ref, ema200Ref, updateEMAs, lastEMA20, lastEMA50, lastEMA200, lastVolume } =
     useCandleSeries(chartRef, candlesRef, indicators, hidden, config, theme);
   const { volumeSeriesRef } = useVolumeSeries(chartRef, candlesRef, indicators, hidden, recomputePaneOffsets);
-  const { updateRSI, lastRSI } = useRSIPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
-  const { updateMACD, lastMACD, lastMACDSignal, lastMACDHist } = useMACDPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
-  const { updateSQZ, lastSQZ } = useSQZPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
-  const { updateADX, lastADX, lastPlusDI, lastMinusDI } = useADXPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
-  const { updateVRVP } = useVRVPSeries(chartRef, candlesRef, indicators, hidden, config);
+  const { updateRSI, rsiRef, lastRSI } = useRSIPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
+  const { updateMACD, macdRef, macdSignalRef, macdHistRef, lastMACD, lastMACDSignal, lastMACDHist } = useMACDPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
+  const { updateSQZ, sqzmomHistRef, sqzmomDotRef, lastSQZ } = useSQZPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
+  const { updateADX, adxRef, lastADX, lastPlusDI, lastMinusDI } = useADXPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
+  const { updateVRVP, vrvpSeriesRef } = useVRVPSeries(chartRef, candlesRef, indicators, hidden, config);
 
   usePriceLines(candleSeriesRef, symbol);
   // Trend line hooks must add their capture listeners BEFORE usePriceLineDrag so that
@@ -75,6 +76,28 @@ export function PriceChart({ symbol, timeframe }: Props) {
 
   const { setMeasure, measureRef, measureRender } = useMeasureTool(chartRef, candleSeriesRef, candlesRef, tool);
   const { hover } = useChartInteraction(containerRef, chartRef, candleSeriesRef, volumeSeriesRef, tool, symbol, measureRef, setMeasure, updateVRVP);
+
+  const rsiPaneIdx = indicators.rsi ? 1 : -1;
+  const macdPaneIdx = indicators.macd ? (indicators.rsi ? 2 : 1) : -1;
+  const sqzmomAdxPaneIdx = (indicators.sqzmom || indicators.adx) ? (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1 : -1;
+
+  const seriesPaneIndices = {
+    ema20: 0,
+    ema50: 0,
+    ema200: 0,
+    vrvp: 0,
+    rsi: rsiPaneIdx,
+    macd: macdPaneIdx,
+    sqzmom: sqzmomAdxPaneIdx,
+    adx: sqzmomAdxPaneIdx,
+  };
+
+  const { selectedIndicatorKey } = useIndicatorDoubleClick(
+    chartRef, containerRef, tool,
+    { ema20Ref, ema50Ref, ema200Ref, rsiRef, macdRef, macdSignalRef, macdHistRef, sqzmomHistRef, sqzmomDotRef, adxRef, vrvpSeriesRef },
+    paneOffsets,
+    seriesPaneIndices
+  );
 
   const { lastPrice, isLoadingHistory } = useKlineData(symbol, timeframe, chartRef, candlesRef, {
     candleSeriesRef,
@@ -103,7 +126,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
     minusDI: lastMinusDI,
   };
 
-  const leftOffset = indicators.adx ? 64 : 12;
+  const leftOffset = 12;
   const mainPaneTop = paneOffsets[0]?.top ?? 0;
 
   return (
@@ -157,6 +180,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
         hidden={hidden}
         config={config}
         lastValues={lastValues}
+        selectedIndicatorKey={selectedIndicatorKey}
         top={mainPaneTop + 52}
         left={leftOffset}
       />
@@ -166,6 +190,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
         hidden={hidden}
         config={config}
         lastValues={lastValues}
+        selectedIndicatorKey={selectedIndicatorKey}
         paneOffsets={paneOffsets}
         left={leftOffset}
       />

@@ -39,6 +39,7 @@ export function PriceLineSettingsDialog() {
   const priceLines = useChartStore((s) => s.priceLines);
   const updatePriceLine = useChartStore((s) => s.updatePriceLine);
   const updatePriceLineOptions = useChartStore((s) => s.updatePriceLineOptions);
+  const setDrawingDefault = useChartStore((s) => s.setDrawingDefault);
 
   const line = priceLines.find((p) => p.id === priceLineEditTarget) ?? null;
   const open = line !== null;
@@ -70,6 +71,12 @@ export function PriceLineSettingsDialog() {
     if (!priceLineEditTarget) return;
     updatePriceLine(priceLineEditTarget, draft.price);
     updatePriceLineOptions(priceLineEditTarget, {
+      color: draft.color,
+      lineWidth: draft.lineWidth,
+      lineStyle: draft.lineStyle,
+      axisLabelVisible: draft.axisLabelVisible,
+    });
+    setDrawingDefault("hline", {
       color: draft.color,
       lineWidth: draft.lineWidth,
       lineStyle: draft.lineStyle,

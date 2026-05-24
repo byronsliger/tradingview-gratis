@@ -30,7 +30,7 @@ interface Entry {
   group: string;
 }
 
-const ENTRIES: Entry[] = [
+export const ENTRIES: Entry[] = [
   { key: "ema20", group: "Medias móviles", label: (c) => `EMA ${c.ema20}` },
   { key: "ema50", group: "Medias móviles", label: (c) => `EMA ${c.ema50}` },
   { key: "ema200", group: "Medias móviles", label: (c) => `EMA ${c.ema200}` },

@@ -37,7 +37,7 @@ export function LeftSidebar() {
   }
 
   return (
-    <aside className="flex w-11 flex-shrink-0 flex-col items-center gap-0.5 border-r border-tv-border bg-tv-panel py-1.5">
+    <aside className="hidden w-11 flex-shrink-0 flex-col items-center gap-0.5 border-r border-tv-border bg-tv-panel py-1.5 md:flex">
       {TOOLS.map((t) => {
         const Icon = t.icon;
         const active = tool === t.key;

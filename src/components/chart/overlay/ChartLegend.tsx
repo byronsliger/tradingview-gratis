@@ -17,6 +17,7 @@ interface Props {
   hidden: Record<IndicatorKey, boolean>;
   config: IndicatorConfig;
   lastValues: LastValues;
+  selectedIndicatorKey: IndicatorKey | null;
   top: number;
   left: number;
 }
@@ -26,7 +27,7 @@ function LegendToggleButton({ collapsed, count, onClick }: { collapsed: boolean;
     <button
       onClick={onClick}
       title="Leyenda de los indicadores"
-      className="pointer-events-auto group flex h-5 items-center gap-1 rounded border border-transparent px-1.5 text-[10px] text-[#787b86] transition-all hover:border-[#2a2e39] hover:bg-[#1e222d] hover:text-[#d1d4dc] cursor-pointer"
+      className="pointer-events-auto group flex items-center gap-1 rounded px-1 py-0.5 text-[10px] text-tv-text-dim transition-colors bg-tv-panel/50 hover:bg-tv-panel/80 hover:text-tv-text cursor-pointer"
       style={{ position: "relative", zIndex: 30 }}
     >
       <span className="leading-none">{collapsed ? "▼" : "▲"}</span>
@@ -38,7 +39,7 @@ function LegendToggleButton({ collapsed, count, onClick }: { collapsed: boolean;
   );
 }
 
-export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden, config, lastValues, top, left }: Props) {
+export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden, config, lastValues, selectedIndicatorKey, top, left }: Props) {
   const collapsed = useChartStore((s) => s.legendCollapsed);
   const toggleLegendCollapsed = useChartStore((s) => s.toggleLegendCollapsed);
   const toggleHidden = useChartStore((s) => s.toggleHidden);
@@ -49,16 +50,17 @@ export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden,
   if (mainCount === 0) return null;
 
   return (
-    <div style={{ top, left: left - 5 }} className="absolute z-30 flex flex-col items-start gap-1">
+    <div style={{ top, left: left - 5 }} className="absolute z-30 flex flex-col items-start gap-0.5">
       <LegendToggleButton collapsed={collapsed} count={mainCount} onClick={toggleLegendCollapsed} />
       {!collapsed && (
-        <div className="ml-1.5 flex flex-col items-start gap-1">
+        <div className="ml-1 flex flex-col items-start">
           {indicators.ema20 && (
             <IndicatorPill
               name={`EMA ${config.ema20}`}
               value={lastValues.ema20 !== undefined ? formatPrice(lastValues.ema20) : undefined}
               color={config.ema20Color}
               hidden={hidden.ema20}
+              selected={selectedIndicatorKey === "ema20"}
               onToggleHide={() => toggleHidden("ema20")}
               onSettings={() => setSettingsTarget("ema20")}
               onRemove={() => removeIndicator("ema20")}
@@ -70,6 +72,7 @@ export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden,
               value={lastValues.ema50 !== undefined ? formatPrice(lastValues.ema50) : undefined}
               color={config.ema50Color}
               hidden={hidden.ema50}
+              selected={selectedIndicatorKey === "ema50"}
               onToggleHide={() => toggleHidden("ema50")}
               onSettings={() => setSettingsTarget("ema50")}
               onRemove={() => removeIndicator("ema50")}
@@ -81,6 +84,7 @@ export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden,
               value={lastValues.ema200 !== undefined ? formatPrice(lastValues.ema200) : undefined}
               color={config.ema200Color}
               hidden={hidden.ema200}
+              selected={selectedIndicatorKey === "ema200"}
               onToggleHide={() => toggleHidden("ema200")}
               onSettings={() => setSettingsTarget("ema200")}
               onRemove={() => removeIndicator("ema200")}
