@@ -51,7 +51,7 @@ export function useADXPane(
     adxKeyLineRef.current = adxRef.current.createPriceLine({
       price: cfg.adxKeyLevel,
       color: cfg.adxColorKeyLevel,
-      lineWidth: cfg.adxWidth,
+      lineWidth: 2,
       lineStyle: 0,
       axisLabelVisible: false,
       title: "Key Level",
