@@ -369,7 +369,7 @@ export function DrawingSettingsDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }} disablePointerDismissal>
-      <DialogContent className="max-w-xs bg-tv-panel">
+      <DialogContent className="max-w-none sm:max-w-xs bg-tv-panel">
         {drawing?.type === "trendline" && (
           <TrendLineSettings
             drawing={drawing as TrendLineDrawing}

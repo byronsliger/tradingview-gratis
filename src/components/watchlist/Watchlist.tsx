@@ -15,7 +15,7 @@ interface Row {
   pct: number;
 }
 
-export function Watchlist() {
+export function Watchlist({ onClose }: { onClose?: () => void } = {}) {
   const watchlist = useChartStore((s) => s.watchlist);
   const symbol = useChartStore((s) => s.symbol);
   const setSymbol = useChartStore((s) => s.setSymbol);
@@ -84,22 +84,31 @@ export function Watchlist() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-tv-border px-3 py-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-tv-text-muted">
+      <div className="flex items-center justify-between border-b border-tv-border px-3 py-2.5">
+        <h2 className="text-sm font-semibold text-tv-text">
           Watchlist
         </h2>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => openSymbolDialog(true)}
-            className="rounded p-1 text-tv-text-muted hover:bg-tv-panel-hover hover:text-tv-text"
+            onClick={() => openSymbolDialog(true, "add")}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-tv-bg text-tv-text-muted hover:text-tv-text transition-colors"
             title="Agregar símbolo"
             aria-label="Agregar al watchlist"
           >
             <Plus className="h-4 w-4" />
           </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="md:hidden flex h-8 w-8 items-center justify-center rounded-full bg-tv-bg text-tv-text-muted hover:text-tv-text transition-colors"
+              title="Cerrar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
           <button
             onClick={toggleWatchlistCollapsed}
-            className="rounded p-1 text-tv-text-muted hover:bg-tv-panel-hover hover:text-tv-text"
+            className="hidden md:flex h-8 w-8 items-center justify-center rounded-full bg-tv-bg text-tv-text-muted hover:text-tv-text transition-colors"
             title="Ocultar Watchlist"
             aria-label="Ocultar Watchlist"
           >
@@ -162,7 +171,7 @@ export function Watchlist() {
                       e.stopPropagation();
                       removeFromWatchlist(s);
                     }}
-                    className="invisible rounded p-0.5 text-tv-text-muted hover:bg-tv-bg hover:text-tv-red group-hover:visible"
+                    className="visible rounded p-0.5 text-tv-text-muted hover:bg-tv-bg hover:text-tv-red md:invisible md:group-hover:visible"
                     aria-label={`Quitar ${s} del watchlist`}
                   >
                     <X className="h-3 w-3" />

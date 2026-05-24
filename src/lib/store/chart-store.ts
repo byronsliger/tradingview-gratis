@@ -190,6 +190,7 @@ interface ChartState {
   tool: DrawingTool;
   priceLines: PriceLine[];
   symbolDialogOpen: boolean;
+  symbolDialogMode: "search" | "add";
   /** Which indicator's settings dialog is open (null = closed) */
   settingsTarget: IndicatorKey | null;
   priceLineEditTarget: string | null;
@@ -218,7 +219,7 @@ interface ChartState {
   removePriceLine: (id: string) => void;
   updatePriceLine: (id: string, price: number) => void;
   clearPriceLines: (symbol?: string) => void;
-  setSymbolDialogOpen: (v: boolean) => void;
+  setSymbolDialogOpen: (v: boolean, mode?: "search" | "add") => void;
   setSettingsTarget: (k: IndicatorKey | null) => void;
   setPriceLineEditTarget: (id: string | null) => void;
   setSelectedPriceLineId: (id: string | null) => void;
@@ -268,6 +269,7 @@ export const useChartStore = create<ChartState>()(
       tool: "cursor",
       priceLines: [],
       symbolDialogOpen: false,
+      symbolDialogMode: "search",
       settingsTarget: null,
       priceLineEditTarget: null,
       selectedPriceLineId: null,
@@ -342,7 +344,7 @@ export const useChartStore = create<ChartState>()(
             ? state.priceLines.filter((p) => p.symbol !== symbol)
             : [],
         })),
-      setSymbolDialogOpen: (symbolDialogOpen) => set({ symbolDialogOpen }),
+      setSymbolDialogOpen: (symbolDialogOpen, mode) => set((state) => ({ symbolDialogOpen, symbolDialogMode: mode ?? state.symbolDialogMode })),
       setSettingsTarget: (settingsTarget) => set({ settingsTarget }),
       setPriceLineEditTarget: (priceLineEditTarget) => set({ priceLineEditTarget }),
       setSelectedPriceLineId: (selectedPriceLineId) => set({ selectedPriceLineId }),

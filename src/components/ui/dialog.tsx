@@ -43,9 +43,11 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  centered = false,
   ...props
 }: DialogPrimitive.Popup.Props & {
-  showCloseButton?: boolean
+  showCloseButton?: boolean;
+  centered?: boolean;
 }) {
   return (
     <DialogPortal>
@@ -53,7 +55,15 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed z-50 grid w-full gap-3 p-3 sm:gap-4 sm:p-4 bg-popover text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+          centered
+            ? "top-1/2 left-1/2 w-[90vw] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl pb-4"
+            : cn(
+                // Mobile: Bottom Sheet
+                "bottom-0 inset-x-0 rounded-t-2xl max-w-none pb-safe data-open:slide-in-from-bottom data-closed:slide-out-to-bottom",
+                // Desktop: Centered Dialog
+                "sm:bottom-auto sm:right-auto sm:top-1/2 sm:left-1/2 sm:max-w-sm sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:pb-4"
+              ),
           className
         )}
         {...props}
@@ -62,16 +72,9 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            render={
-              <Button
-                variant="ghost"
-                className="absolute top-2 right-2"
-                size="icon-sm"
-              />
-            }
+            className="absolute top-2.5 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-tv-bg text-tv-text-muted hover:text-tv-text transition-colors"
           >
-            <XIcon
-            />
+            <XIcon className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}
@@ -122,7 +125,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
     <DialogPrimitive.Title
       data-slot="dialog-title"
       className={cn(
-        "font-heading text-base leading-none font-medium",
+        "text-sm font-semibold text-tv-text",
         className
       )}
       {...props}
