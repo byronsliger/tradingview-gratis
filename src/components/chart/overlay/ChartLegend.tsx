@@ -26,7 +26,7 @@ function LegendToggleButton({ collapsed, count, onClick }: { collapsed: boolean;
     <button
       onClick={onClick}
       title="Leyenda de los indicadores"
-      className="pointer-events-auto group flex h-5 items-center gap-1 rounded border border-transparent px-1.5 text-[10px] text-[#787b86] transition-all hover:border-[#2a2e39] hover:bg-[#1e222d] hover:text-[#d1d4dc] cursor-pointer"
+      className="pointer-events-auto group flex items-center gap-1 rounded px-1 py-0.5 text-[10px] text-tv-text-dim transition-colors bg-tv-panel/50 hover:bg-tv-panel/80 hover:text-tv-text cursor-pointer"
       style={{ position: "relative", zIndex: 30 }}
     >
       <span className="leading-none">{collapsed ? "▼" : "▲"}</span>
@@ -49,10 +49,10 @@ export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden,
   if (mainCount === 0) return null;
 
   return (
-    <div style={{ top, left: left - 5 }} className="absolute z-30 flex flex-col items-start gap-1">
+    <div style={{ top, left: left - 5 }} className="absolute z-30 flex flex-col items-start gap-0.5">
       <LegendToggleButton collapsed={collapsed} count={mainCount} onClick={toggleLegendCollapsed} />
       {!collapsed && (
-        <div className="ml-1.5 flex flex-col items-start gap-1">
+        <div className="ml-1 flex flex-col items-start">
           {indicators.ema20 && (
             <IndicatorPill
               name={`EMA ${config.ema20}`}

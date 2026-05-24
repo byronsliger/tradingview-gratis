@@ -31,7 +31,7 @@ function LegendToggleButton({ collapsed, count, onClick }: { collapsed: boolean;
     <button
       onClick={onClick}
       title="Leyenda de los indicadores"
-      className="pointer-events-auto group flex h-5 items-center gap-1 rounded border border-transparent px-1.5 text-[10px] text-[#787b86] transition-all hover:border-[#2a2e39] hover:bg-[#1e222d] hover:text-[#d1d4dc] cursor-pointer"
+      className="pointer-events-auto group flex items-center gap-1 rounded px-1 py-0.5 text-[10px] text-tv-text-dim transition-colors bg-tv-panel/50 hover:bg-tv-panel/80 hover:text-tv-text cursor-pointer"
       style={{ position: "relative", zIndex: 30 }}
     >
       <span className="leading-none">{collapsed ? "▼" : "▲"}</span>
@@ -68,7 +68,7 @@ export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hid
   return (
     <>
       {/* Toggle button anchored to first visible sub-pane */}
-      <div style={{ top: firstPane.top + 8, left: left - 10 }} className="absolute z-30">
+      <div style={{ top: firstPane.top + 4, left }} className="absolute z-30">
         <LegendToggleButton collapsed={collapsed} count={subCount} onClick={toggleLegendCollapsed} />
       </div>
 
@@ -76,7 +76,7 @@ export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hid
         <>
           {indicators.rsi && paneOffsets[rsiPaneIdx] && (
             <div
-              style={{ top: paneOffsets[rsiPaneIdx].top + 32, left }}
+              style={{ top: paneOffsets[rsiPaneIdx].top + 24, left }}
               className="pointer-events-none absolute z-10"
             >
               <IndicatorPill
@@ -93,7 +93,7 @@ export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hid
 
           {indicators.macd && paneOffsets[macdPaneIdx] && (
             <div
-              style={{ top: paneOffsets[macdPaneIdx].top + 32, left }}
+              style={{ top: paneOffsets[macdPaneIdx].top + 24, left }}
               className="pointer-events-none absolute z-10"
             >
               <IndicatorPill
@@ -114,7 +114,7 @@ export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hid
 
           {indicators.sqzmom && paneOffsets[sqzmomAdxPaneIdx] && (
             <div
-              style={{ top: paneOffsets[sqzmomAdxPaneIdx].top + 32, left }}
+              style={{ top: paneOffsets[sqzmomAdxPaneIdx].top + 24, left }}
               className="pointer-events-none absolute z-10"
             >
               <IndicatorPill
@@ -131,7 +131,7 @@ export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hid
 
           {indicators.adx && paneOffsets[sqzmomAdxPaneIdx] && (
             <div
-              style={{ top: paneOffsets[sqzmomAdxPaneIdx].top + (indicators.sqzmom ? 54 : 32), left }}
+              style={{ top: paneOffsets[sqzmomAdxPaneIdx].top + (indicators.sqzmom ? 44 : 24), left }}
               className="pointer-events-none absolute z-10"
             >
               <IndicatorPill
