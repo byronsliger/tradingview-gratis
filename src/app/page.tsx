@@ -16,7 +16,7 @@ export default function HomePage() {
   const timeframe = useChartStore((s) => s.timeframe);
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-tv-bg">
+    <div className="flex h-[100dvh] w-screen flex-col overflow-hidden bg-tv-bg">
       <Header />
       <div className="flex min-h-0 flex-1">
         <LeftSidebar />

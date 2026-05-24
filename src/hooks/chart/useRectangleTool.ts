@@ -111,7 +111,7 @@ export function useRectangleTool(
         pointARef.current = null;
         setInProgress(null);
         addDrawingRef.current({
-          id: crypto.randomUUID(),
+          id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
           symbol: symbolRef.current,
           type: "rectangle",
           a,
