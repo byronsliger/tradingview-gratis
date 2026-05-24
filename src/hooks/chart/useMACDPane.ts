@@ -12,6 +12,7 @@ import { TV_COLORS } from "@/lib/chart/chart-colors";
 import { INDICATOR_COLORS, type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import { macd } from "@/lib/indicators";
+import { formatPrice } from "@/lib/format";
 
 export function useMACDPane(
   chartRef: RefObject<IChartApi | null>,
@@ -22,6 +23,7 @@ export function useMACDPane(
   recomputePaneOffsets: () => void,
 ) {
   const macdRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const activePaneIndexRef = useRef<number>(-1);
   const macdSignalRef = useRef<ISeriesApi<"Line"> | null>(null);
   const macdHistRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const configRef = useRef(config);
@@ -54,12 +56,40 @@ export function useMACDPane(
    
   useEffect(() => {
     if (!chartRef.current) return;
+    const targetPaneIndex = indicators.rsi ? 2 : 1;
+
+    if (macdRef.current && activePaneIndexRef.current !== targetPaneIndex) {
+      if (macdRef.current) chartRef.current.removeSeries(macdRef.current);
+      if (macdSignalRef.current) chartRef.current.removeSeries(macdSignalRef.current);
+      if (macdHistRef.current) chartRef.current.removeSeries(macdHistRef.current);
+      macdRef.current = null;
+      macdSignalRef.current = null;
+      macdHistRef.current = null;
+    }
+
     if (indicators.macd && !macdRef.current) {
       const chart = chartRef.current;
-      const paneIndex = indicators.rsi ? 2 : 1;
-      const m = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.macd, lineWidth: 1, priceLineVisible: false, lastValueVisible: configRef.current.macdAxisLabel ?? true }, paneIndex);
-      const s = chart.addSeries(LineSeries, { color: TV_COLORS.yellow, lineWidth: 1, priceLineVisible: false, lastValueVisible: configRef.current.macdAxisLabel ?? true }, paneIndex);
-      const h = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, paneIndex);
+      const paneIndex = targetPaneIndex;
+      activePaneIndexRef.current = targetPaneIndex;
+      const m = chart.addSeries(LineSeries, { 
+        color: INDICATOR_COLORS.macd, 
+        lineWidth: 1, 
+        priceLineVisible: false, 
+        lastValueVisible: configRef.current.macdAxisLabel ?? true,
+        priceFormat: { type: "custom", minMove: 0.00000001, formatter: (price: number) => formatPrice(price) }
+      }, paneIndex);
+      const s = chart.addSeries(LineSeries, { 
+        color: TV_COLORS.yellow, 
+        lineWidth: 1, 
+        priceLineVisible: false, 
+        lastValueVisible: configRef.current.macdAxisLabel ?? true,
+        priceFormat: { type: "custom", minMove: 0.00000001, formatter: (price: number) => formatPrice(price) }
+      }, paneIndex);
+      const h = chart.addSeries(HistogramSeries, { 
+        priceLineVisible: false, 
+        lastValueVisible: false,
+        priceFormat: { type: "custom", minMove: 0.00000001, formatter: (price: number) => formatPrice(price) }
+      }, paneIndex);
       macdRef.current = m;
       macdSignalRef.current = s;
       macdHistRef.current = h;

@@ -11,6 +11,19 @@ import { DrawingSettingsDialog } from "@/components/chart/DrawingSettingsDialog"
 import { useChartStore } from "@/lib/store/chart-store";
 import { MobileChartTools } from "@/components/layout/MobileChartTools";
 
+if (typeof window !== "undefined" && typeof Element !== "undefined") {
+  const originalReleasePointerCapture = Element.prototype.releasePointerCapture;
+  Element.prototype.releasePointerCapture = function (pointerId) {
+    try {
+      if (this.hasPointerCapture(pointerId)) {
+        originalReleasePointerCapture.call(this, pointerId);
+      }
+    } catch (e) {
+      // Ignore NotFoundError thrown by third-party libs like Base UI ScrollArea
+    }
+  };
+}
+
 export default function HomePage() {
   const symbol = useChartStore((s) => s.symbol);
   const timeframe = useChartStore((s) => s.timeframe);

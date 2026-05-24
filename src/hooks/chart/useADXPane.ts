@@ -12,6 +12,7 @@ import { TV_COLORS } from "@/lib/chart/chart-colors";
 import { type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import { adx } from "@/lib/indicators";
+import { formatPrice } from "@/lib/format";
 
 export function useADXPane(
   chartRef: RefObject<IChartApi | null>,
@@ -22,6 +23,7 @@ export function useADXPane(
   recomputePaneOffsets: () => void,
 ) {
   const adxRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const activePaneIndexRef = useRef<number>(-1);
   const adxKeyLineRef = useRef<IPriceLine | null>(null);
   const adxStrengthLineRef = useRef<IPriceLine | null>(null);
   const configRef = useRef(config);
@@ -49,7 +51,7 @@ export function useADXPane(
     adxKeyLineRef.current = adxRef.current.createPriceLine({
       price: cfg.adxKeyLevel,
       color: cfg.adxColorKeyLevel,
-      lineWidth: 2,
+      lineWidth: cfg.adxWidth,
       lineStyle: 0,
       axisLabelVisible: false,
       title: "Key Level",
@@ -73,13 +75,35 @@ export function useADXPane(
    
   useEffect(() => {
     if (!chartRef.current) return;
+    const targetPaneIndex = (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1;
+
+    if (adxRef.current && activePaneIndexRef.current !== targetPaneIndex) {
+      try { adxRef.current.priceScale().applyOptions({ visible: false }); } catch {}
+      chartRef.current.removeSeries(adxRef.current);
+      adxRef.current = null;
+      adxKeyLineRef.current = null;
+      adxStrengthLineRef.current = null;
+    }
+
     if (indicators.adx && !adxRef.current) {
       const chart = chartRef.current;
-      const paneIndex = (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1;
+      const paneIndex = targetPaneIndex;
+      activePaneIndexRef.current = targetPaneIndex;
       const showLabel = configRef.current.adxAxisLabel ?? true;
       const aSeries = chart.addSeries(
         LineSeries,
-        { color: TV_COLORS.text, lineWidth: 2, priceLineVisible: false, lastValueVisible: showLabel, priceScaleId: "adx-right" },
+        {
+          color: TV_COLORS.text,
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: showLabel,
+          priceScaleId: "adx-right",
+          priceFormat: {
+            type: "custom",
+            minMove: 0.00000001,
+            formatter: (price: number) => formatPrice(price),
+          },
+        },
         paneIndex,
       );
       adxRef.current = aSeries;

@@ -11,6 +11,7 @@ import {
 import { type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import { squeezeMomentum } from "@/lib/indicators";
+import { formatPrice } from "@/lib/format";
 
 export function useSQZPane(
   chartRef: RefObject<IChartApi | null>,
@@ -21,6 +22,7 @@ export function useSQZPane(
   recomputePaneOffsets: () => void,
 ) {
   const sqzmomHistRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const activePaneIndexRef = useRef<number>(-1);
   const sqzmomDotRef = useRef<ISeriesApi<"Line"> | null>(null);
   const configRef = useRef(config);
   // eslint-disable-next-line react-hooks/refs
@@ -60,10 +62,24 @@ export function useSQZPane(
    
   useEffect(() => {
     if (!chartRef.current) return;
+    const targetPaneIndex = (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1;
+
+    if (sqzmomHistRef.current && activePaneIndexRef.current !== targetPaneIndex) {
+      chartRef.current.removeSeries(sqzmomHistRef.current);
+      if (sqzmomDotRef.current) chartRef.current.removeSeries(sqzmomDotRef.current);
+      sqzmomHistRef.current = null;
+      sqzmomDotRef.current = null;
+    }
+
     if (indicators.sqzmom && !sqzmomHistRef.current) {
       const chart = chartRef.current;
-      const paneIndex = (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1;
-      const hist = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: configRef.current.sqzmomAxisLabel ?? true }, paneIndex);
+      const paneIndex = targetPaneIndex;
+      activePaneIndexRef.current = targetPaneIndex;
+      const hist = chart.addSeries(HistogramSeries, { 
+        priceLineVisible: false, 
+        lastValueVisible: configRef.current.sqzmomAxisLabel ?? true,
+        priceFormat: { type: "custom", minMove: 0.00000001, formatter: (price: number) => formatPrice(price) }
+      }, paneIndex);
       const dot = chart.addSeries(LineSeries, {
         lineWidth: 4,
         pointMarkersVisible: true,
@@ -71,6 +87,7 @@ export function useSQZPane(
         priceLineVisible: false,
         lastValueVisible: false,
         lineVisible: false,
+        priceFormat: { type: "custom", minMove: 0.00000001, formatter: (price: number) => formatPrice(price) }
       }, paneIndex);
       sqzmomHistRef.current = hist;
       sqzmomDotRef.current = dot;

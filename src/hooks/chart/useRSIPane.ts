@@ -11,6 +11,7 @@ import { TV_COLORS } from "@/lib/chart/chart-colors";
 import { INDICATOR_COLORS, type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import { rsi } from "@/lib/indicators";
+import { formatPrice } from "@/lib/format";
 
 export function useRSIPane(
   chartRef: RefObject<IChartApi | null>,
@@ -55,7 +56,17 @@ export function useRSIPane(
     if (indicators.rsi && !rsiRef.current) {
       const chart = chartRef.current;
       const paneIndex = 1;
-      const r = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.rsi, lineWidth: 1, priceLineVisible: false, lastValueVisible: configRef.current.rsiAxisLabel ?? true }, paneIndex);
+      const r = chart.addSeries(LineSeries, { 
+        color: INDICATOR_COLORS.rsi, 
+        lineWidth: 1, 
+        priceLineVisible: false, 
+        lastValueVisible: configRef.current.rsiAxisLabel ?? true,
+        priceFormat: {
+          type: "custom",
+          minMove: 0.00000001,
+          formatter: (price: number) => formatPrice(price),
+        },
+      }, paneIndex);
       const r30 = chart.addSeries(LineSeries, { color: TV_COLORS.textMuted, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }, paneIndex);
       const r70 = chart.addSeries(LineSeries, { color: TV_COLORS.textMuted, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }, paneIndex);
       rsiRef.current = r;
