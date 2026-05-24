@@ -49,7 +49,7 @@ export function useRSIPane(
     setLastRSI(data.at(-1)?.value);
   }, [candlesRef]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!chartRef.current) return;
     if (indicators.rsi && !rsiRef.current) {
@@ -73,6 +73,7 @@ export function useRSIPane(
       rsi70Ref.current = null;
     }
     requestAnimationFrame(() => recomputePaneOffsets());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [indicators.rsi]);
 
   useEffect(() => {

@@ -24,7 +24,7 @@ export function toggleChartScroll(chart: IChartApi | null, enabled: boolean) {
         vertTouchDrag: enabled,
       },
     });
-  } catch (_) {}
+  } catch {}
 }
 
 /**

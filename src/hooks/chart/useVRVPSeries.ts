@@ -10,7 +10,7 @@ import {
 } from "lightweight-charts";
 import { VRVPSeriesPaneView, type VRVPBarData } from "@/lib/indicators/vrvp-series";
 import { calculateVRVP } from "@/lib/indicators";
-import { type IndicatorConfig, type IndicatorKey, useChartStore } from "@/lib/store/chart-store";
+import { type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 
 export function useVRVPSeries(
@@ -31,7 +31,7 @@ export function useVRVPSeries(
   // eslint-disable-next-line react-hooks/refs
   hiddenRef.current = hidden;
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!chartRef.current) return;
     try {
@@ -44,7 +44,7 @@ export function useVRVPSeries(
       console.error("Failed to add custom VRVP series:", e);
     }
     return () => { vrvpSeriesRef.current = null; };
-  }, []);
+  }, [chartRef]);
 
   const updateVRVP = useCallback(() => {
     if (!chartRef.current || !vrvpSeriesRef.current) return;
@@ -98,7 +98,7 @@ export function useVRVPSeries(
   }, [chartRef, candlesRef]);
 
   // rightOffset management
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!chartRef.current) return;
     const chart = chartRef.current;
@@ -143,7 +143,7 @@ export function useVRVPSeries(
     return () => {
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
     };
-  }, [indicators.vrvp, hidden.vrvp, config.vrvpWidth, config.vrvpPlacement]);
+  }, [chartRef, indicators.vrvp, hidden.vrvp, config.vrvpWidth, config.vrvpPlacement]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { updateVRVP(); }, [indicators.vrvp, hidden.vrvp]);

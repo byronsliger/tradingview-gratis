@@ -47,17 +47,18 @@ export function useMeasureTool(
   const [renderTick, setRenderTick] = useState(0);
 
   // Subscribe to range changes to keep pixel coords in sync
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
-    if (!chartRef.current) return;
+    const chart = chartRef.current;
+    if (!chart) return;
     const handler = () => setRenderTick((t) => t + 1);
-    chartRef.current.timeScale().subscribeVisibleTimeRangeChange(handler);
-    chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(handler);
+    chart.timeScale().subscribeVisibleTimeRangeChange(handler);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
     return () => {
-      chartRef.current?.timeScale().unsubscribeVisibleTimeRangeChange(handler);
-      chartRef.current?.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
+      chart.timeScale().unsubscribeVisibleTimeRangeChange(handler);
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
     };
-  }, []);
+  }, [chartRef]);
 
   useEffect(() => {
     if (tool !== "measure") {
@@ -80,10 +81,12 @@ export function useMeasureTool(
     if (aX !== null && bX !== null && aY !== null && bY !== null) {
       let leftScaleWidth = 0;
       try {
+        // eslint-disable-next-line react-hooks/refs
         if (chartRef.current.options().leftPriceScale?.visible) {
+          // eslint-disable-next-line react-hooks/refs
           leftScaleWidth = chartRef.current.priceScale("left").width();
         }
-      } catch (e) {
+      } catch {
         // Ignore internal lightweight-charts initialization errors
       }
       const absAX = aX + leftScaleWidth;

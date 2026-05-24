@@ -77,7 +77,7 @@ export function useTrendLineInteraction(
         if (chartRef.current?.options().leftPriceScale?.visible) {
           leftScaleWidth = chartRef.current.priceScale("left").width();
         }
-      } catch (e) {
+      } catch {
         // Ignore internal lightweight-charts initialization errors
       }
       return { px: e.clientX - rect.left - leftScaleWidth, py: e.clientY - rect.top };
@@ -128,7 +128,7 @@ export function useTrendLineInteraction(
         const price = prim._series.coordinateToPrice(py);
         if (price === null || !isFinite(price)) return null;
 
-        let time = chartRef.current.timeScale().coordinateToTime(px);
+        const time = chartRef.current.timeScale().coordinateToTime(px);
         if (time !== null) return { time: time as number, price };
 
         const logical = chartRef.current.timeScale().coordinateToLogical(px);
@@ -298,6 +298,7 @@ export function useTrendLineInteraction(
     container.addEventListener("pointercancel", onPointerUp, true);
     window.addEventListener("keydown", onKeyDown);
 
+    const chartCleanup = chartRef.current;
     return () => {
       container.removeEventListener("pointermove", onPointerMove, true);
       container.removeEventListener("pointerdown", onPointerDown, true);
@@ -305,16 +306,16 @@ export function useTrendLineInteraction(
       container.removeEventListener("pointercancel", onPointerUp, true);
       cleanLegacyBlockers();
       window.removeEventListener("keydown", onKeyDown);
-      if (chartRef.current) {
+      if (chartCleanup) {
         try {
-          chartRef.current.applyOptions({
+          chartCleanup.applyOptions({
             handleScroll: {
               pressedMouseMove: true,
               horzTouchDrag: true,
               vertTouchDrag: true,
             },
           });
-        } catch (_) {}
+        } catch {}
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

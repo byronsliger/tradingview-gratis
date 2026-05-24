@@ -10,7 +10,6 @@ import { PriceLineSettingsDialog } from "@/components/chart/PriceLineSettingsDia
 import { DrawingSettingsDialog } from "@/components/chart/DrawingSettingsDialog";
 import { useChartStore } from "@/lib/store/chart-store";
 import { MobileChartTools } from "@/components/layout/MobileChartTools";
-import { cn } from "@/lib/utils";
 
 export default function HomePage() {
   const symbol = useChartStore((s) => s.symbol);

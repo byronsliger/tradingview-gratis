@@ -62,7 +62,7 @@ export const RectangleLayer = React.memo(function RectangleLayer({
     if (chart.options().leftPriceScale?.visible) {
       leftScaleWidth = chart.priceScale("left").width();
     }
-  } catch (_) {}
+  } catch {}
 
   const x1 = Math.min(aX, bX) + leftScaleWidth;
   const y1 = Math.min(aY, bY);

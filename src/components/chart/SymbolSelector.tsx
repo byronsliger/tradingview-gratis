@@ -28,7 +28,7 @@ export function SymbolSelector() {
 
   useEffect(() => {
     if (open) {
-      setQuery("");
+      queueMicrotask(() => setQuery(""));
       if (allSymbols.length === 0) {
         fetchExchangeSymbols().then(setAllSymbols).catch(console.error);
       }

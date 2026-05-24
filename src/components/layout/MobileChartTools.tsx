@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type ElementType } from "react";
 import {
   Pencil,
   X,
@@ -8,7 +8,6 @@ import {
   Minus,
   Slash,
   RectangleHorizontal,
-  Moon,
   MoreHorizontal,
   Search,
   Trash2,
@@ -16,7 +15,7 @@ import {
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import type { Timeframe, SymbolInfo } from "@/lib/binance/types";
 import { fetchExchangeSymbols } from "@/lib/binance/rest";
-import { IndicatorMenu, ENTRIES } from "@/components/chart/IndicatorMenu";
+import { ENTRIES } from "@/components/chart/IndicatorMenu";
 import { Watchlist } from "@/components/watchlist/Watchlist";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,7 +24,7 @@ import { cn } from "@/lib/utils";
 
 const TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"];
 
-const DRAWING_TOOLS: { key: DrawingTool; icon: any; label: string }[] = [
+const DRAWING_TOOLS: { key: DrawingTool; icon: ElementType; label: string }[] = [
   { key: "cursor", icon: MousePointer2, label: "Cursor" },
   { key: "hline", icon: Minus, label: "Horizontal" },
   { key: "trendline", icon: Slash, label: "Tendencia" },
@@ -36,13 +35,10 @@ type SheetType = "timeframe" | "drawings" | "more" | "watchlist" | "indicators" 
 
 export function MobileChartTools() {
   const [activeSheet, setActiveSheet] = useState<SheetType>(null);
+  // Keep the last-rendered sheet mounted during the slide-out animation.
+  // Updated only from event handlers — never from effects.
   const [renderedSheet, setRenderedSheet] = useState<SheetType>(null);
 
-  useEffect(() => {
-    if (activeSheet) setRenderedSheet(activeSheet);
-  }, [activeSheet]);
-
-  const mobileTab = useChartStore((s) => s.mobileTab);
   const tf = useChartStore((s) => s.timeframe);
   const setTf = useChartStore((s) => s.setTimeframe);
   const tool = useChartStore((s) => s.tool);
@@ -52,7 +48,6 @@ export function MobileChartTools() {
 
   const symbol = useChartStore((s) => s.symbol);
   const setSymbol = useChartStore((s) => s.setSymbol);
-  const setSymbolDialogOpen = useChartStore((s) => s.setSymbolDialogOpen);
 
   const [allSymbols, setAllSymbols] = useState<SymbolInfo[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -66,7 +61,6 @@ export function MobileChartTools() {
     if (activeSheet === "search" && allSymbols.length === 0) {
       fetchExchangeSymbols().then(setAllSymbols).catch(console.error);
     }
-    if (activeSheet !== "search") setSearchQuery("");
   }, [activeSheet, allSymbols.length]);
 
   const filteredSymbols = useMemo(() => {
@@ -77,18 +71,19 @@ export function MobileChartTools() {
       .slice(0, 100);
   }, [searchQuery, allSymbols]);
 
-  // Close sheet when symbol changes
-  const [prevSymbol, setPrevSymbol] = useState(symbol);
-  useEffect(() => {
-    if (symbol !== prevSymbol) {
-      setPrevSymbol(symbol);
-      if (activeSheet === "watchlist") {
-        setActiveSheet(null);
-      }
-    }
-  }, [symbol, prevSymbol, activeSheet]);
-
-  const closeSheet = () => setActiveSheet(null);
+  // Open a sheet: set rendered content first, then open.
+  // Resetting searchQuery here (not in an effect) avoids set-state-in-effect.
+  const openSheet = (sheet: SheetType) => {
+    if (sheet !== "search") setSearchQuery("");
+    setRenderedSheet(sheet);
+    setActiveSheet(sheet);
+  };
+  // Close: slide the container away; renderedSheet keeps its value so
+  // the content remains mounted during the CSS transition.
+  const closeSheet = () => {
+    setSearchQuery("");
+    setActiveSheet(null);
+  };
 
   return (
     <>
@@ -269,7 +264,7 @@ export function MobileChartTools() {
                   (acc[i.group] ||= []).push(i);
                   return acc;
                 }, {})
-              ).map(([group, items], idx) => (
+              ).map(([group, items]) => (
                 <div key={group} className="flex flex-col gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-tv-text-muted px-2">
                     {group}
@@ -302,13 +297,13 @@ export function MobileChartTools() {
       <div className="fixed bottom-0 inset-x-0 z-30 flex h-10 items-center justify-between border-t border-tv-border bg-tv-panel px-2 pb-safe md:hidden">
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setActiveSheet("watchlist")}
+            onClick={() => openSheet("watchlist")}
             className="flex h-8 items-center rounded-md px-2 text-xs font-bold text-tv-text hover:bg-tv-panel-hover"
           >
             {symbol.replace("USDT", "")}
           </button>
           <button
-            onClick={() => setActiveSheet("timeframe")}
+            onClick={() => openSheet("timeframe")}
             className="flex h-8 min-w-[3rem] items-center justify-center rounded-md text-xs font-bold uppercase text-tv-text hover:bg-tv-panel-hover"
           >
             {tf}
@@ -319,7 +314,7 @@ export function MobileChartTools() {
 
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setActiveSheet("indicators")}
+            onClick={() => openSheet("indicators")}
             className="flex h-8 w-8 items-center justify-center rounded-md text-tv-text hover:bg-tv-panel-hover relative"
           >
             <Activity className="h-4 w-4" />
@@ -330,7 +325,7 @@ export function MobileChartTools() {
             )}
           </button>
           <button
-            onClick={() => setActiveSheet("drawings")}
+            onClick={() => openSheet("drawings")}
             className={cn(
               "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
               tool !== "cursor" ? "text-tv-blue" : "text-tv-text hover:bg-tv-panel-hover"
@@ -339,13 +334,13 @@ export function MobileChartTools() {
             <Pencil className="h-4 w-4" />
           </button>
           <button
-            onClick={() => setActiveSheet("search")}
+            onClick={() => openSheet("search")}
             className="flex h-8 w-8 items-center justify-center rounded-md text-tv-text hover:bg-tv-panel-hover"
           >
             <Search className="h-4 w-4" />
           </button>
           <button
-            onClick={() => setActiveSheet("more")}
+            onClick={() => openSheet("more")}
             className="flex h-8 w-8 items-center justify-center rounded-md text-tv-text hover:bg-tv-panel-hover"
           >
             <MoreHorizontal className="h-4 w-4" />

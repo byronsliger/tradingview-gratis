@@ -33,9 +33,9 @@ export function VRVPSettings({ config, onSave, onReset }: Props) {
   const [colorVAH,      setColorVAH]      = useState(config.vrvpColorVAH      ?? DEFAULT_CONFIG.vrvpColorVAH);
   const [showVAL,       setShowVAL]       = useState(config.vrvpShowVAL       ?? DEFAULT_CONFIG.vrvpShowVAL);
   const [colorVAL,      setColorVAL]      = useState(config.vrvpColorVAL      ?? DEFAULT_CONFIG.vrvpColorVAL);
-  const [showLabels,    setShowLabels]    = useState(config.vrvpShowLabels    ?? DEFAULT_CONFIG.vrvpShowLabels);
-  const [showStatusValues, setShowStatusValues] = useState(config.vrvpShowStatusValues ?? DEFAULT_CONFIG.vrvpShowStatusValues);
-  const [showStatusInputs, setShowStatusInputs] = useState(config.vrvpShowStatusInputs ?? DEFAULT_CONFIG.vrvpShowStatusInputs);
+  const [showLabels]    = useState(config.vrvpShowLabels    ?? DEFAULT_CONFIG.vrvpShowLabels);
+  const [showStatusValues] = useState(config.vrvpShowStatusValues ?? DEFAULT_CONFIG.vrvpShowStatusValues);
+  const [showStatusInputs] = useState(config.vrvpShowStatusInputs ?? DEFAULT_CONFIG.vrvpShowStatusInputs);
 
   function save() {
     onSave({

@@ -49,7 +49,7 @@ export function useTrendLineTool(
     if (tool !== "trendline") {
       phaseRef.current = "idle";
       pointARef.current = null;
-      setInProgress(null);
+      queueMicrotask(() => setInProgress(null));
     }
   }, [tool]);
 
@@ -57,7 +57,7 @@ export function useTrendLineTool(
   useEffect(() => {
     phaseRef.current = "idle";
     pointARef.current = null;
-    setInProgress(null);
+    queueMicrotask(() => setInProgress(null));
   }, [symbol]);
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export function useTrendLineTool(
         if (chart.options().leftPriceScale?.visible) {
           leftScaleWidth = chart.priceScale("left").width();
         }
-      } catch (e) {
+      } catch {
         // Ignore internal lightweight-charts initialization errors
       }
       const x = e.clientX - rect.left - leftScaleWidth;

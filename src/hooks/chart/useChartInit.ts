@@ -11,7 +11,7 @@ export function useChartInit(
   const chartRef = useRef<IChartApi | null>(null);
   const [chartReady, setChartReady] = useState(false);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!containerRef.current) return;
     const c = TV_COLORS;
@@ -47,6 +47,7 @@ export function useChartInit(
       chartRef.current = null;
       setChartReady(false);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

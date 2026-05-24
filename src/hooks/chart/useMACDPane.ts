@@ -51,7 +51,7 @@ export function useMACDPane(
     setLastMACDHist(last?.histogram);
   }, [candlesRef]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!chartRef.current) return;
     if (indicators.macd && !macdRef.current) {
@@ -75,6 +75,7 @@ export function useMACDPane(
       macdHistRef.current = null;
     }
     requestAnimationFrame(() => recomputePaneOffsets());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [indicators.macd, indicators.rsi]);
 
   useEffect(() => {

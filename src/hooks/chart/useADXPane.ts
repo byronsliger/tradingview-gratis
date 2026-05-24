@@ -70,7 +70,7 @@ export function useADXPane(
     setLastMinusDI(last?.minusDI);
   }, [candlesRef]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!chartRef.current) return;
     if (indicators.adx && !adxRef.current) {
@@ -94,6 +94,7 @@ export function useADXPane(
       adxStrengthLineRef.current = null;
     }
     requestAnimationFrame(() => recomputePaneOffsets());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [indicators.adx, indicators.rsi, indicators.macd, indicators.sqzmom]);
 
   useEffect(() => {
@@ -109,6 +110,7 @@ export function useADXPane(
     if (!adxRef.current || !chartRef.current) return;
     adxRef.current.applyOptions({ lastValueVisible: config.adxAxisLabel ?? true });
     adxRef.current.priceScale().applyOptions({ visible: false });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.adxAxisLabel]);
 
   return { updateADX, adxRef, lastADX, lastPlusDI, lastMinusDI };

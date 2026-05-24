@@ -55,7 +55,7 @@ export function useChartInteraction(
   onRangeChangeRef.current = onLogicalRangeChange;
 
   // Subscribe chart events on mount (stable subscription — reads from refs)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!chartRef.current) return;
     const chart = chartRef.current;
@@ -126,6 +126,7 @@ export function useChartInteraction(
       chart.unsubscribeCrosshairMove(onCrosshairMove);
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(logicalRangeHandler);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Cursor style
