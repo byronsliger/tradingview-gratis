@@ -54,15 +54,17 @@ function TrendLineSettings({ drawing, onSave, onDelete, onClose }: {
   });
 
   useEffect(() => {
-    setTab("estilo");
-    setDraft({
-      color: drawing.color,
-      lineWidth: drawing.lineWidth,
-      lineStyle: drawing.lineStyle,
-      extendLeft: drawing.extendLeft,
-      extendRight: drawing.extendRight,
-      priceA: drawing.a.price,
-      priceB: drawing.b.price,
+    queueMicrotask(() => {
+      setTab("estilo");
+      setDraft({
+        color: drawing.color,
+        lineWidth: drawing.lineWidth,
+        lineStyle: drawing.lineStyle,
+        extendLeft: drawing.extendLeft,
+        extendRight: drawing.extendRight,
+        priceA: drawing.a.price,
+        priceB: drawing.b.price,
+      });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawing.id]);
@@ -207,21 +209,23 @@ function RectangleSettings({ drawing, onSave, onDelete, onClose }: {
   });
 
   useEffect(() => {
-    setTab("estilo");
-    const top = Math.max(drawing.a.price, drawing.b.price);
-    const bot = Math.min(drawing.a.price, drawing.b.price);
-    const fc = drawing.fillColor;
-    setDraft({
-      color: drawing.color,
-      lineWidth: drawing.lineWidth,
-      lineStyle: drawing.lineStyle,
-      fillVisible: drawing.fillVisible,
-      fillColor: fc.slice(0, 7),
-      fillAlpha: Math.round(parseInt(fc.slice(7, 9) || "22", 16) / 255 * 100),
-      priceTop: top,
-      priceBottom: bot,
-      timeLeft: Math.min(drawing.a.time, drawing.b.time),
-      timeRight: Math.max(drawing.a.time, drawing.b.time),
+    queueMicrotask(() => {
+      setTab("estilo");
+      const top = Math.max(drawing.a.price, drawing.b.price);
+      const bot = Math.min(drawing.a.price, drawing.b.price);
+      const fc = drawing.fillColor;
+      setDraft({
+        color: drawing.color,
+        lineWidth: drawing.lineWidth,
+        lineStyle: drawing.lineStyle,
+        fillVisible: drawing.fillVisible,
+        fillColor: fc.slice(0, 7),
+        fillAlpha: Math.round(parseInt(fc.slice(7, 9) || "22", 16) / 255 * 100),
+        priceTop: top,
+        priceBottom: bot,
+        timeLeft: Math.min(drawing.a.time, drawing.b.time),
+        timeRight: Math.max(drawing.a.time, drawing.b.time),
+      });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawing.id]);

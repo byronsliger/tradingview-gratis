@@ -57,7 +57,7 @@ export function useSQZPane(
     setLastSQZ(pts.at(-1)?.val);
   }, [candlesRef]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!chartRef.current) return;
     if (indicators.sqzmom && !sqzmomHistRef.current) {
@@ -84,6 +84,7 @@ export function useSQZPane(
       sqzmomDotRef.current = null;
     }
     requestAnimationFrame(() => recomputePaneOffsets());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [indicators.sqzmom, indicators.rsi, indicators.macd]);
 
   useEffect(() => {

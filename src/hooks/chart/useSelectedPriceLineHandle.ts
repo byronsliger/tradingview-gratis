@@ -16,7 +16,7 @@ export function useSelectedPriceLineHandle(
 
   useEffect(() => {
     if (!selectedLine) {
-      setHandleY(null);
+      queueMicrotask(() => setHandleY(null));
       return;
     }
 

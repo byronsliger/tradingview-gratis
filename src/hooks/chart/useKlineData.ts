@@ -88,7 +88,7 @@ export function useKlineData(
   }, [chartRef, candlesRef]);
 
   // Subscribe to logical range for lazy loading and zoom saving
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!chartRef.current) return;
     const chart = chartRef.current;
@@ -111,10 +111,11 @@ export function useKlineData(
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
       clearTimeout(timeoutId);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadMoreHistory]);
 
   // Load initial data and subscribe WS
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     let unsub: (() => void) | null = null;
     let cancelled = false;
@@ -230,6 +231,7 @@ export function useKlineData(
       cancelled = true;
       if (unsub) unsub();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol, timeframe]);
 
   return { lastPrice, isLoadingHistory };

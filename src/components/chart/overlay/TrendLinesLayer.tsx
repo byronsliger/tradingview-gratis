@@ -65,7 +65,7 @@ export const TrendLinesLayer = React.memo(function TrendLinesLayer({
     if (chart.options().leftPriceScale?.visible) {
       leftScaleWidth = chart.priceScale("left").width();
     }
-  } catch (e) {
+  } catch {
     // Ignore internal lightweight-charts initialization errors
   }
   const absAX = aX + leftScaleWidth;

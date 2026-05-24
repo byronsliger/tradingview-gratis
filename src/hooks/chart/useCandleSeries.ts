@@ -37,7 +37,7 @@ export function useCandleSeries(
   const [lastEMA200, setLastEMA200] = useState<number | undefined>(undefined);
   const [lastVolume, setLastVolume] = useState<number | undefined>(undefined);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!chartRef.current) return;
     const c = TV_COLORS;
@@ -83,6 +83,7 @@ export function useCandleSeries(
       ema50Ref.current = null;
       ema200Ref.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

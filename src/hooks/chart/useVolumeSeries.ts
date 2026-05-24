@@ -20,7 +20,7 @@ export function useVolumeSeries(
 ) {
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!chartRef.current) return;
     if (indicators.volume && !volumeSeriesRef.current) {
@@ -49,6 +49,7 @@ export function useVolumeSeries(
       volumeSeriesRef.current = null;
     }
     requestAnimationFrame(() => recomputePaneOffsets());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [indicators.volume]);
 
   useEffect(() => {

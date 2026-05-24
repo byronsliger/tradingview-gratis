@@ -44,7 +44,9 @@ class VRVPRenderer implements ICustomSeriesPaneRenderer {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     target: any,
     priceConverter: PriceToCoordinateConverter,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _isHovered: boolean,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _hitTestData?: unknown
   ): void {
     if (!this._data || this._data.bars.length === 0) return;
@@ -196,6 +198,7 @@ export class VRVPSeriesPaneView implements ICustomSeriesPaneView<Time, VRVPBarDa
     return [0, 0, 0];
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public isWhitespace(_data: VRVPBarData): _data is VRVPBarData {
     return false;
   }

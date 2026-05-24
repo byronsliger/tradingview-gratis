@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { DEFAULT_CONFIG, type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
-import { Tabs, Field, SimpleColorRow, LineStylePicker, WidthPicker, clamp, AxisLabelToggle } from "./shared";
+import { DEFAULT_CONFIG, type IndicatorConfig } from "@/lib/store/chart-store";
+import { Tabs, Field, LineStylePicker, WidthPicker, clamp } from "./shared";
 
 type EMAKey = "ema20" | "ema50" | "ema200";
 type EMAAxisLabelKey = `${EMAKey}AxisLabel`;

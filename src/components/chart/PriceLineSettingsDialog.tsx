@@ -55,13 +55,15 @@ export function PriceLineSettingsDialog() {
 
   useEffect(() => {
     if (line) {
-      setTab("estilo");
-      setDraft({
-        color: line.color ?? "#2962ff",
-        lineWidth: (line.lineWidth ?? 1) as 1 | 2 | 3 | 4,
-        lineStyle: line.lineStyle ?? 2,
-        axisLabelVisible: line.axisLabelVisible ?? true,
-        price: line.price,
+      queueMicrotask(() => {
+        setTab("estilo");
+        setDraft({
+          color: line.color ?? "#2962ff",
+          lineWidth: (line.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+          lineStyle: line.lineStyle ?? 2,
+          axisLabelVisible: line.axisLabelVisible ?? true,
+          price: line.price,
+        });
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

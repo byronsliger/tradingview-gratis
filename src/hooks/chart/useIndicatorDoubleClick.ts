@@ -79,7 +79,7 @@ export function useIndicatorDoubleClick(
   // eslint-disable-next-line react-hooks/refs
   getKeyRef.current = getKey;
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     const chart = chartRef.current;
     const container = containerRef.current;
@@ -119,13 +119,12 @@ export function useIndicatorDoubleClick(
         if (seriesPaneIdx !== activePaneIndex) return;
 
         let price: number | undefined;
-        let vrvpData: any = undefined;
-        if (data && 'value' in data) {
-          price = (data as any).value;
-        } else if (data && 'close' in data) {
-          price = (data as any).close;
-        } else if (data && 'vrvp' in data) {
-          vrvpData = data;
+        if (data && typeof data === "object") {
+          if ('value' in data) {
+            price = (data as { value: number }).value;
+          } else if ('close' in data) {
+            price = (data as { close: number }).close;
+          }
         }
 
         if (price !== undefined) {
@@ -145,12 +144,13 @@ export function useIndicatorDoubleClick(
       if (vrvpSeries) {
         const seriesPaneIdx = indices["vrvp"];
         if (seriesPaneIdx === activePaneIndex) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const allData = typeof (vrvpSeries as any).data === "function" ? (vrvpSeries as any).data() : [];
           if (allData && allData.length > 0) {
             const vrvpData = allData[allData.length - 1];
             if (vrvpData && vrvpData.vrvp && vrvpData.vrvp.bins && vrvpData.vrvp.bins.length > 0) {
-              const minPrice = Math.min(...vrvpData.vrvp.bins.map((b: any) => b.low));
-              const maxPrice = Math.max(...vrvpData.vrvp.bins.map((b: any) => b.high));
+              const minPrice = Math.min(...vrvpData.vrvp.bins.map((b: { low: number }) => b.low));
+              const maxPrice = Math.max(...vrvpData.vrvp.bins.map((b: { high: number }) => b.high));
               const y1 = vrvpSeries.priceToCoordinate(minPrice);
               const y2 = vrvpSeries.priceToCoordinate(maxPrice);
               if (y1 !== null && y2 !== null) {
@@ -295,6 +295,7 @@ export function useIndicatorDoubleClick(
       container.removeEventListener("pointerup", pointerUpHandler, { capture: true });
       container.removeEventListener("mousemove", mouseMoveHandler);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { selectedIndicatorKey };

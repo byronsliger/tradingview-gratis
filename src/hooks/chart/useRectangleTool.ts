@@ -48,14 +48,14 @@ export function useRectangleTool(
     if (tool !== "rectangle") {
       phaseRef.current = "idle";
       pointARef.current = null;
-      setInProgress(null);
+      queueMicrotask(() => setInProgress(null));
     }
   }, [tool]);
 
   useEffect(() => {
     phaseRef.current = "idle";
     pointARef.current = null;
-    setInProgress(null);
+    queueMicrotask(() => setInProgress(null));
   }, [symbol]);
 
   useEffect(() => {
@@ -73,7 +73,9 @@ export function useRectangleTool(
         if (chart.options().leftPriceScale?.visible) {
           leftScaleWidth = chart.priceScale("left").width();
         }
-      } catch (_) {}
+      } catch {
+        // Ignore internal lightweight-charts initialization errors
+      }
       const x = e.clientX - rect.left - leftScaleWidth;
       const y = e.clientY - rect.top;
       const price = series.coordinateToPrice(y);

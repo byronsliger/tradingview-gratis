@@ -163,6 +163,7 @@ export class RectanglePrimitive {
     };
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   testHit(px: number, py: number, _containerWidth: number): boolean {
     const c = this.getRectCoords();
     if (!c) return false;
