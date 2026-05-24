@@ -265,6 +265,7 @@ export function useRectangleInteraction(
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement && ["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
       if (toolRef.current !== "cursor") return;
       const selId = selectedIdRef.current;
       if (e.key === "Escape") { setSelectedRef.current(null); return; }

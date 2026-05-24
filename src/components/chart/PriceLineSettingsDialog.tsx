@@ -89,7 +89,7 @@ export function PriceLineSettingsDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) setPriceLineEditTarget(null); }} disablePointerDismissal>
-      <DialogContent className="max-w-xs bg-tv-panel">
+      <DialogContent className="max-w-none sm:max-w-xs bg-tv-panel">
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold text-tv-text">
             Línea horizontal

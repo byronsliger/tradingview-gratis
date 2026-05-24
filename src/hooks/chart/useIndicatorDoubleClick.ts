@@ -44,7 +44,7 @@ export function useIndicatorDoubleClick(
   const paneOffsetsRef = useRef(paneOffsets);
   // eslint-disable-next-line react-hooks/refs
   paneOffsetsRef.current = paneOffsets;
-  
+
   const paneIndicesRef = useRef(seriesPaneIndices);
   // eslint-disable-next-line react-hooks/refs
   paneIndicesRef.current = seriesPaneIndices;
@@ -79,7 +79,7 @@ export function useIndicatorDoubleClick(
   // eslint-disable-next-line react-hooks/refs
   getKeyRef.current = getKey;
 
-   
+
   useEffect(() => {
     const chart = chartRef.current;
     const container = containerRef.current;
@@ -87,14 +87,14 @@ export function useIndicatorDoubleClick(
 
     const getHitSeries = (x: number, y: number, param: MouseEventParams): ISeriesApi<SeriesType> | null => {
       if (!param.seriesData) return null;
-      
+
       const indices = paneIndicesRef.current;
-      
+
       const panes = chart.panes();
       let activePaneIndex = -1;
       let currentTop = 0;
       let activePaneTop = 0;
-      
+
       for (let i = 0; i < panes.length; i++) {
         const h = panes[i].getHeight();
         if (y >= currentTop && y <= currentTop + h) {
@@ -104,16 +104,16 @@ export function useIndicatorDoubleClick(
         }
         currentTop += h;
       }
-      
+
       if (activePaneIndex === -1) return null;
-      const localY = y - activePaneTop; 
-      
+      const localY = y - activePaneTop;
+
       let closestSeries: ISeriesApi<SeriesType> | null = null;
-      let minDistance = 20; 
+      let minDistance = 20;
 
       param.seriesData.forEach((data, series) => {
         const key = getKeyRef.current(series);
-        if (!key) return; 
+        if (!key) return;
 
         const seriesPaneIdx = indices[key];
         if (seriesPaneIdx !== activePaneIndex) return;
@@ -183,7 +183,7 @@ export function useIndicatorDoubleClick(
 
     const crosshairHandler = (param: MouseEventParams) => {
       lastMouseParamRef.current = param;
-      
+
       if (!param.point) {
         setSelectedIndicatorKey(null);
         return;
@@ -192,18 +192,18 @@ export function useIndicatorDoubleClick(
 
     const clickHandler = (param: MouseEventParams) => {
       lastMouseParamRef.current = param;
-      
+
       if (!param.point) {
         setSelectedIndicatorKey(null);
         return;
       }
-      
+
       const hovered = getHitSeries(param.point.x, param.point.y, param);
       if (!hovered) {
         setSelectedIndicatorKey(null);
         return;
       }
-      
+
       const key = getKeyRef.current(hovered);
       setSelectedIndicatorKey(key || null);
     };
@@ -214,7 +214,7 @@ export function useIndicatorDoubleClick(
       const rect = container.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      
+
       if (x > rect.width - 60 || y > rect.height - 30) return null;
       return { x, y };
     };
@@ -222,7 +222,7 @@ export function useIndicatorDoubleClick(
     const dblClickHandler = (e: MouseEvent) => {
       const pos = getExactPos(e);
       if (!pos || !lastMouseParamRef.current) return;
-      
+
       const hovered = getHitSeries(pos.x, pos.y, lastMouseParamRef.current);
       if (hovered) {
         const key = getKeyRef.current(hovered);
@@ -234,21 +234,21 @@ export function useIndicatorDoubleClick(
 
     const pointerUpHandler = (e: PointerEvent) => {
       if (toolRef.current !== "cursor") return;
-      
+
       const pos = getExactPos(e);
       if (!pos) return;
-      
+
       const now = Date.now();
       const last = lastTouchRef.current;
-      
-      if (last && now - last.time < 350) {
+
+      if (last && now - last.time < 500) {
         if (lastMouseParamRef.current) {
           const hovered = getHitSeries(pos.x, pos.y, lastMouseParamRef.current);
           if (hovered) {
             const key = getKeyRef.current(hovered);
             if (key) {
               setSettingsTargetRef.current(key);
-              e.stopPropagation();
+              //e.stopPropagation();
             }
           }
         }
@@ -260,13 +260,13 @@ export function useIndicatorDoubleClick(
 
     const mouseMoveHandler = (e: MouseEvent) => {
       if (toolRef.current !== "cursor") return;
-      
+
       const pos = getExactPos(e);
       if (!pos || !lastMouseParamRef.current) {
         container.classList.remove("force-pointer");
         return;
       }
-      
+
       const hovered = getHitSeries(pos.x, pos.y, lastMouseParamRef.current);
       if (hovered && getKeyRef.current(hovered)) {
         if (!document.getElementById("tv-force-pointer")) {
@@ -283,7 +283,7 @@ export function useIndicatorDoubleClick(
 
     chart.subscribeCrosshairMove(crosshairHandler);
     chart.subscribeClick(clickHandler);
-    
+
     container.addEventListener("dblclick", dblClickHandler);
     container.addEventListener("pointerup", pointerUpHandler, { capture: true });
     container.addEventListener("mousemove", mouseMoveHandler);
@@ -295,7 +295,7 @@ export function useIndicatorDoubleClick(
       container.removeEventListener("pointerup", pointerUpHandler, { capture: true });
       container.removeEventListener("mousemove", mouseMoveHandler);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { selectedIndicatorKey };

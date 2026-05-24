@@ -183,6 +183,7 @@ export function usePriceLineDrag(
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement && ["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
       if (toolRef.current !== "cursor") return;
       if (e.key === "Escape") {
         setSelectedPriceLineIdRef.current(null);
