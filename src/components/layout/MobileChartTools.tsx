@@ -9,10 +9,10 @@ import {
   Slash,
   RectangleHorizontal,
   Moon,
-  Sun,
   Plus,
   MoreHorizontal,
   Search,
+  Trash2,
 } from "lucide-react";
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import type { Timeframe } from "@/lib/binance/types";
@@ -53,6 +53,8 @@ export function MobileChartTools() {
   const indicators = useChartStore((s) => s.indicators);
   const config = useChartStore((s) => s.config);
   const toggleIndicator = useChartStore((s) => s.toggleIndicator);
+  const clearDrawings = useChartStore((s) => s.clearDrawings);
+  const clearPriceLines = useChartStore((s) => s.clearPriceLines);
 
   // Close sheet when symbol changes
   const [prevSymbol, setPrevSymbol] = useState(symbol);
@@ -125,29 +127,42 @@ export function MobileChartTools() {
           )}
 
           {renderedSheet === "drawings" && (
-            <div className="grid grid-cols-4 gap-2">
-              {DRAWING_TOOLS.map((t) => {
-                const Icon = t.icon;
-                const active = tool === t.key;
-                return (
-                  <button
-                    key={t.key}
-                    onClick={() => {
-                      setTool(t.key);
-                      closeSheet();
-                    }}
-                    className={cn(
-                      "flex flex-col items-center justify-center gap-1.5 rounded-lg py-2 px-1 text-[10px] font-medium transition-colors text-center",
-                      active
-                        ? "bg-tv-blue text-white"
-                        : "bg-tv-bg text-tv-text-muted hover:text-tv-text"
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span className="leading-tight break-words">{t.label}</span>
-                  </button>
-                );
-              })}
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-4 gap-2">
+                {DRAWING_TOOLS.map((t) => {
+                  const Icon = t.icon;
+                  const active = tool === t.key;
+                  return (
+                    <button
+                      key={t.key}
+                      onClick={() => {
+                        setTool(t.key);
+                        closeSheet();
+                      }}
+                      className={cn(
+                        "flex flex-col items-center justify-center gap-1.5 rounded-lg py-2 px-1 text-[10px] font-medium transition-colors text-center",
+                        active
+                          ? "bg-tv-blue text-white"
+                          : "bg-tv-bg text-tv-text-muted hover:text-tv-text"
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="leading-tight break-words">{t.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => {
+                  clearPriceLines(symbol);
+                  clearDrawings(symbol);
+                  closeSheet();
+                }}
+                className="flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium text-tv-red bg-tv-red/10 transition-colors hover:bg-tv-red/20"
+              >
+                <Trash2 className="h-4 w-4" />
+                Borrar todos los dibujos
+              </button>
             </div>
           )}
 

@@ -163,17 +163,22 @@ export function usePriceLineDrag(
       // Single click: select the line + start pending drag
       setSelectedPriceLineIdRef.current(id);
       pendingRef.current = { id, startX: e.clientX, startY: e.clientY };
-      container.setPointerCapture(e.pointerId);
+      try { container.setPointerCapture(e.pointerId); } catch {}
       container.style.cursor = "ns-resize";
     };
 
     const onPointerUp = (e: PointerEvent) => {
       const wasDragging = !!draggingIdRef.current;
+      const wasPending = !!pendingRef.current;
       draggingIdRef.current = null;
       pendingRef.current = null;
       try { container.releasePointerCapture(e.pointerId); } catch {}
       if (wasDragging || toolRef.current !== "cursor") {
         container.style.cursor = "";
+      }
+      if (wasDragging || wasPending) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
       }
     };
 

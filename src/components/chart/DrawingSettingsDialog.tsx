@@ -35,9 +35,10 @@ function formatTime(t: number): string {
 
 // ── TrendLine settings ────────────────────────────────────────────────────────
 
-function TrendLineSettings({ drawing, onSave, onClose }: {
+function TrendLineSettings({ drawing, onSave, onDelete, onClose }: {
   drawing: TrendLineDrawing;
   onSave: (patch: Partial<Omit<TrendLineDrawing, "id" | "symbol" | "type">>) => void;
+  onDelete: () => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("estilo");
@@ -152,20 +153,26 @@ function TrendLineSettings({ drawing, onSave, onClose }: {
         </div>
       )}
 
-      <div className="mt-1 flex items-center justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={onClose}
-          className="text-tv-text-muted hover:text-tv-text">Cancelar</Button>
-        <Button size="sm" onClick={() => {
-          onSave({
-            color: draft.color,
-            lineWidth: draft.lineWidth,
-            lineStyle: draft.lineStyle,
-            extendLeft: draft.extendLeft,
-            extendRight: draft.extendRight,
-            a: { ...drawing.a, price: draft.priceA },
-            b: { ...drawing.b, price: draft.priceB },
-          });
-        }} className="bg-tv-blue hover:bg-tv-blue/90">Aceptar</Button>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <Button variant="ghost" size="sm" onClick={onDelete}
+          className="text-tv-red hover:bg-tv-red/10 hover:text-tv-red p-2" title="Eliminar">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}
+            className="text-tv-text-muted hover:text-tv-text">Cancelar</Button>
+          <Button size="sm" onClick={() => {
+            onSave({
+              color: draft.color,
+              lineWidth: draft.lineWidth,
+              lineStyle: draft.lineStyle,
+              extendLeft: draft.extendLeft,
+              extendRight: draft.extendRight,
+              a: { ...drawing.a, price: draft.priceA },
+              b: { ...drawing.b, price: draft.priceB },
+            });
+          }} className="bg-tv-blue hover:bg-tv-blue/90">Aceptar</Button>
+        </div>
       </div>
     </>
   );
@@ -173,9 +180,10 @@ function TrendLineSettings({ drawing, onSave, onClose }: {
 
 // ── Rectangle settings ────────────────────────────────────────────────────────
 
-function RectangleSettings({ drawing, onSave, onClose }: {
+function RectangleSettings({ drawing, onSave, onDelete, onClose }: {
   drawing: RectangleDrawing;
   onSave: (patch: Partial<Omit<RectangleDrawing, "id" | "symbol" | "type">>) => void;
+  onDelete: () => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("estilo");
@@ -325,30 +333,36 @@ function RectangleSettings({ drawing, onSave, onClose }: {
         </div>
       )}
 
-      <div className="mt-1 flex items-center justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={onClose}
-          className="text-tv-text-muted hover:text-tv-text">Cancelar</Button>
-        <Button size="sm" onClick={() => {
-          const aIsLeft = drawing.a.time <= drawing.b.time;
-          const aIsTop = drawing.a.price >= drawing.b.price;
-          const newA = {
-            time: aIsLeft ? draft.timeLeft : draft.timeRight,
-            price: aIsTop ? draft.priceTop : draft.priceBottom,
-          };
-          const newB = {
-            time: aIsLeft ? draft.timeRight : draft.timeLeft,
-            price: aIsTop ? draft.priceBottom : draft.priceTop,
-          };
-          onSave({
-            color: draft.color,
-            lineWidth: draft.lineWidth,
-            lineStyle: draft.lineStyle,
-            fillVisible: draft.fillVisible,
-            fillColor: buildFillColor(draft.fillColor, draft.fillAlpha),
-            a: newA,
-            b: newB,
-          });
-        }} className="bg-tv-blue hover:bg-tv-blue/90">Aceptar</Button>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <Button variant="ghost" size="sm" onClick={onDelete}
+          className="text-tv-red hover:bg-tv-red/10 hover:text-tv-red p-2" title="Eliminar">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}
+            className="text-tv-text-muted hover:text-tv-text">Cancelar</Button>
+          <Button size="sm" onClick={() => {
+            const aIsLeft = drawing.a.time <= drawing.b.time;
+            const aIsTop = drawing.a.price >= drawing.b.price;
+            const newA = {
+              time: aIsLeft ? draft.timeLeft : draft.timeRight,
+              price: aIsTop ? draft.priceTop : draft.priceBottom,
+            };
+            const newB = {
+              time: aIsLeft ? draft.timeRight : draft.timeLeft,
+              price: aIsTop ? draft.priceBottom : draft.priceTop,
+            };
+            onSave({
+              color: draft.color,
+              lineWidth: draft.lineWidth,
+              lineStyle: draft.lineStyle,
+              fillVisible: draft.fillVisible,
+              fillColor: buildFillColor(draft.fillColor, draft.fillAlpha),
+              a: newA,
+              b: newB,
+            });
+          }} className="bg-tv-blue hover:bg-tv-blue/90">Aceptar</Button>
+        </div>
       </div>
     </>
   );
@@ -361,6 +375,7 @@ export function DrawingSettingsDialog() {
   const setDrawingEditTarget = useChartStore((s) => s.setDrawingEditTarget);
   const drawings = useChartStore((s) => s.drawings);
   const updateDrawing = useChartStore((s) => s.updateDrawing);
+  const removeDrawing = useChartStore((s) => s.removeDrawing);
 
   const drawing = drawings.find((d) => d.id === drawingEditTarget) ?? null;
   const open = drawing !== null;
@@ -374,6 +389,7 @@ export function DrawingSettingsDialog() {
           <TrendLineSettings
             drawing={drawing as TrendLineDrawing}
             onSave={(patch) => { updateDrawing(drawingEditTarget!, patch as Parameters<typeof updateDrawing>[1]); handleClose(); }}
+            onDelete={() => { removeDrawing(drawingEditTarget!); handleClose(); }}
             onClose={handleClose}
           />
         )}
@@ -381,6 +397,7 @@ export function DrawingSettingsDialog() {
           <RectangleSettings
             drawing={drawing as RectangleDrawing}
             onSave={(patch) => { updateDrawing(drawingEditTarget!, patch as Parameters<typeof updateDrawing>[1]); handleClose(); }}
+            onDelete={() => { removeDrawing(drawingEditTarget!); handleClose(); }}
             onClose={handleClose}
           />
         )}

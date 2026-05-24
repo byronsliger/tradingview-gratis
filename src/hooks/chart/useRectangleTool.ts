@@ -5,6 +5,7 @@ import { type IChartApi, type ISeriesApi } from "lightweight-charts";
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import type { TrendLinePoint } from "@/lib/drawings/types";
 import type { Candle } from "@/lib/binance/types";
+import { registerLegacyEventBlockers } from "@/lib/chart/event-utils";
 
 export interface RectangleInProgress {
   a: TrendLinePoint;
@@ -136,6 +137,8 @@ export function useRectangleTool(
       setToolRef.current("cursor");
     };
 
+    const cleanLegacyBlockers = registerLegacyEventBlockers(container, () => toolRef.current === "rectangle");
+
     container.addEventListener("pointerdown", onPointerDown, true);
     container.addEventListener("pointermove", onPointerMove);
     window.addEventListener("keydown", onKeyDown);
@@ -143,6 +146,7 @@ export function useRectangleTool(
     return () => {
       container.removeEventListener("pointerdown", onPointerDown, true);
       container.removeEventListener("pointermove", onPointerMove);
+      cleanLegacyBlockers();
       window.removeEventListener("keydown", onKeyDown);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
