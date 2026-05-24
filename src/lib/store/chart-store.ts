@@ -29,6 +29,41 @@ export interface PriceLine {
   axisLabelVisible?: boolean;
 }
 
+export interface TrendLineDefaults {
+  color: string;
+  lineWidth: 1 | 2 | 3 | 4;
+  lineStyle: number;
+  extendLeft: boolean;
+  extendRight: boolean;
+}
+
+export interface RectangleDefaults {
+  color: string;
+  lineWidth: 1 | 2 | 3 | 4;
+  lineStyle: number;
+  fillColor: string;
+  fillVisible: boolean;
+}
+
+export interface HLineDefaults {
+  color: string;
+  lineWidth: 1 | 2 | 3 | 4;
+  lineStyle: number;
+  axisLabelVisible: boolean;
+}
+
+export interface DrawingDefaults {
+  trendline: TrendLineDefaults;
+  rectangle: RectangleDefaults;
+  hline: HLineDefaults;
+}
+
+export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = {
+  trendline: { color: "#2962ff", lineWidth: 1, lineStyle: 0, extendLeft: false, extendRight: false },
+  rectangle: { color: "#2962ff", lineWidth: 1, lineStyle: 0, fillColor: "#2962ff22", fillVisible: true },
+  hline: { color: "#2962ff", lineWidth: 1, lineStyle: 2, axisLabelVisible: true },
+};
+
 export interface IndicatorConfig {
   ema20: number;
   ema50: number;
@@ -224,6 +259,8 @@ interface ChartState {
   setPriceLineEditTarget: (id: string | null) => void;
   setSelectedPriceLineId: (id: string | null) => void;
   updatePriceLineOptions: (id: string, patch: Partial<Pick<PriceLine, "color" | "lineWidth" | "lineStyle" | "axisLabelVisible">>) => void;
+  drawingDefaults: DrawingDefaults;
+  setDrawingDefault: <K extends keyof DrawingDefaults>(type: K, patch: Partial<DrawingDefaults[K]>) => void;
   addDrawing: (d: Drawing) => void;
   removeDrawing: (id: string) => void;
   updateDrawing: (id: string, patch: Partial<Omit<TrendLineDrawing | RectangleDrawing, "id" | "symbol" | "type">>) => void;
@@ -274,6 +311,7 @@ export const useChartStore = create<ChartState>()(
       priceLineEditTarget: null,
       selectedPriceLineId: null,
       drawings: [],
+      drawingDefaults: { ...DEFAULT_DRAWING_DEFAULTS },
       drawingEditTarget: null,
       selectedDrawingId: null,
       legendCollapsed: true,
@@ -323,10 +361,10 @@ export const useChartStore = create<ChartState>()(
                   : `${Date.now()}-${Math.random()}`,
               symbol,
               price,
-              color: "#2962ff",
-              lineWidth: 1,
-              lineStyle: 2,
-              axisLabelVisible: true,
+              color: state.drawingDefaults.hline.color,
+              lineWidth: state.drawingDefaults.hline.lineWidth,
+              lineStyle: state.drawingDefaults.hline.lineStyle,
+              axisLabelVisible: state.drawingDefaults.hline.axisLabelVisible,
             },
           ],
         })),
@@ -351,6 +389,13 @@ export const useChartStore = create<ChartState>()(
       updatePriceLineOptions: (id, patch) =>
         set((state) => ({
           priceLines: state.priceLines.map((p) => p.id === id ? { ...p, ...patch } : p),
+        })),
+      setDrawingDefault: (type, patch) =>
+        set((s) => ({
+          drawingDefaults: {
+            ...s.drawingDefaults,
+            [type]: { ...s.drawingDefaults[type], ...(patch as object) },
+          },
         })),
       addDrawing: (d) => set((s) => ({ drawings: [...s.drawings, d] })),
       removeDrawing: (id) => set((s) => ({ drawings: s.drawings.filter((d) => d.id !== id) })),
@@ -383,6 +428,7 @@ export const useChartStore = create<ChartState>()(
         watchlist: s.watchlist,
         priceLines: s.priceLines,
         drawings: s.drawings,
+        drawingDefaults: s.drawingDefaults,
         legendCollapsed: s.legendCollapsed,
         watchlistCollapsed: s.watchlistCollapsed,
         mobileTab: s.mobileTab,
@@ -402,6 +448,11 @@ export const useChartStore = create<ChartState>()(
           // Same for indicator flags — new keys default to `false`
           indicators: { ...current.indicators, ...(p.indicators ?? {}) },
           hidden: { ...current.hidden, ...(p.hidden ?? {}) },
+          drawingDefaults: {
+            trendline: { ...DEFAULT_DRAWING_DEFAULTS.trendline, ...(p.drawingDefaults?.trendline ?? {}) },
+            rectangle: { ...DEFAULT_DRAWING_DEFAULTS.rectangle, ...(p.drawingDefaults?.rectangle ?? {}) },
+            hline: { ...DEFAULT_DRAWING_DEFAULTS.hline, ...(p.drawingDefaults?.hline ?? {}) },
+          },
         };
       },
     },

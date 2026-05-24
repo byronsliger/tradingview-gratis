@@ -31,6 +31,7 @@ export function useChartInteraction(
   const addPriceLine = useChartStore((s) => s.addPriceLine);
   const removePriceLine = useChartStore((s) => s.removePriceLine);
   const priceLines = useChartStore((s) => s.priceLines);
+  const setTool = useChartStore((s) => s.setTool);
   const toolRef = useRef(tool);
   // eslint-disable-next-line react-hooks/refs
   toolRef.current = tool;
@@ -43,6 +44,9 @@ export function useChartInteraction(
   const priceLinesRef = useRef(priceLines);
   // eslint-disable-next-line react-hooks/refs
   priceLinesRef.current = priceLines;
+  const setToolRef = useRef(setTool);
+  // eslint-disable-next-line react-hooks/refs
+  setToolRef.current = setTool;
   const symbolRef = useRef(symbol);
   // eslint-disable-next-line react-hooks/refs
   symbolRef.current = symbol;
@@ -63,6 +67,7 @@ export function useChartInteraction(
 
       if (toolRef.current === "hline") {
         addPriceLineRef.current(price, symbolRef.current);
+        setToolRef.current("cursor");
         return;
       }
 

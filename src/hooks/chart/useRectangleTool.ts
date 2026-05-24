@@ -22,6 +22,7 @@ export function useRectangleTool(
 ): { inProgress: RectangleInProgress | null } {
   const addDrawing = useChartStore((s) => s.addDrawing);
   const setTool = useChartStore((s) => s.setTool);
+  const drawingDefaults = useChartStore((s) => s.drawingDefaults);
 
   const addDrawingRef = useRef(addDrawing);
   // eslint-disable-next-line react-hooks/refs
@@ -35,6 +36,9 @@ export function useRectangleTool(
   const symbolRef = useRef(symbol);
   // eslint-disable-next-line react-hooks/refs
   symbolRef.current = symbol;
+  const drawingDefaultsRef = useRef(drawingDefaults);
+  // eslint-disable-next-line react-hooks/refs
+  drawingDefaultsRef.current = drawingDefaults;
 
   const phaseRef = useRef<"idle" | "placing_b">("idle");
   const pointARef = useRef<TrendLinePoint | null>(null);
@@ -110,11 +114,7 @@ export function useRectangleTool(
           type: "rectangle",
           a,
           b: point,
-          color: "#2962ff",
-          lineWidth: 1,
-          lineStyle: 0,
-          fillColor: "#2962ff22",
-          fillVisible: true,
+          ...drawingDefaultsRef.current.rectangle,
         });
         setToolRef.current("cursor");
       }

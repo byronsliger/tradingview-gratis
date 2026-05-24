@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useChartStore } from "@/lib/store/chart-store";
 import type { TrendLineDrawing, RectangleDrawing } from "@/lib/drawings/types";
+import type { TrendLineDefaults, RectangleDefaults } from "@/lib/store/chart-store";
 
 type Tab = "estilo" | "coordenadas";
 
@@ -377,6 +378,8 @@ export function DrawingSettingsDialog() {
   const updateDrawing = useChartStore((s) => s.updateDrawing);
   const removeDrawing = useChartStore((s) => s.removeDrawing);
 
+  const setDrawingDefault = useChartStore((s) => s.setDrawingDefault);
+
   const drawing = drawings.find((d) => d.id === drawingEditTarget) ?? null;
   const open = drawing !== null;
 
@@ -388,7 +391,18 @@ export function DrawingSettingsDialog() {
         {drawing?.type === "trendline" && (
           <TrendLineSettings
             drawing={drawing as TrendLineDrawing}
-            onSave={(patch) => { updateDrawing(drawingEditTarget!, patch as Parameters<typeof updateDrawing>[1]); handleClose(); }}
+            onSave={(patch) => {
+              updateDrawing(drawingEditTarget!, patch as Parameters<typeof updateDrawing>[1]);
+              const p = patch as Partial<Omit<TrendLineDrawing, "id" | "symbol" | "type">>;
+              setDrawingDefault("trendline", {
+                color: p.color,
+                lineWidth: p.lineWidth,
+                lineStyle: p.lineStyle,
+                extendLeft: p.extendLeft,
+                extendRight: p.extendRight,
+              } as Partial<TrendLineDefaults>);
+              handleClose();
+            }}
             onDelete={() => { removeDrawing(drawingEditTarget!); handleClose(); }}
             onClose={handleClose}
           />
@@ -396,7 +410,18 @@ export function DrawingSettingsDialog() {
         {drawing?.type === "rectangle" && (
           <RectangleSettings
             drawing={drawing as RectangleDrawing}
-            onSave={(patch) => { updateDrawing(drawingEditTarget!, patch as Parameters<typeof updateDrawing>[1]); handleClose(); }}
+            onSave={(patch) => {
+              updateDrawing(drawingEditTarget!, patch as Parameters<typeof updateDrawing>[1]);
+              const p = patch as Partial<Omit<RectangleDrawing, "id" | "symbol" | "type">>;
+              setDrawingDefault("rectangle", {
+                color: p.color,
+                lineWidth: p.lineWidth,
+                lineStyle: p.lineStyle,
+                fillColor: p.fillColor,
+                fillVisible: p.fillVisible,
+              } as Partial<RectangleDefaults>);
+              handleClose();
+            }}
             onDelete={() => { removeDrawing(drawingEditTarget!); handleClose(); }}
             onClose={handleClose}
           />

@@ -22,6 +22,7 @@ export function useTrendLineTool(
 ): { inProgress: TrendLineInProgress | null } {
   const addDrawing = useChartStore((s) => s.addDrawing);
   const setTool = useChartStore((s) => s.setTool);
+  const drawingDefaults = useChartStore((s) => s.drawingDefaults);
 
   const addDrawingRef = useRef(addDrawing);
   // eslint-disable-next-line react-hooks/refs
@@ -35,6 +36,9 @@ export function useTrendLineTool(
   const symbolRef = useRef(symbol);
   // eslint-disable-next-line react-hooks/refs
   symbolRef.current = symbol;
+  const drawingDefaultsRef = useRef(drawingDefaults);
+  // eslint-disable-next-line react-hooks/refs
+  drawingDefaultsRef.current = drawingDefaults;
 
   const phaseRef = useRef<"idle" | "placing_b">("idle");
   const pointARef = useRef<TrendLinePoint | null>(null);
@@ -127,11 +131,7 @@ export function useTrendLineTool(
           type: "trendline",
           a,
           b: point,
-          color: "#2962ff",
-          lineWidth: 1,
-          lineStyle: 0,
-          extendLeft: false,
-          extendRight: false,
+          ...drawingDefaultsRef.current.trendline,
         });
         setToolRef.current("cursor");
       }
