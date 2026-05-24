@@ -93,5 +93,5 @@ export function useMACDPane(
     macdSignalRef.current?.applyOptions({ lastValueVisible: v });
   }, [config.macdAxisLabel]);
 
-  return { updateMACD, lastMACD, lastMACDSignal, lastMACDHist };
+  return { updateMACD, macdRef, macdSignalRef, macdHistRef, lastMACD, lastMACDSignal, lastMACDHist };
 }

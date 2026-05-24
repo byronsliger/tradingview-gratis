@@ -22,6 +22,7 @@ interface Props {
   hidden: Record<IndicatorKey, boolean>;
   config: IndicatorConfig;
   lastValues: LastValues;
+  selectedIndicatorKey: IndicatorKey | null;
   paneOffsets: PaneOffset[];
   left: number;
 }
@@ -43,7 +44,7 @@ function LegendToggleButton({ collapsed, count, onClick }: { collapsed: boolean;
   );
 }
 
-export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hidden, config, lastValues, paneOffsets, left }: Props) {
+export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hidden, config, lastValues, selectedIndicatorKey, paneOffsets, left }: Props) {
   const collapsed = useChartStore((s) => s.legendCollapsed);
   const toggleLegendCollapsed = useChartStore((s) => s.toggleLegendCollapsed);
   const toggleHidden = useChartStore((s) => s.toggleHidden);
@@ -84,6 +85,7 @@ export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hid
                 value={lastValues.rsi !== undefined ? lastValues.rsi.toFixed(2) : undefined}
                 color={INDICATOR_COLORS.rsi}
                 hidden={hidden.rsi}
+                selected={selectedIndicatorKey === "rsi"}
                 onToggleHide={() => toggleHidden("rsi")}
                 onSettings={() => setSettingsTarget("rsi")}
                 onRemove={() => removeIndicator("rsi")}
@@ -105,6 +107,7 @@ export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hid
                 }
                 color={INDICATOR_COLORS.macd}
                 hidden={hidden.macd}
+                selected={selectedIndicatorKey === "macd"}
                 onToggleHide={() => toggleHidden("macd")}
                 onSettings={() => setSettingsTarget("macd")}
                 onRemove={() => removeIndicator("macd")}
@@ -122,6 +125,7 @@ export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hid
                 value={lastValues.sqzmom !== undefined ? lastValues.sqzmom.toFixed(4) : undefined}
                 color={INDICATOR_COLORS.sqzmom}
                 hidden={hidden.sqzmom}
+                selected={selectedIndicatorKey === "sqzmom"}
                 onToggleHide={() => toggleHidden("sqzmom")}
                 onSettings={() => setSettingsTarget("sqzmom")}
                 onRemove={() => removeIndicator("sqzmom")}
@@ -139,6 +143,7 @@ export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hid
                 value={lastValues.adx !== undefined ? lastValues.adx.toFixed(2) : undefined}
                 color={INDICATOR_COLORS.adx}
                 hidden={hidden.adx}
+                selected={selectedIndicatorKey === "adx"}
                 onToggleHide={() => toggleHidden("adx")}
                 onSettings={() => setSettingsTarget("adx")}
                 onRemove={() => removeIndicator("adx")}

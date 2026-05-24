@@ -89,5 +89,5 @@ export function useRSIPane(
     rsiRef.current?.applyOptions({ lastValueVisible: config.rsiAxisLabel ?? true });
   }, [config.rsiAxisLabel]);
 
-  return { updateRSI, lastRSI };
+  return { updateRSI, rsiRef, lastRSI };
 }

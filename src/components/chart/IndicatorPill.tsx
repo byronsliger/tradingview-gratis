@@ -8,6 +8,7 @@ interface Props {
   value?: string;
   color: string;
   hidden: boolean;
+  selected?: boolean;
   onToggleHide: () => void;
   onSettings: () => void;
   onRemove: () => void;
@@ -18,14 +19,17 @@ export function IndicatorPill({
   value,
   color,
   hidden,
+  selected,
   onToggleHide,
   onSettings,
   onRemove,
 }: Props) {
   return (
     <div
+      onDoubleClick={onSettings}
       className={cn(
-        "group/pill pointer-events-auto flex items-center gap-1 rounded px-1 py-px text-[11px] transition-colors bg-tv-panel/50 hover:bg-tv-panel/80",
+        "group/pill pointer-events-auto flex cursor-pointer items-center gap-1 rounded px-1 py-px text-[11px] transition-colors bg-tv-panel/50 hover:bg-tv-panel/80",
+        selected && "outline outline-1 outline-tv-blue/60",
         hidden && "opacity-40",
       )}
     >
@@ -39,7 +43,7 @@ export function IndicatorPill({
       )}
       <div className="ml-0.5 flex items-center gap-0.5 md:hidden md:group-hover/pill:flex">
         <button
-          onClick={onToggleHide}
+          onClick={(e) => { e.stopPropagation(); onToggleHide(); }}
           title={hidden ? "Mostrar" : "Ocultar"}
           aria-label={hidden ? "Mostrar" : "Ocultar"}
           className="rounded p-0.5 text-tv-text-dim transition-colors hover:text-tv-text"
@@ -47,7 +51,7 @@ export function IndicatorPill({
           {hidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
         </button>
         <button
-          onClick={onSettings}
+          onClick={(e) => { e.stopPropagation(); onSettings(); }}
           title="Configurar"
           aria-label="Configurar"
           className="rounded p-0.5 text-tv-text-dim transition-colors hover:text-tv-text"
@@ -55,7 +59,7 @@ export function IndicatorPill({
           <Settings className="h-3 w-3" />
         </button>
         <button
-          onClick={onRemove}
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
           title="Eliminar"
           aria-label="Eliminar"
           className="rounded p-0.5 text-tv-text-dim transition-colors hover:text-tv-red"

@@ -144,5 +144,5 @@ export function useCandleSeries(
     ema200Ref.current?.applyOptions({ color: config.ema200Color, lineWidth: config.ema200Width, lineStyle: config.ema200Style, lastValueVisible: config.ema200AxisLabel ?? true });
   }, [config.ema200Color, config.ema200Width, config.ema200Style, config.ema200AxisLabel]);
 
-  return { candleSeriesRef, updateEMAs, lastEMA20, lastEMA50, lastEMA200, lastVolume };
+  return { candleSeriesRef, ema20Ref, ema50Ref, ema200Ref, updateEMAs, lastEMA20, lastEMA50, lastEMA200, lastVolume };
 }

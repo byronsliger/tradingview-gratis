@@ -111,5 +111,5 @@ export function useADXPane(
     adxRef.current.priceScale().applyOptions({ visible: false });
   }, [config.adxAxisLabel]);
 
-  return { updateADX, lastADX, lastPlusDI, lastMinusDI };
+  return { updateADX, adxRef, lastADX, lastPlusDI, lastMinusDI };
 }
