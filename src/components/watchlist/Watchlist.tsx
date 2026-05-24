@@ -130,7 +130,10 @@ export function Watchlist({ onClose }: { onClose?: () => void } = {}) {
             return (
               <div
                 key={s}
-                onClick={() => setSymbol(s)}
+                onClick={() => {
+                  setSymbol(s);
+                  onClose?.();
+                }}
                 className={cn(
                   "group grid cursor-pointer grid-cols-[1fr_auto_auto] items-center gap-2 px-3 py-1.5 text-xs transition-colors",
                   "hover:bg-tv-panel-hover",
