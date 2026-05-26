@@ -29,6 +29,7 @@ export function useKlineData(
 ) {
   const [lastPrice, setLastPrice] = useState<{ value: number; pct: number } | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const isRefreshingRef = useRef(false);
 
   const symbolRef = useRef(symbol);
   // eslint-disable-next-line react-hooks/refs
@@ -190,6 +191,8 @@ export function useKlineData(
           symbol,
           interval: timeframe,
           onCandle: (k) => {
+            // Block WS updates while a REST refresh is running to prevent false gaps
+            if (isRefreshingRef.current) return;
             const { candleSeriesRef, volumeSeriesRef, updateEMAs, updateRSI, updateMACD, updateSQZ, updateADX, updateVRVP } = callbacksRef.current;
             if (!candleSeriesRef.current) return;
             const arr = candlesRef.current;
@@ -233,6 +236,64 @@ export function useKlineData(
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol, timeframe]);
+
+  // Full reload from REST — same as initial load, blocks WS updates during fetch
+  // Used on page wake-up, network recovery, or WS reconnect to eliminate gaps
+  const fullRefresh = useCallback(async () => {
+    if (isRefreshingRef.current) return;
+    const { candleSeriesRef, volumeSeriesRef, updateEMAs, updateRSI, updateMACD, updateSQZ, updateADX } = callbacksRef.current;
+    if (!candleSeriesRef.current) return;
+    isRefreshingRef.current = true;
+    try {
+      const klines = await fetchKlines(symbolRef.current, timeframeRef.current, 1000);
+      if (!klines.length) return;
+      candlesRef.current = klines;
+
+      candleSeriesRef.current?.setData(
+        klines.map((k) => ({ time: k.time as UTCTimestamp, open: k.open, high: k.high, low: k.low, close: k.close })),
+      );
+      volumeSeriesRef.current?.setData(
+        klines.map((k) => ({
+          time: k.time as UTCTimestamp,
+          value: k.volume,
+          color: k.close >= k.open ? `${TV_COLORS.green}66` : `${TV_COLORS.red}66`,
+        })),
+      );
+      updateEMAs();
+      updateRSI();
+      updateMACD();
+      updateSQZ();
+      updateADX();
+
+      const last = klines[klines.length - 1];
+      const prev = klines[klines.length - 2] ?? last;
+      setLastPrice({
+        value: last.close,
+        pct: prev.close === 0 ? 0 : ((last.close - prev.close) / prev.close) * 100,
+      });
+    } catch {
+      // Silently ignore — WS will keep updating once reconnected
+    } finally {
+      isRefreshingRef.current = false;
+    }
+  }, [candlesRef]);
+
+  // Reload on page visibility restored (phone wake-up) or network recovery
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") fullRefresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", fullRefresh);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", fullRefresh);
+    };
+  }, [fullRefresh]);
+
+  // Reload when WS reconnects after a stale/dead connection
+  useEffect(() => {
+    const ws = getBinanceWS();
+    return ws.addReconnectListener(fullRefresh);
+  }, [fullRefresh]);
 
   return { lastPrice, isLoadingHistory };
 }

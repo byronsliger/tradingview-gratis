@@ -59,19 +59,30 @@ export class BinanceWS {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private lastMessageAt = 0;
   private nextId = 1;
   private klineSubs = new Map<string, KlineSubscription>();
   private tickerSubs = new Map<string, (m: MiniTickerMsg["data"]) => void>();
+  private reconnectListeners = new Set<() => void>();
   private connected = false;
   private closing = false;
+
+  addReconnectListener(cb: () => void): () => void {
+    this.reconnectListeners.add(cb);
+    return () => this.reconnectListeners.delete(cb);
+  }
 
   connect() {
     if (this.ws || this.closing) return;
     this.ws = new WebSocket(WS_BASE);
 
     this.ws.onopen = () => {
+      const wasReconnect = this.reconnectAttempts > 0;
       this.connected = true;
       this.reconnectAttempts = 0;
+      this.lastMessageAt = Date.now();
+      this.startHeartbeat();
       // Re-subscribe everything
       const streams: string[] = [];
       this.klineSubs.forEach((s) => {
@@ -79,9 +90,11 @@ export class BinanceWS {
       });
       this.tickerSubs.forEach((_v, k) => streams.push(k));
       if (streams.length > 0) this.send({ method: "SUBSCRIBE", params: streams, id: this.nextId++ });
+      if (wasReconnect) this.reconnectListeners.forEach((cb) => cb());
     };
 
     this.ws.onmessage = (ev) => {
+      this.lastMessageAt = Date.now();
       try {
         const msg = JSON.parse(ev.data) as WSMsg | { result: unknown; id: number };
         if ("stream" in msg) this.dispatch(msg);
@@ -93,12 +106,30 @@ export class BinanceWS {
     this.ws.onclose = () => {
       this.connected = false;
       this.ws = null;
+      this.stopHeartbeat();
       if (!this.closing) this.scheduleReconnect();
     };
 
     this.ws.onerror = () => {
       this.ws?.close();
     };
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    // If no messages received in 45s, the connection is stale — force reconnect
+    this.heartbeatTimer = setInterval(() => {
+      if (this.connected && Date.now() - this.lastMessageAt > 45_000) {
+        this.ws?.close();
+      }
+    }, 15_000);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
   }
 
   private scheduleReconnect() {
@@ -172,6 +203,7 @@ export class BinanceWS {
   close() {
     this.closing = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.stopHeartbeat();
     this.ws?.close();
     this.ws = null;
   }
