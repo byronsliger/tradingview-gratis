@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChartStore } from "@/lib/store/chart-store";
 import type { Timeframe } from "@/lib/binance/types";
 
@@ -48,50 +48,77 @@ function writeTabState(state: TabState): void {
   }
 }
 
+interface Wanted {
+  symbol: string | null;
+  tf: Timeframe | null;
+}
+
+/** Lo que esta pestaña quiere mostrar: query params de la URL → sessionStorage. */
+function readWanted(): Wanted {
+  const params = new URLSearchParams(window.location.search);
+  const tab = readTabState();
+  const urlSymbol = params.get("symbol")?.trim().toUpperCase();
+  const tabSymbol = tab.symbol?.trim().toUpperCase();
+  return {
+    symbol:
+      urlSymbol && VALID_SYMBOL.test(urlSymbol)
+        ? urlSymbol
+        : tabSymbol && VALID_SYMBOL.test(tabSymbol)
+          ? tabSymbol
+          : null,
+    tf: parseTimeframe(params.get("tf")) ?? parseTimeframe(tab.tf),
+  };
+}
+
 /**
  * Mantiene símbolo y timeframe independientes por pestaña.
  *
- * Prioridad al cargar: query params de la URL (`?symbol=&tf=`) →
- * sessionStorage de la pestaña → último valor persistido en localStorage.
- * Así cada pestaña recupera SU símbolo al refrescar, aunque otra pestaña
- * haya sobrescrito el localStorage compartido después.
+ * La hidratación de zustand/persist es asíncrona: el primer render usa los
+ * valores por defecto y el valor persistido (compartido entre pestañas vía
+ * localStorage) llega un instante después. Si escribiéramos la URL antes de
+ * eso, el símbolo de otra pestaña pisaría el de esta. Por eso el hook tiene
+ * dos fases:
  *
- * Cada cambio de símbolo/timeframe se escribe en la URL (compartible) vía
- * `history.replaceState` y en el sessionStorage de la pestaña.
+ * 1. Al terminar la hidratación (`persist.onFinishHydration`) se aplica lo
+ *    que ESTA pestaña quiere — query params de la URL, o el sessionStorage
+ *    de la pestaña como respaldo — por encima de lo persistido.
+ * 2. Solo a partir de ahí el store manda: cada cambio de símbolo/timeframe
+ *    se refleja en la URL (compartible, vía `history.replaceState`) y en el
+ *    sessionStorage de la pestaña.
  */
 export function useUrlSymbolSync() {
   const symbol = useChartStore((s) => s.symbol);
   const timeframe = useChartStore((s) => s.timeframe);
-  const initialized = useRef(false);
+  const wantedRef = useRef<Wanted | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!initialized.current) {
-      initialized.current = true;
-      const params = new URLSearchParams(window.location.search);
-      const tab = readTabState();
-
-      const urlSymbol = params.get("symbol")?.trim().toUpperCase();
-      const tabSymbol = tab.symbol?.trim().toUpperCase();
-      const wantedSymbol =
-        urlSymbol && VALID_SYMBOL.test(urlSymbol)
-          ? urlSymbol
-          : tabSymbol && VALID_SYMBOL.test(tabSymbol)
-            ? tabSymbol
-            : null;
-      const wantedTf = parseTimeframe(params.get("tf")) ?? parseTimeframe(tab.tf);
-
+    const applyWanted = () => {
+      // Capturado una sola vez por carga de página (StrictMode lo repite)
+      wantedRef.current ??= readWanted();
+      const wanted = wantedRef.current;
+      const state = useChartStore.getState();
       const patch: { symbol?: string; timeframe?: Timeframe } = {};
-      if (wantedSymbol && wantedSymbol !== symbol) {
-        patch.symbol = wantedSymbol;
+      if (wanted.symbol && state.symbol !== wanted.symbol) {
+        patch.symbol = wanted.symbol;
       }
-      if (wantedTf && wantedTf !== timeframe) {
-        patch.timeframe = wantedTf;
+      if (wanted.tf && state.timeframe !== wanted.tf) {
+        patch.timeframe = wanted.tf;
       }
       if (Object.keys(patch).length > 0) {
         useChartStore.setState(patch);
-        return; // re-runs with the new values and writes URL + sessionStorage
       }
+      setReady(true);
+    };
+    if (useChartStore.persist.hasHydrated()) {
+      applyWanted();
+      return;
     }
+    return useChartStore.persist.onFinishHydration(applyWanted);
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
     writeTabState({ symbol, tf: timeframe });
     const url = new URL(window.location.href);
     if (
@@ -102,5 +129,5 @@ export function useUrlSymbolSync() {
       url.searchParams.set("tf", timeframe);
       window.history.replaceState(null, "", url);
     }
-  }, [symbol, timeframe]);
+  }, [ready, symbol, timeframe]);
 }
