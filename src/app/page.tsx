@@ -10,6 +10,7 @@ import { PriceLineSettingsDialog } from "@/components/chart/PriceLineSettingsDia
 import { DrawingSettingsDialog } from "@/components/chart/DrawingSettingsDialog";
 import { useChartStore } from "@/lib/store/chart-store";
 import { useUrlSymbolSync } from "@/hooks/useUrlSymbolSync";
+import { useDriveSync } from "@/hooks/useDriveSync";
 import { MobileChartTools } from "@/components/layout/MobileChartTools";
 
 if (typeof window !== "undefined" && typeof Element !== "undefined") {
@@ -29,6 +30,7 @@ export default function HomePage() {
   const symbol = useChartStore((s) => s.symbol);
   const timeframe = useChartStore((s) => s.timeframe);
   useUrlSymbolSync();
+  useDriveSync();
 
   return (
     <div className="flex h-[100dvh] w-screen flex-col overflow-hidden bg-tv-bg">

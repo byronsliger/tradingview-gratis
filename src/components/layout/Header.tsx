@@ -4,6 +4,7 @@ import { Code2, Moon, Sun, Zap } from "lucide-react";
 import { SymbolSelector } from "@/components/chart/SymbolSelector";
 import { TimeframeSelector } from "@/components/chart/TimeframeSelector";
 import { IndicatorMenu } from "@/components/chart/IndicatorMenu";
+import { SyncMenu } from "@/components/layout/SyncMenu";
 import { Separator } from "@/components/ui/separator";
 import { useChartStore } from "@/lib/store/chart-store";
 
@@ -33,6 +34,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
+        <SyncMenu />
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           className="flex h-7 w-7 items-center justify-center rounded text-tv-text-muted hover:bg-tv-panel-hover hover:text-tv-text"

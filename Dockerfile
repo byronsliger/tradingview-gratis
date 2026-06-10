@@ -27,6 +27,12 @@ RUN corepack enable pnpm
 # Disable Next.js telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Client ID de Google para la sincronización con Drive. Las variables
+# NEXT_PUBLIC_* se incrustan en el bundle del cliente durante `next build`,
+# por lo que debe pasarse como build-arg (no sirve definirla en runtime).
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
+
 RUN pnpm run build
 
 # Production image, copy all the files and run next

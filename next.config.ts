@@ -12,6 +12,10 @@ if (process.env.NODE_ENV === "development") {
       }
     }
   }
+  // Dominios extra (p. ej. el túnel de ngrok), separados por comas
+  for (const origin of (process.env.DEV_ALLOWED_ORIGINS ?? "").split(",")) {
+    if (origin.trim()) allowedDevOrigins.push(origin.trim());
+  }
 }
 
 const nextConfig: NextConfig = {

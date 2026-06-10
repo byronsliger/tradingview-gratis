@@ -16,6 +16,7 @@ import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import type { Timeframe, SymbolInfo } from "@/lib/binance/types";
 import { fetchExchangeSymbols } from "@/lib/binance/rest";
 import { ENTRIES } from "@/components/chart/IndicatorMenu";
+import { SyncSheetSection } from "@/components/layout/SyncMenu";
 import { Watchlist } from "@/components/watchlist/Watchlist";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -202,6 +203,7 @@ export function MobileChartTools() {
                   />
                 </button>
               </div>
+              <SyncSheetSection />
             </div>
           )}
 

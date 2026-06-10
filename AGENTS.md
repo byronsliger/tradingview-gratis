@@ -55,7 +55,8 @@ Welcome! This file provides comprehensive instructions, context, rules, and comm
   - `binance/`: Binance API client (`rest.ts`, `ws.ts`)
   - `chart/chart-colors.ts`: `TV_COLORS`, `TV_COLORS_LIGHT`, `getChartColors(theme)`
   - `indicators/`: Custom technical indicators (SMA, EMA, MACD, RSI, ADX, Squeeze Momentum, VRVP)
-  - `store/`: Zustand global store (`chart-store.ts`)
+  - `sync/`: Sincronización opcional con Google Drive sin backend (`google-auth.ts` token flow de Google Identity Services, `drive-client.ts` REST sobre appDataFolder, `drive-sync.ts` motor singleton local-first con last-write-wins). Requiere `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (ver `.env.local.example`); `src/hooks/useDriveSync.ts` lo arranca y `src/components/layout/SyncMenu.tsx` es la UI (desktop + móvil).
+  - `store/`: Zustand global stores (`chart-store.ts`, `sync-store.ts`)
 
 ---
 
