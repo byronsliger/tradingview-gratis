@@ -12,7 +12,7 @@ import type {
 import type { TrendLineDrawing, TrendLinePoint } from "../types";
 import type { RefObject } from "react";
 import type { Candle } from "@/lib/binance/types";
-import type { Logical } from "lightweight-charts";
+import { timeToCoordinateExtended } from "../time-coordinate";
 
 type CanvasRenderingTarget2D = Parameters<IPrimitivePaneRenderer["draw"]>[0];
 
@@ -201,25 +201,6 @@ export class TrendLinePrimitive {
 
   getCoordinateForTime(time: number): number | null {
     if (!this._chart) return null;
-    const x = this._chart.timeScale().timeToCoordinate(time as Time);
-    if (x !== null) return x;
-
-    if (!this._candlesRef) return null;
-    const candles = this._candlesRef.current;
-    if (!candles || candles.length < 2) return null;
-
-    const maxIdx = candles.length - 1;
-    const interval = candles[maxIdx].time - candles[maxIdx - 1].time;
-    if (interval === 0) return null;
-
-    if (time < candles[0].time) {
-      const bars = (candles[0].time - time) / interval;
-      return this._chart.timeScale().logicalToCoordinate(-bars as Logical);
-    }
-    if (time > candles[maxIdx].time) {
-      const bars = (time - candles[maxIdx].time) / interval;
-      return this._chart.timeScale().logicalToCoordinate((maxIdx + bars) as Logical);
-    }
-    return null;
+    return timeToCoordinateExtended(this._chart, this._candlesRef?.current, time);
   }
 }

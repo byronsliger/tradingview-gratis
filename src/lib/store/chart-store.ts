@@ -227,6 +227,8 @@ interface ChartState {
   timeframe: Timeframe;
   theme: Theme;
   initialZoom: number;
+  /** Logarithmic price scale on the main pane */
+  logScale: boolean;
   /** Indicator is added to the chart (appears in pill + renders unless hidden) */
   indicators: Record<IndicatorKey, boolean>;
   /** Indicator is hidden (eye icon off) — kept in pill list, just not rendered */
@@ -257,6 +259,7 @@ interface ChartState {
   setTimeframe: (t: Timeframe) => void;
   setTheme: (t: Theme) => void;
   setInitialZoom: (z: number) => void;
+  setLogScale: (v: boolean) => void;
   toggleIndicator: (key: IndicatorKey) => void;
   removeIndicator: (key: IndicatorKey) => void;
   toggleHidden: (key: IndicatorKey) => void;
@@ -293,6 +296,7 @@ export const useChartStore = create<ChartState>()(
       timeframe: "1d" as Timeframe,
       theme: "light" as Theme,
       initialZoom: 105,
+      logScale: false,
       indicators: {
         ema20: true,
         ema50: true,
@@ -336,6 +340,7 @@ export const useChartStore = create<ChartState>()(
       setTimeframe: (timeframe) => set({ timeframe }),
       setTheme: (theme) => set({ theme }),
       setInitialZoom: (initialZoom) => set({ initialZoom }),
+      setLogScale: (logScale) => set({ logScale }),
       toggleIndicator: (key) =>
         set((s) => ({
           indicators: { ...s.indicators, [key]: !s.indicators[key] },
@@ -436,6 +441,7 @@ export const useChartStore = create<ChartState>()(
         timeframe: s.timeframe,
         theme: s.theme,
         initialZoom: s.initialZoom,
+        logScale: s.logScale,
         indicators: s.indicators,
         hidden: s.hidden,
         config: s.config,

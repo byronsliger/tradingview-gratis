@@ -28,12 +28,14 @@ import { useRectangleTool } from "@/hooks/chart/useRectangleTool";
 import { useRectanglePrimitives } from "@/hooks/chart/useRectanglePrimitives";
 import { useRectangleInteraction } from "@/hooks/chart/useRectangleInteraction";
 import { useIndicatorDoubleClick } from "@/hooks/chart/useIndicatorDoubleClick";
+import { useLogScale } from "@/hooks/chart/useLogScale";
 
 import { SymbolHeader } from "./overlay/SymbolHeader";
 import { ChartLegend } from "./overlay/ChartLegend";
 import { SubPaneLegend } from "./overlay/SubPaneLegend";
 import { TrendLinesLayer } from "./overlay/TrendLinesLayer";
 import { RectangleLayer } from "./overlay/RectangleLayer";
+import { LogScaleToggle } from "./overlay/LogScaleToggle";
 
 interface Props {
   symbol: string;
@@ -56,6 +58,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
   }, []);
 
   const { chartRef, chartReady } = useChartInit(containerRef, theme);
+  useLogScale(chartRef, chartReady);
   const { paneOffsets, recomputePaneOffsets } = usePaneLayout(chartRef, containerRef);
 
   const { candleSeriesRef, ema20Ref, ema50Ref, ema200Ref, updateEMAs, lastEMA20, lastEMA50, lastEMA200, lastVolume } =
@@ -156,6 +159,12 @@ export function PriceChart({ symbol, timeframe }: Props) {
         candlesRef={candlesRef}
         inProgress={rectInProgress}
         chartReady={chartReady}
+      />
+
+      <LogScaleToggle
+        containerRef={containerRef}
+        chartRef={chartRef}
+        mainPaneBottom={(paneOffsets[0]?.top ?? 0) + (paneOffsets[0]?.height ?? 0)}
       />
 
       {handleY !== null && (

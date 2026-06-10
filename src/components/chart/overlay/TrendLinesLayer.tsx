@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useReducer, type RefObject } from "react";
-import { type IChartApi, type ISeriesApi, type Time } from "lightweight-charts";
+import { type IChartApi, type ISeriesApi } from "lightweight-charts";
 import type { TrendLineInProgress } from "@/hooks/chart/useTrendLineTool";
+import { timeToCoordinateExtended } from "@/lib/drawings/time-coordinate";
 
 interface Props {
   chartRef: RefObject<IChartApi | null>;
@@ -32,27 +33,8 @@ export const TrendLinesLayer = React.memo(function TrendLinesLayer({
   const series = candleSeriesRef.current;
   if (!chart || !series) return null;
 
-  const getCoordinateForTime = (time: number): number | null => {
-    const x = chart.timeScale().timeToCoordinate(time as Time);
-    if (x !== null) return x;
-
-    const candles = candlesRef.current;
-    if (!candles || candles.length < 2) return null;
-
-    const maxIdx = candles.length - 1;
-    const interval = candles[maxIdx].time - candles[maxIdx - 1].time;
-    if (interval === 0) return null;
-
-    if (time < candles[0].time) {
-      const bars = (candles[0].time - time) / interval;
-      return chart.timeScale().logicalToCoordinate(-bars as import("lightweight-charts").Logical);
-    }
-    if (time > candles[maxIdx].time) {
-      const bars = (time - candles[maxIdx].time) / interval;
-      return chart.timeScale().logicalToCoordinate((maxIdx + bars) as import("lightweight-charts").Logical);
-    }
-    return null;
-  };
+  const getCoordinateForTime = (time: number): number | null =>
+    timeToCoordinateExtended(chart, candlesRef.current, time);
 
   const aX = getCoordinateForTime(inProgress.a.time as number);
   const aY = series.priceToCoordinate(inProgress.a.price);
