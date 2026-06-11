@@ -29,6 +29,7 @@ import { useRectanglePrimitives } from "@/hooks/chart/useRectanglePrimitives";
 import { useRectangleInteraction } from "@/hooks/chart/useRectangleInteraction";
 import { useIndicatorDoubleClick } from "@/hooks/chart/useIndicatorDoubleClick";
 import { useLogScale } from "@/hooks/chart/useLogScale";
+import { useDocumentTitle } from "@/hooks/chart/useDocumentTitle";
 
 import { SymbolHeader } from "./overlay/SymbolHeader";
 import { ChartLegend } from "./overlay/ChartLegend";
@@ -120,6 +121,8 @@ export function PriceChart({ symbol, timeframe }: Props) {
     updateVRVP,
     recomputePaneOffsets,
   });
+
+  useDocumentTitle(symbol, lastPrice);
 
   const lastValues = {
     ema20: lastEMA20,
