@@ -8,6 +8,7 @@ import { PriceChart } from "@/components/chart/PriceChart";
 import { IndicatorSettingsDialog } from "@/components/chart/IndicatorSettingsDialog";
 import { PriceLineSettingsDialog } from "@/components/chart/PriceLineSettingsDialog";
 import { DrawingSettingsDialog } from "@/components/chart/DrawingSettingsDialog";
+import { AddScriptDialog } from "@/components/pine/AddScriptDialog";
 import { useChartStore } from "@/lib/store/chart-store";
 import { useUrlSymbolSync } from "@/hooks/useUrlSymbolSync";
 import { useDriveSync } from "@/hooks/useDriveSync";
@@ -53,6 +54,7 @@ export default function HomePage() {
       <IndicatorSettingsDialog />
       <PriceLineSettingsDialog />
       <DrawingSettingsDialog />
+      <AddScriptDialog />
     </div>
   );
 }

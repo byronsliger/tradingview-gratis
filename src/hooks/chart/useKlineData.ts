@@ -17,6 +17,7 @@ interface KlineDataCallbacks {
   updateSQZ: () => void;
   updateADX: () => void;
   updateVRVP: () => void;
+  updateUserScripts: () => void;
   recomputePaneOffsets: () => void;
 }
 
@@ -63,7 +64,7 @@ export function useKlineData(
 
       candlesRef.current = [...fresh, ...candlesRef.current];
       const all = candlesRef.current;
-      const { candleSeriesRef, volumeSeriesRef, updateEMAs, updateRSI, updateMACD, updateSQZ, updateADX } = callbacksRef.current;
+      const { candleSeriesRef, volumeSeriesRef, updateEMAs, updateRSI, updateMACD, updateSQZ, updateADX, updateUserScripts } = callbacksRef.current;
 
       candleSeriesRef.current?.setData(
         all.map((k) => ({ time: k.time as UTCTimestamp, open: k.open, high: k.high, low: k.low, close: k.close })),
@@ -80,6 +81,7 @@ export function useKlineData(
       updateMACD();
       updateSQZ();
       updateADX();
+      updateUserScripts();
     } catch {
       // Silently ignore network errors — user can scroll back and retry
     } finally {
@@ -130,7 +132,7 @@ export function useKlineData(
         if (cancelled) return;
         candlesRef.current = klines;
 
-        const { candleSeriesRef, volumeSeriesRef, updateEMAs, updateRSI, updateMACD, updateSQZ, updateADX, updateVRVP, recomputePaneOffsets } = callbacksRef.current;
+        const { candleSeriesRef, volumeSeriesRef, updateEMAs, updateRSI, updateMACD, updateSQZ, updateADX, updateVRVP, updateUserScripts, recomputePaneOffsets } = callbacksRef.current;
 
         candleSeriesRef.current?.setData(
           klines.map((k) => ({ time: k.time as UTCTimestamp, open: k.open, high: k.high, low: k.low, close: k.close })),
@@ -147,6 +149,7 @@ export function useKlineData(
         updateMACD();
         updateSQZ();
         updateADX();
+        updateUserScripts();
 
         // Auto-zoom based on user preference
         if (chartRef.current && klines.length > 0) {
@@ -193,7 +196,7 @@ export function useKlineData(
           onCandle: (k) => {
             // Block WS updates while a REST refresh is running to prevent false gaps
             if (isRefreshingRef.current) return;
-            const { candleSeriesRef, volumeSeriesRef, updateEMAs, updateRSI, updateMACD, updateSQZ, updateADX, updateVRVP } = callbacksRef.current;
+            const { candleSeriesRef, volumeSeriesRef, updateEMAs, updateRSI, updateMACD, updateSQZ, updateADX, updateVRVP, updateUserScripts } = callbacksRef.current;
             if (!candleSeriesRef.current) return;
             const arr = candlesRef.current;
             const lastCandle = arr[arr.length - 1];
@@ -217,6 +220,7 @@ export function useKlineData(
             updateSQZ();
             updateADX();
             updateVRVP();
+            updateUserScripts();
             const prev = arr[arr.length - 2] ?? lastCandle;
             setLastPrice({
               value: k.close,
@@ -241,7 +245,7 @@ export function useKlineData(
   // Used on page wake-up, network recovery, or WS reconnect to eliminate gaps
   const fullRefresh = useCallback(async () => {
     if (isRefreshingRef.current) return;
-    const { candleSeriesRef, volumeSeriesRef, updateEMAs, updateRSI, updateMACD, updateSQZ, updateADX } = callbacksRef.current;
+    const { candleSeriesRef, volumeSeriesRef, updateEMAs, updateRSI, updateMACD, updateSQZ, updateADX, updateUserScripts } = callbacksRef.current;
     if (!candleSeriesRef.current) return;
     isRefreshingRef.current = true;
     try {
@@ -264,6 +268,7 @@ export function useKlineData(
       updateMACD();
       updateSQZ();
       updateADX();
+      updateUserScripts();
 
       const last = klines[klines.length - 1];
       const prev = klines[klines.length - 2] ?? last;

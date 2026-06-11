@@ -29,6 +29,21 @@ export interface PriceLine {
   axisLabelVisible?: boolean;
 }
 
+/** Script Pine del usuario, persistido en localStorage (ver plans/pine-script-engine.md). */
+export interface PineScriptRecord {
+  id: string;
+  name: string;
+  source: string;
+  /** Solo overrides sobre los defaults declarados con input.* (Fase 4) */
+  inputs: Record<string, number | string | boolean>;
+  /** Añadido al chart (≈ indicators[key]) */
+  onChart: boolean;
+  /** Oculto con el ojo (≈ hidden[key]) */
+  hidden: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface TrendLineDefaults {
   color: string;
   lineWidth: 1 | 2 | 3 | 4;
@@ -236,6 +251,8 @@ interface ChartState {
   /** Periods and parameters for each indicator */
   config: IndicatorConfig;
   watchlist: string[];
+  /** Pine scripts del usuario (persistidos) */
+  scripts: PineScriptRecord[];
 
   // Ephemeral UI state (not persisted)
   tool: DrawingTool;
@@ -253,6 +270,8 @@ interface ChartState {
   legendCollapsed: boolean;
   watchlistCollapsed: boolean;
   mobileTab: "chart" | "watchlist";
+  /** Dialog "Nuevo script Pine" abierto (efímero) */
+  addScriptDialogOpen: boolean;
 
   // Actions
   setSymbol: (s: string) => void;
@@ -287,6 +306,12 @@ interface ChartState {
   toggleLegendCollapsed: () => void;
   toggleWatchlistCollapsed: () => void;
   setMobileTab: (tab: "chart" | "watchlist") => void;
+  addScript: (name: string, source: string) => void;
+  updateScript: (id: string, patch: Partial<Omit<PineScriptRecord, "id" | "createdAt" | "updatedAt">>) => void;
+  removeScript: (id: string) => void;
+  toggleScriptOnChart: (id: string) => void;
+  toggleScriptHidden: (id: string) => void;
+  setAddScriptDialogOpen: (v: boolean) => void;
 }
 
 export const useChartStore = create<ChartState>()(
@@ -321,6 +346,7 @@ export const useChartStore = create<ChartState>()(
       },
       config: { ...DEFAULT_CONFIG },
       watchlist: DEFAULT_WATCHLIST,
+      scripts: [],
       tool: "cursor",
       priceLines: [],
       symbolDialogOpen: false,
@@ -335,6 +361,7 @@ export const useChartStore = create<ChartState>()(
       legendCollapsed: true,
       watchlistCollapsed: true,
       mobileTab: "chart",
+      addScriptDialogOpen: false,
 
       setSymbol: (symbol) => set({ symbol }),
       setTimeframe: (timeframe) => set({ timeframe }),
@@ -433,6 +460,55 @@ export const useChartStore = create<ChartState>()(
       toggleLegendCollapsed: () => set((s) => ({ legendCollapsed: !s.legendCollapsed })),
       toggleWatchlistCollapsed: () => set((s) => ({ watchlistCollapsed: !s.watchlistCollapsed })),
       setMobileTab: (mobileTab) => set({ mobileTab }),
+      addScript: (name, source) =>
+        set((state) => ({
+          scripts: [
+            ...state.scripts,
+            {
+              id:
+                typeof crypto !== "undefined" && "randomUUID" in crypto
+                  ? crypto.randomUUID()
+                  : `${Date.now()}-${Math.random()}`,
+              name,
+              source,
+              inputs: {},
+              onChart: true,
+              hidden: false,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            },
+          ],
+        })),
+      updateScript: (id, patch) =>
+        set((state) => ({
+          scripts: state.scripts.map((sc) =>
+            sc.id === id ? { ...sc, ...patch, updatedAt: Date.now() } : sc,
+          ),
+        })),
+      removeScript: (id) =>
+        set((state) => ({
+          scripts: state.scripts.filter((sc) => sc.id !== id),
+        })),
+      toggleScriptOnChart: (id) =>
+        set((state) => ({
+          scripts: state.scripts.map((sc) =>
+            sc.id === id
+              ? {
+                  ...sc,
+                  onChart: !sc.onChart,
+                  // Al re-añadir, asegurar que no quede oculto (igual que toggleIndicator)
+                  hidden: !sc.onChart ? false : sc.hidden,
+                }
+              : sc,
+          ),
+        })),
+      toggleScriptHidden: (id) =>
+        set((state) => ({
+          scripts: state.scripts.map((sc) =>
+            sc.id === id ? { ...sc, hidden: !sc.hidden } : sc,
+          ),
+        })),
+      setAddScriptDialogOpen: (addScriptDialogOpen) => set({ addScriptDialogOpen }),
     }),
     {
       name: "tv-gratis-chart-state",
@@ -446,6 +522,7 @@ export const useChartStore = create<ChartState>()(
         hidden: s.hidden,
         config: s.config,
         watchlist: s.watchlist,
+        scripts: s.scripts,
         priceLines: s.priceLines,
         drawings: s.drawings,
         drawingDefaults: s.drawingDefaults,
@@ -468,6 +545,8 @@ export const useChartStore = create<ChartState>()(
           // Same for indicator flags — new keys default to `false`
           indicators: { ...current.indicators, ...(p.indicators ?? {}) },
           hidden: { ...current.hidden, ...(p.hidden ?? {}) },
+          // Scripts del usuario: default [] si no existen en el estado persistido
+          scripts: p.scripts ?? [],
           drawingDefaults: {
             trendline: { ...DEFAULT_DRAWING_DEFAULTS.trendline, ...(p.drawingDefaults?.trendline ?? {}) },
             rectangle: { ...DEFAULT_DRAWING_DEFAULTS.rectangle, ...(p.drawingDefaults?.rectangle ?? {}) },

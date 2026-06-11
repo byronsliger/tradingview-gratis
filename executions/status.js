@@ -2,8 +2,8 @@
 // Cada sesión LEE este archivo al empezar y lo ACTUALIZA al terminar (o antes de agotar tokens).
 // Plan completo: plans/pine-script-engine.md
 module.exports = {
-  updatedAt: "2026-06-11T09:20:00Z",
-  currentPhase: 1,
+  updatedAt: "2026-06-11T09:40:00Z",
+  currentPhase: 2,
   done: [
     "Plan aprobado y guardado en plans/pine-script-engine.md",
     "Carpeta executions/ creada con este archivo de estado",
@@ -11,17 +11,25 @@ module.exports = {
     "Fase 1: vitest configurado (vitest.config.ts, script npm test) — 56 tests verdes en 4 suites (lexer, parser, interpreter, ta-golden)",
     "Fase 1: golden tests vs src/lib/indicators/{rsi,ema,sma}.ts pasan con tolerancia relativa 1e-8 (mismo nº de puntos)",
     "Fase 1: npm run lint limpio y npx tsc --noEmit limpio",
+    "Fase 2 COMPLETA: integración en el chart (scripts del usuario dibujándose en vivo)",
+    "Fase 2: chart-store.ts — PineScriptRecord + scripts: PineScriptRecord[] + acciones addScript/updateScript/removeScript/toggleScriptOnChart/toggleScriptHidden + estado efímero addScriptDialogOpen/setAddScriptDialogOpen + scripts en partialize y en merge (default [])",
+    "Fase 2: src/hooks/chart/useUserScriptPanes.ts (nuevo) — hook genérico con Map scriptId→{compiled, series[], error}; compile cacheado por source; LineSeries por PlotSpec; overlay→pane 0, no-overlay→scriptBasePaneIdx+offset; hidden vía applyOptions({visible}); updateUserScripts estable con try/catch por script; rebuild total de series al cambiar layoutKey (basePaneIdx/source/inputs/onChart)",
+    "Fase 2: PriceChart.tsx — scriptBasePaneIdx = 1 + rsi + macd + (sqzmom||adx), instancia useUserScriptPanes y pasa updateUserScripts a useKlineData",
+    "Fase 2: useKlineData.ts — updateUserScripts añadido a KlineDataCallbacks e invocado en los 4 puntos (carga inicial, tick WS, loadMoreHistory, fullRefresh)",
+    "Fase 2: src/components/pine/AddScriptDialog.tsx (nuevo, provisional) — nombre opcional (fallback al title de indicator()), textarea monoespaciada 14 filas, diagnostics línea:col en rojo sin cerrar, addScript con onChart=true al compilar; UI en español",
+    "Fase 2: IndicatorMenu.tsx — sección 'Mis scripts' con 'Nuevo script Pine…', toggle on/off por script y botón eliminar; contador de activos incluye scripts onChart",
+    "Fase 2: AddScriptDialog montado en src/app/page.tsx junto a IndicatorSettingsDialog/PriceLineSettingsDialog/DrawingSettingsDialog",
+    "Fase 2: npm run lint limpio, npx tsc --noEmit limpio, npm test 56/56 verdes",
   ],
   inProgress: [],
   pending: [
-    "Fase 2: integración en chart (useUserScriptPanes, store.scripts, PriceChart, useKlineData, IndicatorMenu)",
-    "Fase 3: editor CodeMirror 6 + CRUD de scripts",
+    "Fase 3: editor CodeMirror 6 + CRUD de scripts (reemplaza AddScriptDialog.tsx; estado efímero pineEditorOpen/pineEditorTarget en el store)",
     "Fase 4: inputs autogenerados, estilos de plot, legend pills",
     "Fase 5: control de flujo, funciones de usuario, builtins ampliados (paridad copy/paste)",
     "Fase 6: Drive sync v2, badges de error, autocomplete",
   ],
   notes: [
-    "API pública: compile(source) → {ok,script|diagnostics}; runScript(script, candles, inputs?, options?) → ScriptResult; runScript LANZA PineRuntimeError (runtime/fuel) — el caller de Fase 2 debe capturarlo",
+    "API pública: compile(source) → {ok,script|diagnostics}; runScript(script, candles, inputs?, options?) → ScriptResult; runScript LANZA PineRuntimeError (runtime/fuel) — el caller debe capturarlo (useUserScriptPanes ya lo hace)",
     "RunOptions { maxFuelPerBar, maxFuelTotal } expone los límites de fuel (defaults 50k/5M en runtime/context.ts); los tests los bajan para probar el aborto",
     "Semántica implementada: aritmética con na→na, división/módulo por 0→na, comparación con na→false, and/or/not y ternario evalúan AMBOS lados/ramas (estado ta.* consistente, sin cortocircuito), truthiness na/false/0/\"\"→false",
     "var carry-forward: el init de `var` solo corre en barra 0; en barras siguientes arrastra series[bar-1]; `:=` exige slot declarado",
@@ -31,5 +39,13 @@ module.exports = {
     "analyze(): meta de indicator() (title/shorttitle/overlay literales), PlotSpec por plot() (id=callSiteId, title posicional/nombrado, color de color.* o literal), inputs=[] (estructura lista para Fase 4); falta de indicator()/plot() genera warnings, no errores",
     "Tests golden usan velas sintéticas mulberry32(seed=42), 300 velas, en el propio test (sin fixtures)",
     "Limitación conocida: `not na` → true (Pine real da na); strings usan truthiness estilo JS; input.*/hline/plotshape lanzan error claro 'llega en fase posterior'",
+    "FASE 2 — gotchas para la Fase 3:",
+    "useUserScriptPanes: el rebuild se decide por layoutKey(basePaneIdx + id/source/inputs de scripts onChart). Cambios de hidden/name NO recrean series (solo applyOptions). Al editar source en Fase 3, updateScript dispara rebuild automático vía layoutKey — no hace falta nada extra",
+    "useUserScriptPanes destruye y recrea TODAS las series de scripts cuando cambia el layout (lightweight-charts compacta panes al quitar series intermedias); recomputePaneOffsets se llama en requestAnimationFrame tras cada rebuild (mismo patrón que useRSIPane)",
+    "Caché de compile por source (Map, se limpia a >50 entradas). Errores de compile/runtime quedan en entry.error (console.warn, no UI todavía — el badge en pill llega en Fase 6)",
+    "El chart se crea UNA sola vez (useChartInit; el tema cambia con applyOptions), por eso layoutKeyRef sobrevive sin invalidarse",
+    "AddScriptDialog se monta en src/app/page.tsx (patrón de los otros dialogs globales) y se abre con store.addScriptDialogOpen — en Fase 3 reemplazar por PineEditorDialog y eliminar AddScriptDialog.tsx + considerar si addScriptDialogOpen muere o se renombra",
+    "scripts está en partialize y en el deep-merge (p.scripts ?? []) — persiste en localStorage; el sync a Drive llega en Fase 6 (NO está en SyncedState todavía)",
+    "Verificación manual Fase 2: npm run dev → Indicadores → 'Nuevo script Pine…' → pegar indicator(\"Mi EMA\", overlay=true) + plot(ta.ema(close, 21), color=color.orange) → línea naranja sobre velas moviéndose con cada tick; versión overlay=false → sub-pane debajo de ADX; toggle de MACD builtin reubica el pane del script; recarga → persiste",
   ],
 };

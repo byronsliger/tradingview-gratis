@@ -14,6 +14,7 @@ import { useRSIPane } from "@/hooks/chart/useRSIPane";
 import { useMACDPane } from "@/hooks/chart/useMACDPane";
 import { useSQZPane } from "@/hooks/chart/useSQZPane";
 import { useADXPane } from "@/hooks/chart/useADXPane";
+import { useUserScriptPanes } from "@/hooks/chart/useUserScriptPanes";
 import { useVRVPSeries } from "@/hooks/chart/useVRVPSeries";
 import { usePriceLines } from "@/hooks/chart/usePriceLines";
 import { usePriceLineDrag } from "@/hooks/chart/usePriceLineDrag";
@@ -52,6 +53,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const config = useChartStore((s) => s.config);
   const tool = useChartStore((s) => s.tool);
   const theme = useChartStore((s) => s.theme);
+  const scripts = useChartStore((s) => s.scripts);
 
   useEffect(() => {
     // Prefetch symbol dictionary in the background on load
@@ -90,6 +92,20 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const rsiPaneIdx = indicators.rsi ? 1 : -1;
   const macdPaneIdx = indicators.macd ? (indicators.rsi ? 2 : 1) : -1;
   const sqzmomAdxPaneIdx = (indicators.sqzmom || indicators.adx) ? (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1 : -1;
+  // Los sub-panes de scripts Pine del usuario se apilan después de los builtin
+  const scriptBasePaneIdx =
+    1 +
+    (indicators.rsi ? 1 : 0) +
+    (indicators.macd ? 1 : 0) +
+    (indicators.sqzmom || indicators.adx ? 1 : 0);
+
+  const { updateUserScripts } = useUserScriptPanes(
+    chartRef,
+    candlesRef,
+    scripts,
+    scriptBasePaneIdx,
+    recomputePaneOffsets,
+  );
 
   const seriesPaneIndices = {
     ema20: 0,
@@ -119,6 +135,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
     updateSQZ,
     updateADX,
     updateVRVP,
+    updateUserScripts,
     recomputePaneOffsets,
   });
 
