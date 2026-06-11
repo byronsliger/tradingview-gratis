@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
@@ -20,6 +20,18 @@ export const metadata: Metadata = {
   title: "TradingView Gratis — Crypto charts open source",
   description:
     "Plataforma de charts crypto en vivo. Alternativa gratis a TradingView. Powered by Binance + lightweight-charts.",
+  applicationName: "TradingView Gratis",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "TV Gratis",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#131722",
+  // viewport-fit=cover evita franjas alrededor del notch en modo standalone
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
