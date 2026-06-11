@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Check, Plus, Trash2 } from "lucide-react";
+import { Activity, Check, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,7 +61,13 @@ export function IndicatorMenu() {
   const scripts = useChartStore((s) => s.scripts);
   const toggleScriptOnChart = useChartStore((s) => s.toggleScriptOnChart);
   const removeScript = useChartStore((s) => s.removeScript);
-  const setAddScriptDialogOpen = useChartStore((s) => s.setAddScriptDialogOpen);
+  const setPineEditorOpen = useChartStore((s) => s.setPineEditorOpen);
+  const setPineEditorTarget = useChartStore((s) => s.setPineEditorTarget);
+
+  function openEditor(target: string | null) {
+    setPineEditorTarget(target);
+    setPineEditorOpen(true);
+  }
 
   const groups = ENTRIES.reduce<Record<string, Entry[]>>((acc, i) => {
     (acc[i.group] ||= []).push(i);
@@ -110,7 +116,7 @@ export function IndicatorMenu() {
             Mis scripts
           </DropdownMenuLabel>
           <DropdownMenuItem
-            onClick={() => setAddScriptDialogOpen(true)}
+            onClick={() => openEditor(null)}
             className="flex items-center gap-1.5 text-xs"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -126,6 +132,17 @@ export function IndicatorMenu() {
               <span className="truncate">{sc.name}</span>
               <span className="flex shrink-0 items-center gap-1">
                 {sc.onChart && <Check className="h-3.5 w-3.5 text-tv-blue" />}
+                <button
+                  type="button"
+                  aria-label={`Editar script ${sc.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEditor(sc.id);
+                  }}
+                  className="rounded p-0.5 text-tv-text-muted hover:bg-tv-panel-hover hover:text-tv-text"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
                 <button
                   type="button"
                   aria-label={`Eliminar script ${sc.name}`}

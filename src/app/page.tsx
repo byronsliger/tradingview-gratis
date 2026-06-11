@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+import dynamic from "next/dynamic";
 import { Header } from "@/components/layout/Header";
 import { LeftSidebar } from "@/components/layout/LeftSidebar";
 import { RightSidebar } from "@/components/layout/RightSidebar";
@@ -8,11 +10,17 @@ import { PriceChart } from "@/components/chart/PriceChart";
 import { IndicatorSettingsDialog } from "@/components/chart/IndicatorSettingsDialog";
 import { PriceLineSettingsDialog } from "@/components/chart/PriceLineSettingsDialog";
 import { DrawingSettingsDialog } from "@/components/chart/DrawingSettingsDialog";
-import { AddScriptDialog } from "@/components/pine/AddScriptDialog";
 import { useChartStore } from "@/lib/store/chart-store";
 import { useUrlSymbolSync } from "@/hooks/useUrlSymbolSync";
 import { useDriveSync } from "@/hooks/useDriveSync";
 import { MobileChartTools } from "@/components/layout/MobileChartTools";
+
+// CodeMirror no soporta SSR y el editor no debe entrar en el chunk inicial:
+// se carga bajo demanda la primera vez que se abre.
+const PineEditorDialog = dynamic(
+  () => import("@/components/pine/PineEditorDialog").then((m) => m.PineEditorDialog),
+  { ssr: false },
+);
 
 if (typeof window !== "undefined" && typeof Element !== "undefined") {
   const originalReleasePointerCapture = Element.prototype.releasePointerCapture;
@@ -30,6 +38,16 @@ if (typeof window !== "undefined" && typeof Element !== "undefined") {
 export default function HomePage() {
   const symbol = useChartStore((s) => s.symbol);
   const timeframe = useChartStore((s) => s.timeframe);
+  const pineEditorOpen = useChartStore((s) => s.pineEditorOpen);
+  // Montar el Editor Pine solo tras la primera apertura (y dejarlo montado
+  // después para conservar la animación de cierre del dialog).
+  const pineEditorEverOpened = useRef(false);
+  if (pineEditorOpen) {
+    // eslint-disable-next-line react-hooks/refs
+    pineEditorEverOpened.current = true;
+  }
+  // eslint-disable-next-line react-hooks/refs
+  const pineEditorMounted = pineEditorOpen || pineEditorEverOpened.current;
   useUrlSymbolSync();
   useDriveSync();
 
@@ -54,7 +72,7 @@ export default function HomePage() {
       <IndicatorSettingsDialog />
       <PriceLineSettingsDialog />
       <DrawingSettingsDialog />
-      <AddScriptDialog />
+      {pineEditorMounted && <PineEditorDialog />}
     </div>
   );
 }

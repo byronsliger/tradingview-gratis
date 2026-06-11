@@ -2,8 +2,8 @@
 // Cada sesión LEE este archivo al empezar y lo ACTUALIZA al terminar (o antes de agotar tokens).
 // Plan completo: plans/pine-script-engine.md
 module.exports = {
-  updatedAt: "2026-06-11T09:40:00Z",
-  currentPhase: 2,
+  updatedAt: "2026-06-11T19:35:00Z",
+  currentPhase: 3,
   done: [
     "Plan aprobado y guardado en plans/pine-script-engine.md",
     "Carpeta executions/ creada con este archivo de estado",
@@ -20,10 +20,20 @@ module.exports = {
     "Fase 2: IndicatorMenu.tsx — sección 'Mis scripts' con 'Nuevo script Pine…', toggle on/off por script y botón eliminar; contador de activos incluye scripts onChart",
     "Fase 2: AddScriptDialog montado en src/app/page.tsx junto a IndicatorSettingsDialog/PriceLineSettingsDialog/DrawingSettingsDialog",
     "Fase 2: npm run lint limpio, npx tsc --noEmit limpio, npm test 56/56 verdes",
+    "Fase 3 COMPLETA: editor CodeMirror 6 + CRUD de scripts (reemplaza el textarea provisional)",
+    "Fase 3: deps añadidas con pnpm (NO npm, ver notes): @codemirror/{state,view,language,lint,commands} + @lezer/highlight",
+    "Fase 3: src/lib/pine/editor/pine-language.ts (nuevo) — StreamLanguage con tokenizer ~100 líneas (keywords, ns builtins ta./math./input./color./plot., series vars, números, strings, #hex, comentarios //, operadores) + HighlightStyle dark/light acordes a TV_COLORS",
+    "Fase 3: src/lib/pine/editor/pine-lint.ts (nuevo) — linter CM con delay 300ms; usa compile() y mapea Diagnostic.start/end (offsets absolutos del lexer) a from/to, clampeados al doc; incluye warnings de analyze() cuando compila ok",
+    "Fase 3: src/components/pine/PineEditor.tsx (nuevo) — wrapper CM6 controlado (value/onChange/theme); EditorView creado una vez en useEffect con cleanup view.destroy(); tema vía Compartment; sync externo de value con dispatch",
+    "Fase 3: src/components/pine/PineEditorDialog.tsx + ScriptList.tsx (nuevos) — dialog ~90vw/90vh (94dvh móvil) con lista lateral (crear/renombrar inline/duplicar/eliminar con confirm, punto azul = en el chart), input de nombre, botones Guardar / Guardar y añadir al chart (con errores guarda pero NO añade, muestra aviso), confirm al descartar cambios sin guardar",
+    "Fase 3: chart-store.ts — addScriptDialogOpen/setAddScriptDialogOpen reemplazados por pineEditorOpen + pineEditorTarget (string|null) + setPineEditorOpen/setPineEditorTarget; addScript ahora devuelve el id y acepta opts {onChart} (default true)",
+    "Fase 3: IndicatorMenu.tsx — 'Nuevo script Pine…' abre editor con target null; cada script tiene botón lápiz (editar) además de toggle y eliminar",
+    "Fase 3: page.tsx — AddScriptDialog eliminado; PineEditorDialog cargado con next/dynamic ssr:false y montado solo tras la primera apertura (ref everOpened) para no entrar en el chunk inicial",
+    "Fase 3: src/components/pine/AddScriptDialog.tsx ELIMINADO",
+    "Fase 3: npm run lint limpio, npx tsc --noEmit limpio, npm test 56/56 verdes, npm run build ok",
   ],
   inProgress: [],
   pending: [
-    "Fase 3: editor CodeMirror 6 + CRUD de scripts (reemplaza AddScriptDialog.tsx; estado efímero pineEditorOpen/pineEditorTarget en el store)",
     "Fase 4: inputs autogenerados, estilos de plot, legend pills",
     "Fase 5: control de flujo, funciones de usuario, builtins ampliados (paridad copy/paste)",
     "Fase 6: Drive sync v2, badges de error, autocomplete",
@@ -47,5 +57,15 @@ module.exports = {
     "AddScriptDialog se monta en src/app/page.tsx (patrón de los otros dialogs globales) y se abre con store.addScriptDialogOpen — en Fase 3 reemplazar por PineEditorDialog y eliminar AddScriptDialog.tsx + considerar si addScriptDialogOpen muere o se renombra",
     "scripts está en partialize y en el deep-merge (p.scripts ?? []) — persiste en localStorage; el sync a Drive llega en Fase 6 (NO está en SyncedState todavía)",
     "Verificación manual Fase 2: npm run dev → Indicadores → 'Nuevo script Pine…' → pegar indicator(\"Mi EMA\", overlay=true) + plot(ta.ema(close, 21), color=color.orange) → línea naranja sobre velas moviéndose con cada tick; versión overlay=false → sub-pane debajo de ADX; toggle de MACD builtin reubica el pane del script; recarga → persiste",
+    "FASE 3 — gotchas para la Fase 4:",
+    "IMPORTANTE: el proyecto se instala con PNPM, no npm (npm install falla con 'Cannot read properties of null (reading matches)' por el layout .pnpm de node_modules). Usar `pnpm add …`",
+    "Las reglas nuevas de eslint react-hooks (set-state-in-effect) prohíben setState síncrono en efectos: PineEditorDialog evita el efecto de carga montando el body keyed por target y solo mientras open (useState lazy initializers); el dirty se reporta al padre vía dirtyRef asignado en render con eslint-disable react-hooks/refs",
+    "StreamLanguage: la tabla legacy del stream-parser ya define el nombre de token 'builtin' (→ variableName.standard) y PISA las entradas custom del tokenTable — por eso el token custom se llama 'pineBuiltin'. Nombres estándar (keyword/bool/atom/number/string/comment/operator/punctuation/variableName) resuelven solos contra tags de @lezer/highlight",
+    "pine-lint.ts mapea Diagnostic.start/end del motor directamente a from/to de CM (son offsets absolutos 0-based del lexer, verificado); clampea al tamaño del doc y fuerza rango mínimo de 1 char",
+    "El chrome del editor usa var(--tv-*) (cambian solos con el tema); solo el flag dark de EditorView.theme y el HighlightStyle se reconfiguran vía Compartment al cambiar store.theme",
+    "PineEditorDialog se monta en page.tsx con next/dynamic ssr:false + condición pineEditorOpen||everOpenedRef → el chunk de CodeMirror solo se descarga en la primera apertura (verificado en npm run build: no entra en el chunk inicial)",
+    "addScript(name, source, opts?) ahora DEVUELVE el id y acepta {onChart} — duplicar usa onChart:false; 'Guardar' de un script nuevo usa onChart:false y 'Guardar y añadir' onChart:true solo si compila",
+    "Para Fase 4: ScriptSettingsDialog puede seguir el patrón keyed-body de PineEditorDialog para evitar set-state-in-effect; settingsTarget del store debe ampliarse a IndicatorKey | `script:<id>` | null",
+    "Verificación manual Fase 3: npm run dev → Indicadores → 'Nuevo script Pine…' → editor grande con highlighting; escribir plot(ta.sma(close 14)) → subrayado rojo en la coma faltante (~300ms); Guardar y añadir al chart → aparece en el chart y en la lista con punto azul; lápiz en el menú reabre con el script cargado; renombrar inline (doble click o lápiz en la lista), duplicar y eliminar con confirm; cambiar tema light/dark → el editor cambia de paleta",
   ],
 };

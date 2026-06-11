@@ -270,8 +270,10 @@ interface ChartState {
   legendCollapsed: boolean;
   watchlistCollapsed: boolean;
   mobileTab: "chart" | "watchlist";
-  /** Dialog "Nuevo script Pine" abierto (efímero) */
-  addScriptDialogOpen: boolean;
+  /** Dialog "Editor Pine" abierto (efímero) */
+  pineEditorOpen: boolean;
+  /** Script a cargar en el Editor Pine (null = nuevo borrador) */
+  pineEditorTarget: string | null;
 
   // Actions
   setSymbol: (s: string) => void;
@@ -306,12 +308,14 @@ interface ChartState {
   toggleLegendCollapsed: () => void;
   toggleWatchlistCollapsed: () => void;
   setMobileTab: (tab: "chart" | "watchlist") => void;
-  addScript: (name: string, source: string) => void;
+  /** Crea un script y devuelve su id (onChart configurable, default true) */
+  addScript: (name: string, source: string, opts?: { onChart?: boolean }) => string;
   updateScript: (id: string, patch: Partial<Omit<PineScriptRecord, "id" | "createdAt" | "updatedAt">>) => void;
   removeScript: (id: string) => void;
   toggleScriptOnChart: (id: string) => void;
   toggleScriptHidden: (id: string) => void;
-  setAddScriptDialogOpen: (v: boolean) => void;
+  setPineEditorOpen: (v: boolean) => void;
+  setPineEditorTarget: (id: string | null) => void;
 }
 
 export const useChartStore = create<ChartState>()(
@@ -361,7 +365,8 @@ export const useChartStore = create<ChartState>()(
       legendCollapsed: true,
       watchlistCollapsed: true,
       mobileTab: "chart",
-      addScriptDialogOpen: false,
+      pineEditorOpen: false,
+      pineEditorTarget: null,
 
       setSymbol: (symbol) => set({ symbol }),
       setTimeframe: (timeframe) => set({ timeframe }),
@@ -460,25 +465,28 @@ export const useChartStore = create<ChartState>()(
       toggleLegendCollapsed: () => set((s) => ({ legendCollapsed: !s.legendCollapsed })),
       toggleWatchlistCollapsed: () => set((s) => ({ watchlistCollapsed: !s.watchlistCollapsed })),
       setMobileTab: (mobileTab) => set({ mobileTab }),
-      addScript: (name, source) =>
+      addScript: (name, source, opts) => {
+        const id =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random()}`;
         set((state) => ({
           scripts: [
             ...state.scripts,
             {
-              id:
-                typeof crypto !== "undefined" && "randomUUID" in crypto
-                  ? crypto.randomUUID()
-                  : `${Date.now()}-${Math.random()}`,
+              id,
               name,
               source,
               inputs: {},
-              onChart: true,
+              onChart: opts?.onChart ?? true,
               hidden: false,
               createdAt: Date.now(),
               updatedAt: Date.now(),
             },
           ],
-        })),
+        }));
+        return id;
+      },
       updateScript: (id, patch) =>
         set((state) => ({
           scripts: state.scripts.map((sc) =>
@@ -508,7 +516,8 @@ export const useChartStore = create<ChartState>()(
             sc.id === id ? { ...sc, hidden: !sc.hidden } : sc,
           ),
         })),
-      setAddScriptDialogOpen: (addScriptDialogOpen) => set({ addScriptDialogOpen }),
+      setPineEditorOpen: (pineEditorOpen) => set({ pineEditorOpen }),
+      setPineEditorTarget: (pineEditorTarget) => set({ pineEditorTarget }),
     }),
     {
       name: "tv-gratis-chart-state",
