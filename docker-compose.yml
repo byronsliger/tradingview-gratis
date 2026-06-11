@@ -2,13 +2,7 @@ version: '3.8'
 
 services:
   caddy:
-    build:
-      context: .
-      dockerfile_inline: |
-        FROM caddy:2-builder AS builder
-        RUN xcaddy build --with github.com/caddy-dns/duckdns
-        FROM caddy:2
-        COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+    image: ghcr.io/byronsliger/tradingview-caddy:latest
     container_name: caddy-tv
     restart: unless-stopped
     ports:
