@@ -2,7 +2,7 @@
 // Cada sesión LEE este archivo al empezar y lo ACTUALIZA al terminar (o antes de agotar tokens).
 // Plan completo: plans/pine-script-engine.md
 module.exports = {
-  updatedAt: "2026-06-16T11:15:00Z",
+  updatedAt: "2026-06-16T15:15:00Z",
   currentPhase: 6,
   branch: "pinescript (sale de master@cbdea78=Fase 3; Fases 1-3 estan en master, Fase 4 en adelante en pinescript)",
   done: [
@@ -62,6 +62,12 @@ module.exports = {
     "Fase 6 autocomplete: dep @codemirror/autocomplete 6.20.3 instalada con pnpm. src/lib/pine/editor/pine-complete.ts (nuevo) — pineCompletions(context): modo namespace (matchBefore de ns.miembro → solo miembros: ta.*, math.*, color.*, input.*, location.*, shape.*, plot.style_*) y modo palabra suelta (keywords, namespaces, top-level indicator/plot/plotshape/plotchar/hline/fill/nz/fixnan, series vars open/high/low/close/volume/...). Listas espejan runtime/builtins-*.ts. Conectado en PineEditor.tsx vía autocompletion({override:[pineCompletions], icons:false}) + completionKeymap antepuesto en el keymap. No toca highlighting ni lint.",
     "Fase 6 opcional (fill/runner incremental): NO implementado — documentado como mejora futura (bajo riesgo, sin demanda actual).",
     "PROYECTO PINE COMPLETO (Fases 1-6): motor lexer/parser/intérprete con fuel + builtins ta/math/core, integración chart en vivo (overlay/sub-panes, ticks WS), editor CodeMirror 6 con highlighting+lint+autocomplete, inputs autogenerados, estilos de plot/hline/markers, pills con último valor y badge de error, persistencia localStorage + Google Drive sync v2 con migración. 115 tests verdes.",
+    "POST-FASE6 (compatibilidad con indicadores reales — caso 'SQZ MOM + ADX + RSI ... + Divergencias' de Lupown): se añadieron builtins y se corrigió el historial de locales. 122 tests verdes.",
+    "Fix: parser ya no confunde una tupla literal de retorno `[plus, minus]` (última expr de una función) con el LHS de un destructuring `[a,b]=…` (lookahead tupleDeclAhead: solo es destructuring si tras `]` viene `=`).",
+    "Builtin nuevo: fixnan(x) — arrastra el último valor no-na (na hasta el primero), estado por call-site vía ctx.getState. Registrado como builtin suelto en interpreter.ts (junto a nz/na).",
+    "Builtins nuevos: ta.pivothigh / ta.pivotlow ([source,] left, right) — forma 2-arg (source=high/low) y 3-arg; extremo ESTRICTO frente a left vecinos izq + right der; na hasta tener left+right+1 barras. Implementados con windowState en builtins-ta.ts. NOTA: usan `>=`/`<=` estricto en ambos lados (TradingView puede diferir en empates).",
+    "Fix IMPORTANTE de semántica: el historial `[n]` sobre PARÁMETROS y LOCALES PLANOS de funciones antes devolvía na (cada llamada creaba Series nueva). Ahora persistentVarSlot(name, isVar=false) hace que TODOS los locales de función (params + planos + var) sean series persistentes entre barras keyed por callStackKey::name. Así `param[1]`, `osc[lbR]` y `m := nz(m[1], …)` (running-max tipo biggest()) funcionan. Verificado: dos call-sites mantienen historial independiente.",
+    "Limitaciones cosméticas detectadas en ese indicador (NO rompen la ejecución, se ignoran silenciosamente): plot(..., offset=-lbR) no desplaza la serie; plotshape style=shape.labelup/labeldown no mapea a un marcador específico; textcolor= ignorado; inline= en input ignorado. El núcleo (momentum, ADX con escala correcta, detección de divergencias) sí funciona.",
   ],
   inProgress: [],
   pending: [],

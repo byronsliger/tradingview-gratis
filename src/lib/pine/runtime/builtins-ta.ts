@@ -100,6 +100,47 @@ interface CrossState {
   b: number | null;
 }
 
+/**
+ * ta.pivothigh / ta.pivotlow. Mantiene una ventana de la serie fuente y, cuando
+ * hay al menos `left+right+1` barras, evalúa si el punto situado `right` barras
+ * atrás es un extremo estricto frente a sus vecinos. Soporta la forma de 2 args
+ * (sin source → usa high/low) y la de 3 args (source explícito).
+ */
+function pivotValue(
+  ctx: ExecutionContext,
+  id: number,
+  args: (PineValue | undefined)[],
+  kind: "high" | "low",
+): PineValue {
+  let srcVal: PineValue | undefined;
+  let left: number | null;
+  let right: number | null;
+  if (args[2] !== undefined) {
+    srcVal = args[0];
+    left = intLen(args[1]);
+    right = intLen(args[2]);
+  } else {
+    const c = ctx.candles[ctx.barIndex];
+    srcVal = kind === "high" ? c.high : c.low;
+    left = intLen(args[0]);
+    right = intLen(args[1]);
+  }
+  const st = windowState(ctx, id, srcVal);
+  if (left === null || right === null) return null;
+  const len = st.values.length;
+  if (len < left + right + 1) return null;
+  const ci = len - 1 - right;
+  const cand = st.values[ci];
+  if (cand === null) return null;
+  for (let i = ci - left; i <= ci + right; i++) {
+    if (i === ci) continue;
+    const v = st.values[i];
+    if (v === null) return null;
+    if (kind === "high" ? v >= cand : v <= cand) return null;
+  }
+  return cand;
+}
+
 function trueRange(ctx: ExecutionContext, prevClose: number | null, handleNa: boolean): number | null {
   const c = ctx.candles[ctx.barIndex];
   if (prevClose === null) return handleNa ? c.high - c.low : null;
@@ -478,6 +519,22 @@ export const taBuiltins: Record<string, TaBuiltin> = {
       else if (st.count !== null) st.count += 1;
       return st.count;
     },
+  },
+
+  // pivothigh([source,] left, right): valor del pivote `right` barras atrás si
+  // ese punto es estrictamente mayor que sus `left` vecinos izquierdos y `right`
+  // derechos; si no, na. Acepta la forma de 2 args (usa `high` como source).
+  pivothigh: {
+    params: ["source", "leftbars", "rightbars"],
+    required: 2,
+    fn: (ctx, id, args) => pivotValue(ctx, id, args, "high"),
+  },
+  // pivotlow([source,] left, right): análogo con mínimo estricto (source por
+  // defecto = `low`).
+  pivotlow: {
+    params: ["source", "leftbars", "rightbars"],
+    required: 2,
+    fn: (ctx, id, args) => pivotValue(ctx, id, args, "low"),
   },
 
   // valuewhen(cond, src, occurrence): valor de src en la n-ésima ocurrencia de cond.

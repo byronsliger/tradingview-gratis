@@ -159,10 +159,14 @@ function declareVar(
   pos: Stmt,
 ): void {
   const inFunction = ctx.currentScope() !== ctx.vars;
-  if (isVar && inFunction) {
-    const { slot, existed } = ctx.persistentVarSlot(name);
+  if (inFunction) {
+    // Dentro de una función todos los locales son series persistentes entre
+    // barras (keyed por call-site + nombre), para que `x[1]` lea la barra previa.
+    // Los `var` ya inicializados arrastran su valor; el resto se recalcula cada
+    // barra conservando el historial.
+    const { slot, existed } = ctx.persistentVarSlot(name, isVar);
     ctx.currentScope().set(name, slot);
-    if (existed) {
+    if (isVar && existed) {
       slot.series.set(ctx.barIndex, slot.series.get(ctx.barIndex, 1));
     } else {
       slot.series.set(ctx.barIndex, computeInit());
@@ -478,6 +482,14 @@ function evalCallT(ctx: ExecutionContext, e: CallExpr): EvalValue {
         const mapped = mapArgs(e, evaluated, ["source"], 1);
         return mapped[0] === null;
       }
+      case "fixnan": {
+        // Arrastra el último valor no-na (na hasta que aparezca el primero).
+        const mapped = mapArgs(e, evaluated, ["source"], 1);
+        const v = mapped[0];
+        const st = ctx.getState<{ last: PineValue }>(e.callSiteId, () => ({ last: null }));
+        if (v !== null && v !== undefined) st.last = v;
+        return st.last;
+      }
       case "alertcondition":
         throw new PineRuntimeError(
           `'${callee.name}()' aún no está soportado (llega en una fase posterior)`,
@@ -576,7 +588,9 @@ function callUserFunction(ctx: ExecutionContext, e: CallExpr, name: string): Eva
   const scope = ctx.pushScope(String(e.callSiteId));
   try {
     def.params.forEach((p, i) => {
-      const slot = { series: new Series(), isVar: false };
+      // Parámetro como serie persistente: `p[1]` lee el valor pasado en la barra
+      // anterior por este mismo sitio de invocación (semántica de series de Pine).
+      const { slot } = ctx.persistentVarSlot(p, false);
       slot.series.set(ctx.barIndex, argValues[i]);
       scope.set(p, slot);
     });

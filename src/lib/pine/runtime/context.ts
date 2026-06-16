@@ -144,15 +144,16 @@ export class ExecutionContext {
   }
 
   /**
-   * Slot persistente entre barras para un `var` local de función, keyed por la
-   * pila de llamadas + nombre. Permite que `var` dentro de una función conserve
-   * su valor por sitio de invocación, igual que en Pine.
+   * Slot persistente entre barras para una variable o parámetro local de función,
+   * keyed por la pila de llamadas + nombre. Así, dentro de una función, tanto los
+   * `var` como los locales planos y los parámetros son series con historial
+   * (`x[1]` lee la barra anterior), igual que en Pine — por sitio de invocación.
    */
-  persistentVarSlot(name: string): { slot: VarSlot; existed: boolean } {
+  persistentVarSlot(name: string, isVar = true): { slot: VarSlot; existed: boolean } {
     const key = this.callStackKey + "::" + name;
     const existing = this.localVarSlots.get(key);
     if (existing) return { slot: existing, existed: true };
-    const slot: VarSlot = { series: new Series(), isVar: true };
+    const slot: VarSlot = { series: new Series(), isVar };
     this.localVarSlots.set(key, slot);
     return { slot, existed: false };
   }
