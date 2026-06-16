@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff, Settings, X } from "lucide-react";
+import { AlertTriangle, Eye, EyeOff, Pencil, Settings, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -9,9 +9,13 @@ interface Props {
   color: string;
   hidden: boolean;
   selected?: boolean;
+  /** Mensaje de error del script (muestra un icono rojo con tooltip) */
+  error?: string;
   onToggleHide: () => void;
   onSettings: () => void;
   onRemove: () => void;
+  /** Si se pasa, muestra un botón de editar (lápiz) — usado por los scripts Pine */
+  onEdit?: () => void;
 }
 
 export function IndicatorPill({
@@ -20,9 +24,11 @@ export function IndicatorPill({
   color,
   hidden,
   selected,
+  error,
   onToggleHide,
   onSettings,
   onRemove,
+  onEdit,
 }: Props) {
   return (
     <div
@@ -38,8 +44,12 @@ export function IndicatorPill({
         style={{ background: color }}
       />
       <span className="font-medium text-tv-text">{name}</span>
-      {value !== undefined && (
-        <span className="tabular-nums text-tv-text-muted">{value}</span>
+      {error ? (
+        <AlertTriangle className="h-3 w-3 shrink-0 text-tv-red" aria-label="Error" />
+      ) : (
+        value !== undefined && (
+          <span className="tabular-nums text-tv-text-muted">{value}</span>
+        )
       )}
       <div className="ml-0.5 flex items-center gap-0.5 md:hidden md:group-hover/pill:flex">
         <button
@@ -50,6 +60,16 @@ export function IndicatorPill({
         >
           {hidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
         </button>
+        {onEdit && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            title="Editar código"
+            aria-label="Editar código"
+            className="rounded p-0.5 text-tv-text-dim transition-colors hover:text-tv-text"
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+        )}
         <button
           onClick={(e) => { e.stopPropagation(); onSettings(); }}
           title="Configurar"

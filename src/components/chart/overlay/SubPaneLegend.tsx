@@ -3,6 +3,7 @@
 import React from "react";
 import { INDICATOR_COLORS, useChartStore, type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import { IndicatorPill } from "@/components/chart/IndicatorPill";
+import type { ScriptPill } from "@/hooks/chart/useUserScriptPanes";
 
 interface PaneOffset {
   top: number;
@@ -23,6 +24,8 @@ interface Props {
   config: IndicatorConfig;
   lastValues: LastValues;
   selectedIndicatorKey: IndicatorKey | null;
+  /** Pills de scripts Pine con overlay=false (cada uno en su sub-pane por paneIndex) */
+  scriptPills?: ScriptPill[];
   paneOffsets: PaneOffset[];
   left: number;
 }
@@ -44,26 +47,42 @@ function LegendToggleButton({ collapsed, count, onClick }: { collapsed: boolean;
   );
 }
 
-export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hidden, config, lastValues, selectedIndicatorKey, paneOffsets, left }: Props) {
+export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hidden, config, lastValues, selectedIndicatorKey, scriptPills, paneOffsets, left }: Props) {
   const collapsed = useChartStore((s) => s.legendCollapsed);
   const toggleLegendCollapsed = useChartStore((s) => s.toggleLegendCollapsed);
   const toggleHidden = useChartStore((s) => s.toggleHidden);
   const setSettingsTarget = useChartStore((s) => s.setSettingsTarget);
   const removeIndicator = useChartStore((s) => s.removeIndicator);
+  const toggleScriptHidden = useChartStore((s) => s.toggleScriptHidden);
+  const toggleScriptOnChart = useChartStore((s) => s.toggleScriptOnChart);
+  const setPineEditorTarget = useChartStore((s) => s.setPineEditorTarget);
+  const setPineEditorOpen = useChartStore((s) => s.setPineEditorOpen);
 
-  const subCount = [indicators.rsi, indicators.macd, indicators.sqzmom, indicators.adx].filter(Boolean).length;
+  const subPanePills = scriptPills ?? [];
+  const subCount =
+    [indicators.rsi, indicators.macd, indicators.sqzmom, indicators.adx].filter(Boolean).length +
+    subPanePills.length;
   if (subCount === 0) return null;
 
   const rsiPaneIdx = 1;
   const macdPaneIdx = indicators.rsi ? 2 : 1;
   const sqzmomAdxPaneIdx = (indicators.rsi ? 1 : 0) + (indicators.macd ? 1 : 0) + 1;
 
-  const firstPane = indicators.rsi
+  const indicatorFirstPane = indicators.rsi
     ? paneOffsets[rsiPaneIdx]
     : indicators.macd
       ? paneOffsets[macdPaneIdx]
-      : paneOffsets[sqzmomAdxPaneIdx];
+      : (indicators.sqzmom || indicators.adx)
+        ? paneOffsets[sqzmomAdxPaneIdx]
+        : undefined;
 
+  // Si no hay indicadores de sub-pane, anclamos el toggle al primer sub-pane con script.
+  const scriptFirstPane = subPanePills
+    .map((p) => paneOffsets[p.paneIndex])
+    .filter((o): o is PaneOffset => !!o)
+    .sort((a, b) => a.top - b.top)[0];
+
+  const firstPane = indicatorFirstPane ?? scriptFirstPane;
   if (!firstPane) return null;
 
   return (
@@ -149,6 +168,28 @@ export const SubPaneLegend = React.memo(function SubPaneLegend({ indicators, hid
                 onRemove={() => removeIndicator("adx")}
               />
             </div>
+          )}
+
+          {subPanePills.map((pill) =>
+            paneOffsets[pill.paneIndex] ? (
+              <div
+                key={pill.id}
+                style={{ top: paneOffsets[pill.paneIndex].top + 24, left }}
+                className="pointer-events-none absolute z-10"
+              >
+                <IndicatorPill
+                  name={pill.name}
+                  value={pill.value}
+                  color={pill.color}
+                  hidden={pill.hidden}
+                  error={pill.error}
+                  onToggleHide={() => toggleScriptHidden(pill.id)}
+                  onSettings={() => setSettingsTarget(`script:${pill.id}`)}
+                  onRemove={() => toggleScriptOnChart(pill.id)}
+                  onEdit={() => { setPineEditorTarget(pill.id); setPineEditorOpen(true); }}
+                />
+              </div>
+            ) : null,
           )}
         </>
       )}

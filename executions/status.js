@@ -2,7 +2,7 @@
 // Cada sesión LEE este archivo al empezar y lo ACTUALIZA al terminar (o antes de agotar tokens).
 // Plan completo: plans/pine-script-engine.md
 module.exports = {
-  updatedAt: "2026-06-16T09:00:00Z",
+  updatedAt: "2026-06-16T09:45:00Z",
   currentPhase: 4,
   branch: "pinescript (sale de master@cbdea78=Fase 3; Fases 1-3 estan en master, Fase 4 en adelante en pinescript)",
   done: [
@@ -39,13 +39,15 @@ module.exports = {
     "Fase 4 motor: hline() estática → script.hlines: HLineSpec[] {price,title,color,linestyle}; precio no literal = error 'constante numérica'",
     "Fase 4 motor: plotshape()/plotchar() → script.shapes + ScriptResult.shapes[].points {time,position:'aboveBar'|'belowBar',shape:'arrowUp'|'arrowDown'|'circle',color,text?}; mapeo shape.triangleup→arrowUp, triangledown→arrowDown, circle→circle; location.belowbar/abovebar/absolute→belowBar/aboveBar (absolute→aboveBar con warning); plotchar usa el char como text del marker",
   ],
-  inProgress: [
-    "Fase 4 UI/RENDER — PENDIENTE (la mitad de motor ya está hecha y commiteada). Falta SOLO la UI:",
-    "  (a) useUserScriptPanes.ts: crear series según PlotSpec.style (line/stepline=LineSeries lineType, histogram/columns=HistogramSeries color por punto, area=AreaSeries, circles/cross=LineSeries pointMarkersVisible); hlines→series.createPriceLine (remover en cleanup); shapes→createSeriesMarkers (import de lightweight-charts v5) sobre la 1ª serie del script, refrescar en cada update y limpiar; PASAR script.inputs a runScript; exponer lastValues por scriptId y error por script para las pills",
-    "  (b) src/components/pine/ScriptSettingsDialog.tsx (nuevo): dialog autogenerado desde script.inputs (InputDef[]) — int/float→number con min/max/step, bool→switch, string→text o select si options, color→color picker; reutiliza controles de src/components/chart/indicator-settings/shared.tsx; guarda overrides en script.inputs vía updateScript (recalcula solo, layoutKey ya incluye inputs); botón 'Restaurar valores'; usar patrón keyed-body de PineEditorDialog para evitar set-state-in-effect",
-    "  (c) chart-store.ts: ampliar settingsTarget de IndicatorKey|null a IndicatorKey|`script:${string}`|null; IndicatorSettingsDialog.tsx enruta 'script:*' al ScriptSettingsDialog (o montarlo aparte)",
-    "  (d) Pills: scripts overlay→ChartLegend.tsx, no-overlay→SubPaneLegend.tsx en su pane (usar paneOffsets como RSI/MACD); cada pill (diseño de IndicatorPill.tsx): nombre (title de indicator() o name), último valor del 1er plot, ojo (toggleScriptHidden), engranaje (settingsTarget=`script:id`), X (quitar del chart = onChart:false, NO borra), lápiz (abre editor Pine)",
+    "Fase 4 UI COMPLETA: estilos de plot renderizados, hline/markers, ScriptSettingsDialog autogenerado, pills de scripts en las leyendas. 77 tests verdes, lint+tsc limpios, npm run build OK",
+    "Fase 4 UI: useUserScriptPanes.ts — createPlotSeries por estilo (line/stepline=LineSeries lineType WithSteps, histogram/columns=HistogramSeries color por punto, area=AreaSeries, circles/cross=LineSeries lineVisible:false+pointMarkersVisible); hlines→createPriceLine (removidas en teardown); plotshape/plotchar→createSeriesMarkers sobre la 1ª serie (tipo ISeriesMarkersPluginApi<Time>, NO UTCTimestamp — corregido); pasa record.inputs a runScript; expone scriptLastValues, scriptErrors y scriptMeta (overlay/paneIndex/title/color) vía setState en syncPillState (llamado en rAF y en updateUserScripts, nunca dentro del efecto síncrono)",
+    "Fase 4 UI: IndicatorPill.tsx — props opcionales onEdit (lápiz) y error (icono AlertTriangle rojo en vez del valor); no rompe los usos existentes",
+    "Fase 4 UI: ChartLegend.tsx recibe scriptPills (overlay) y SubPaneLegend.tsx recibe scriptPills (no-overlay, posicionados por paneOffsets[paneIndex].top+24); ambos suman los scripts al count y muestran la leyenda aunque no haya indicadores builtin; acciones toggleScriptHidden/toggleScriptOnChart(=quitar del chart, no borra)/setSettingsTarget(`script:id`)/abrir editor",
+    "Fase 4 UI: PriceChart.tsx construye scriptPills desde scripts+scriptMeta+scriptLastValues+scriptErrors y los parte en overlayScriptPills / subPaneScriptPills",
+    "Fase 4 UI: ScriptSettingsDialog.tsx (nuevo, montado en page.tsx) — autogenera controles desde compile(source).inputs (useMemo, sin set-state-in-effect, todo controlado por el store); int/float→number min/max/step o select si options, bool→checkbox, string→text/select, color→SimpleColorRow, source→select de open/high/low/close/volume/hl2/hlc3/ohlc4; guarda overrides en script.inputs vía updateScript; botón 'Restaurar valores' (inputs={})",
+    "Fase 4 UI: chart-store ya tenía SettingsTarget=IndicatorKey|`script:${string}`; IndicatorSettingsDialog ignora targets script:* (los toma ScriptSettingsDialog)",
   ],
+  inProgress: [],
   pending: [
     "Fase 5: control de flujo (if/else, for, switch), [a,b]=f(), funciones de usuario, builtins ampliados (ta.macd/bb/kc/linreg/valuewhen/barssince, color.new/rgb) — paridad copy/paste; golden: Squeeze Momentum LazyBear y DMI/ADX ≡ builtins",
     "Fase 6: Drive sync v2 (SyncedState+scripts, version 2 con migración), badges de error en pills, autocomplete de builtins",

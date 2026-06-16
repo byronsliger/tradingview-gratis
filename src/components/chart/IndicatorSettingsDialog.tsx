@@ -31,7 +31,10 @@ export function IndicatorSettingsDialog() {
   const config    = useChartStore((s) => s.config);
   const setConfig = useChartStore((s) => s.setConfig);
 
-  const open = target !== null;
+  // Los targets `script:<id>` se enrutan al ScriptSettingsDialog (montado aparte).
+  const isScript = typeof target === "string" && target.startsWith("script:");
+  const indicatorTarget = !isScript ? (target as IndicatorKey | null) : null;
+  const open = indicatorTarget !== null;
 
   function handleSave(patch: Parameters<typeof setConfig>[0]) {
     setConfig(patch);
@@ -48,19 +51,19 @@ export function IndicatorSettingsDialog() {
       <DialogContent className="max-w-none sm:max-w-sm bg-tv-panel">
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold">
-            {target ? TITLES[target] : ""} — Configuración
+            {indicatorTarget ? TITLES[indicatorTarget] : ""} — Configuración
           </DialogTitle>
         </DialogHeader>
 
-        {target === "ema20"  && <EMASettings  target="ema20"  config={config} onSave={handleSave} onReset={handleReset} />}
-        {target === "ema50"  && <EMASettings  target="ema50"  config={config} onSave={handleSave} onReset={handleReset} />}
-        {target === "ema200" && <EMASettings  target="ema200" config={config} onSave={handleSave} onReset={handleReset} />}
-        {target === "rsi"    && <RSISettings               config={config} onSave={handleSave} onReset={handleReset} />}
-        {target === "macd"   && <MACDSettings              config={config} onSave={handleSave} onReset={handleReset} />}
-        {target === "volume" && <VolumeSettings                            onSave={handleSave} onReset={handleReset} />}
-        {target === "sqzmom" && <SQZSettings               config={config} onSave={handleSave} onReset={handleReset} />}
-        {target === "adx"    && <ADXSettings               config={config} onSave={handleSave} onReset={handleReset} />}
-        {target === "vrvp"   && <VRVPSettings              config={config} onSave={handleSave} onReset={handleReset} />}
+        {indicatorTarget === "ema20"  && <EMASettings  target="ema20"  config={config} onSave={handleSave} onReset={handleReset} />}
+        {indicatorTarget === "ema50"  && <EMASettings  target="ema50"  config={config} onSave={handleSave} onReset={handleReset} />}
+        {indicatorTarget === "ema200" && <EMASettings  target="ema200" config={config} onSave={handleSave} onReset={handleReset} />}
+        {indicatorTarget === "rsi"    && <RSISettings               config={config} onSave={handleSave} onReset={handleReset} />}
+        {indicatorTarget === "macd"   && <MACDSettings              config={config} onSave={handleSave} onReset={handleReset} />}
+        {indicatorTarget === "volume" && <VolumeSettings                            onSave={handleSave} onReset={handleReset} />}
+        {indicatorTarget === "sqzmom" && <SQZSettings               config={config} onSave={handleSave} onReset={handleReset} />}
+        {indicatorTarget === "adx"    && <ADXSettings               config={config} onSave={handleSave} onReset={handleReset} />}
+        {indicatorTarget === "vrvp"   && <VRVPSettings              config={config} onSave={handleSave} onReset={handleReset} />}
       </DialogContent>
     </Dialog>
   );

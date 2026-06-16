@@ -16,6 +16,9 @@ export type IndicatorKey =
   | "adx"
   | "vrvp";
 
+/** Target del dialog de configuración: un indicador builtin o un script Pine (`script:<id>`). */
+export type SettingsTarget = IndicatorKey | `script:${string}`;
+
 export type DrawingTool = "cursor" | "hline" | "measure" | "trendline" | "rectangle";
 export type Theme = "dark" | "light";
 
@@ -259,8 +262,8 @@ interface ChartState {
   priceLines: PriceLine[];
   symbolDialogOpen: boolean;
   symbolDialogMode: "search" | "add";
-  /** Which indicator's settings dialog is open (null = closed) */
-  settingsTarget: IndicatorKey | null;
+  /** Which indicator's settings dialog is open (null = closed). `script:<id>` apunta a un script Pine. */
+  settingsTarget: SettingsTarget | null;
   priceLineEditTarget: string | null;
   selectedPriceLineId: string | null;
   drawings: Drawing[];
@@ -293,7 +296,7 @@ interface ChartState {
   updatePriceLine: (id: string, price: number) => void;
   clearPriceLines: (symbol?: string) => void;
   setSymbolDialogOpen: (v: boolean, mode?: "search" | "add") => void;
-  setSettingsTarget: (k: IndicatorKey | null) => void;
+  setSettingsTarget: (k: SettingsTarget | null) => void;
   setPriceLineEditTarget: (id: string | null) => void;
   setSelectedPriceLineId: (id: string | null) => void;
   updatePriceLineOptions: (id: string, patch: Partial<Pick<PriceLine, "color" | "lineWidth" | "lineStyle" | "axisLabelVisible">>) => void;

@@ -4,6 +4,7 @@ import React from "react";
 import { INDICATOR_COLORS, useChartStore, type IndicatorConfig, type IndicatorKey } from "@/lib/store/chart-store";
 import { IndicatorPill } from "@/components/chart/IndicatorPill";
 import { formatPrice, formatVolume } from "@/lib/format";
+import type { ScriptPill } from "@/hooks/chart/useUserScriptPanes";
 
 interface LastValues {
   ema20?: number;
@@ -18,6 +19,8 @@ interface Props {
   config: IndicatorConfig;
   lastValues: LastValues;
   selectedIndicatorKey: IndicatorKey | null;
+  /** Pills de scripts Pine con overlay=true (van en el pane principal) */
+  scriptPills?: ScriptPill[];
   top: number;
   left: number;
 }
@@ -39,14 +42,21 @@ function LegendToggleButton({ collapsed, count, onClick }: { collapsed: boolean;
   );
 }
 
-export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden, config, lastValues, selectedIndicatorKey, top, left }: Props) {
+export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden, config, lastValues, selectedIndicatorKey, scriptPills, top, left }: Props) {
   const collapsed = useChartStore((s) => s.legendCollapsed);
   const toggleLegendCollapsed = useChartStore((s) => s.toggleLegendCollapsed);
   const toggleHidden = useChartStore((s) => s.toggleHidden);
   const setSettingsTarget = useChartStore((s) => s.setSettingsTarget);
   const removeIndicator = useChartStore((s) => s.removeIndicator);
+  const toggleScriptHidden = useChartStore((s) => s.toggleScriptHidden);
+  const toggleScriptOnChart = useChartStore((s) => s.toggleScriptOnChart);
+  const setPineEditorTarget = useChartStore((s) => s.setPineEditorTarget);
+  const setPineEditorOpen = useChartStore((s) => s.setPineEditorOpen);
 
-  const mainCount = [indicators.ema20, indicators.ema50, indicators.ema200, indicators.volume, indicators.vrvp].filter(Boolean).length;
+  const overlayPills = scriptPills ?? [];
+  const mainCount =
+    [indicators.ema20, indicators.ema50, indicators.ema200, indicators.volume, indicators.vrvp].filter(Boolean).length +
+    overlayPills.length;
   if (mainCount === 0) return null;
 
   return (
@@ -112,6 +122,20 @@ export const ChartLegend = React.memo(function ChartLegend({ indicators, hidden,
               onRemove={() => removeIndicator("vrvp")}
             />
           )}
+          {overlayPills.map((pill) => (
+            <IndicatorPill
+              key={pill.id}
+              name={pill.name}
+              value={pill.value}
+              color={pill.color}
+              hidden={pill.hidden}
+              error={pill.error}
+              onToggleHide={() => toggleScriptHidden(pill.id)}
+              onSettings={() => setSettingsTarget(`script:${pill.id}`)}
+              onRemove={() => toggleScriptOnChart(pill.id)}
+              onEdit={() => { setPineEditorTarget(pill.id); setPineEditorOpen(true); }}
+            />
+          ))}
         </div>
       )}
     </div>

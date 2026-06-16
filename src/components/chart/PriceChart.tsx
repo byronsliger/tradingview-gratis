@@ -14,7 +14,7 @@ import { useRSIPane } from "@/hooks/chart/useRSIPane";
 import { useMACDPane } from "@/hooks/chart/useMACDPane";
 import { useSQZPane } from "@/hooks/chart/useSQZPane";
 import { useADXPane } from "@/hooks/chart/useADXPane";
-import { useUserScriptPanes } from "@/hooks/chart/useUserScriptPanes";
+import { useUserScriptPanes, type ScriptPill } from "@/hooks/chart/useUserScriptPanes";
 import { useVRVPSeries } from "@/hooks/chart/useVRVPSeries";
 import { usePriceLines } from "@/hooks/chart/usePriceLines";
 import { usePriceLineDrag } from "@/hooks/chart/usePriceLineDrag";
@@ -31,6 +31,7 @@ import { useRectangleInteraction } from "@/hooks/chart/useRectangleInteraction";
 import { useIndicatorDoubleClick } from "@/hooks/chart/useIndicatorDoubleClick";
 import { useLogScale } from "@/hooks/chart/useLogScale";
 import { useDocumentTitle } from "@/hooks/chart/useDocumentTitle";
+import { formatPrice } from "@/lib/format";
 
 import { SymbolHeader } from "./overlay/SymbolHeader";
 import { ChartLegend } from "./overlay/ChartLegend";
@@ -99,7 +100,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
     (indicators.macd ? 1 : 0) +
     (indicators.sqzmom || indicators.adx ? 1 : 0);
 
-  const { updateUserScripts } = useUserScriptPanes(
+  const { updateUserScripts, scriptLastValues, scriptErrors, scriptMeta } = useUserScriptPanes(
     chartRef,
     candlesRef,
     scripts,
@@ -159,6 +160,25 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const leftOffset = 12;
   const mainPaneTop = paneOffsets[0]?.top ?? 0;
 
+  // Pills de scripts Pine: overlay → ChartLegend, sub-pane → SubPaneLegend.
+  const scriptPills: ScriptPill[] = scripts
+    .filter((s) => s.onChart)
+    .map((s) => {
+      const meta = scriptMeta[s.id];
+      const last = scriptLastValues[s.id];
+      return {
+        id: s.id,
+        name: meta?.title || s.name,
+        color: meta?.color ?? "#2962ff",
+        value: typeof last === "number" ? formatPrice(last) : undefined,
+        hidden: s.hidden,
+        error: scriptErrors[s.id],
+        paneIndex: meta?.paneIndex ?? 0,
+      };
+    });
+  const overlayScriptPills = scriptPills.filter((p) => (scriptMeta[p.id]?.overlay ?? true));
+  const subPaneScriptPills = scriptPills.filter((p) => !(scriptMeta[p.id]?.overlay ?? true));
+
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
@@ -217,6 +237,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
         config={config}
         lastValues={lastValues}
         selectedIndicatorKey={selectedIndicatorKey}
+        scriptPills={overlayScriptPills}
         top={mainPaneTop + 52}
         left={leftOffset}
       />
@@ -227,6 +248,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
         config={config}
         lastValues={lastValues}
         selectedIndicatorKey={selectedIndicatorKey}
+        scriptPills={subPaneScriptPills}
         paneOffsets={paneOffsets}
         left={leftOffset}
       />
