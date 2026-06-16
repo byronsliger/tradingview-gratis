@@ -2,6 +2,7 @@ import type { Candle } from "@/lib/binance/types";
 import type { FuncDeclStmt } from "../ast";
 import { PineRuntimeError, type SourcePos } from "../errors";
 import type { InputDef, RunOptions } from "../types";
+import type { TypeDescriptor } from "./objects";
 import { Series } from "./series";
 
 export const DEFAULT_FUEL_PER_BAR = 50_000;
@@ -34,6 +35,9 @@ export class ExecutionContext {
 
   /** Definiciones de funciones de usuario por nombre. */
   readonly functions = new Map<string, FuncDef>();
+
+  /** Descriptores de tipos definidos por el usuario (UDTs), por nombre. */
+  readonly types = new Map<string, TypeDescriptor>();
 
   /**
    * Prefijo del estado por call-site, derivado de la pila de llamadas a funciones

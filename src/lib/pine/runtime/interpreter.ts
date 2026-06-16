@@ -3,6 +3,7 @@ import type {
   CallArg,
   CallExpr,
   Expr,
+  FieldAccess,
   HistAccess,
   Identifier,
   MemberExpr,
@@ -25,6 +26,7 @@ import {
 import { mathBuiltins } from "./builtins-math";
 import { taBuiltins } from "./builtins-ta";
 import { ExecutionContext } from "./context";
+import { PineObject, type FieldDef, type TypeDescriptor } from "./objects";
 import { Series } from "./series";
 import { TupleValue, type EvalValue } from "./values";
 
@@ -47,10 +49,18 @@ export function runProgram(
   inputDefs: InputDef[] = [],
 ): ExecutionContext {
   const ctx = new ExecutionContext(candles, inputs, options, inputDefs);
-  // Registrar funciones de usuario antes de ejecutar barras (hoisting).
+  // Registrar funciones de usuario y tipos (UDTs) antes de ejecutar barras (hoisting).
   for (const stmt of program.statements) {
     if (stmt.kind === "funcDecl") {
       ctx.functions.set(stmt.name, { params: stmt.params, decl: stmt });
+    } else if (stmt.kind === "typeDecl") {
+      const descriptor: TypeDescriptor = {
+        name: stmt.name,
+        fields: stmt.fields.map(
+          (f): FieldDef => ({ name: f.name, typeRef: f.typeRef, default: f.default }),
+        ),
+      };
+      ctx.types.set(stmt.name, descriptor);
     }
   }
   for (let bar = 0; bar < candles.length; bar++) {
@@ -82,7 +92,8 @@ function execStmt(ctx: ExecutionContext, stmt: Stmt): void {
       if (SERIES_BUILTINS.has(stmt.name) || stmt.name === "na") {
         throw new PineRuntimeError(`No se puede redeclarar el builtin '${stmt.name}'`, stmt);
       }
-      declareVar(ctx, stmt.isVar, stmt.name, () => evalExpr(ctx, stmt.init), stmt);
+      // evalExprT: la RHS puede ser un objeto (Type.new()/acceso a campo/función).
+      declareVar(ctx, stmt.isVar, stmt.name, () => evalExprT(ctx, stmt.init), stmt);
       return;
     }
     case "tupleDecl": {
@@ -116,9 +127,36 @@ function execStmt(ctx: ExecutionContext, stmt: Stmt): void {
           stmt,
         );
       }
-      slot.series.set(ctx.barIndex, evalExpr(ctx, stmt.value));
+      // evalExprT: puede reasignarse un objeto (o na de objeto).
+      slot.series.set(ctx.barIndex, evalExprT(ctx, stmt.value));
       return;
     }
+    case "fieldAssign": {
+      const obj = evalExprT(ctx, stmt.target.target);
+      if (obj === null) {
+        throw new PineRuntimeError(
+          `No se puede asignar al campo '${stmt.target.field}' de un objeto na`,
+          stmt.target,
+        );
+      }
+      if (!(obj instanceof PineObject)) {
+        throw new PineRuntimeError(
+          `Solo se puede asignar a campos de un objeto (UDT)`,
+          stmt.target,
+        );
+      }
+      if (!obj.fields.has(stmt.target.field)) {
+        throw new PineRuntimeError(
+          `El tipo '${obj.typeName}' no tiene el campo '${stmt.target.field}'`,
+          stmt.target,
+        );
+      }
+      obj.fields.set(stmt.target.field, evalExprT(ctx, stmt.value));
+      return;
+    }
+    case "typeDecl":
+      // Ya registrada en runProgram (hoisting); no-op por barra.
+      return;
     case "ifStmt": {
       if (toBool(evalExpr(ctx, stmt.cond))) {
         execBlock(ctx, stmt.then);
@@ -155,7 +193,7 @@ function declareVar(
   ctx: ExecutionContext,
   isVar: boolean,
   name: string,
-  computeInit: () => PineValue,
+  computeInit: () => EvalValue,
   pos: Stmt,
 ): void {
   const inFunction = ctx.currentScope() !== ctx.vars;
@@ -228,9 +266,11 @@ function evalExpr(ctx: ExecutionContext, e: Expr): PineValue {
     case "color":
       return e.value;
     case "ident":
-      return evalIdent(ctx, e);
+      return scalar(evalIdentT(ctx, e), e);
     case "member":
       return evalMember(ctx, e);
+    case "fieldAccess":
+      return scalar(evalFieldAccess(ctx, e), e);
     case "call":
       return evalCall(ctx, e);
     case "unary": {
@@ -255,7 +295,7 @@ function evalExpr(ctx: ExecutionContext, e: Expr): PineValue {
       return cond ? whenTrue : whenFalse;
     }
     case "hist":
-      return evalHist(ctx, e);
+      return scalar(evalHistT(ctx, e), e);
     case "ifExpr":
     case "switchExpr":
       return scalar(evalExprT(ctx, e), e);
@@ -267,20 +307,32 @@ function evalExpr(ctx: ExecutionContext, e: Expr): PineValue {
   }
 }
 
-/** Exige un valor escalar; una tupla en contexto escalar es un error. */
+/** Exige un valor escalar; una tupla o un objeto en contexto escalar es un error. */
 function scalar(v: EvalValue, pos: SourcePos): PineValue {
   if (v instanceof TupleValue) {
     throw new PineRuntimeError("Se usó una tupla donde se esperaba un valor", pos);
   }
+  if (v instanceof PineObject) {
+    throw new PineRuntimeError(
+      `Se usó un objeto de tipo '${v.typeName}' donde se esperaba un valor escalar`,
+      pos,
+    );
+  }
   return v;
 }
 
-/** Variante tuple-capable de evalExpr (call/if/switch/array pueden devolver tuplas). */
+/**
+ * Variante tuple-/objeto-capable de evalExpr: call/if/switch/array pueden devolver
+ * tuplas; ident/hist/fieldAccess pueden devolver objetos (instancias de UDT).
+ */
 function evalExprT(ctx: ExecutionContext, e: Expr): EvalValue {
   if (e.kind === "call") return evalCallT(ctx, e);
-  // `[a, b]` como valor de retorno de una función → tupla.
+  if (e.kind === "ident") return evalIdentT(ctx, e);
+  if (e.kind === "hist") return evalHistT(ctx, e);
+  if (e.kind === "fieldAccess") return evalFieldAccess(ctx, e);
+  // `[a, b]` como valor de retorno de una función → tupla (elementos pueden ser objetos).
   if (e.kind === "array") {
-    return new TupleValue(e.elements.map((el) => scalar(evalExprT(ctx, el), el)));
+    return new TupleValue(e.elements.map((el) => evalExprT(ctx, el)));
   }
   if (e.kind === "ifExpr") {
     for (const branch of e.branches) {
@@ -322,12 +374,36 @@ function valuesEqual(a: PineValue, b: PineValue): boolean {
   return a === b;
 }
 
-function evalIdent(ctx: ExecutionContext, e: Identifier): PineValue {
+function evalIdentT(ctx: ExecutionContext, e: Identifier): EvalValue {
   if (e.name === "na") return null;
   if (SERIES_BUILTINS.has(e.name)) return builtinSeriesValue(ctx, e.name, ctx.barIndex);
   const slot = ctx.lookupVar(e.name);
   if (slot) return slot.series.get(ctx.barIndex);
   throw new PineRuntimeError(`Variable '${e.name}' no definida`, e);
+}
+
+/** Lectura de un campo de objeto: `obj.field` (encadenable). */
+function evalFieldAccess(ctx: ExecutionContext, e: FieldAccess): EvalValue {
+  const target = evalExprT(ctx, e.target);
+  if (target === null) {
+    throw new PineRuntimeError(
+      `No se puede leer el campo '${e.field}' de un objeto na`,
+      e,
+    );
+  }
+  if (!(target instanceof PineObject)) {
+    throw new PineRuntimeError(
+      `El acceso a campo '.${e.field}' requiere un objeto (UDT)`,
+      e,
+    );
+  }
+  if (!target.fields.has(e.field)) {
+    throw new PineRuntimeError(
+      `El tipo '${target.typeName}' no tiene el campo '${e.field}'`,
+      e,
+    );
+  }
+  return target.fields.get(e.field) ?? null;
 }
 
 function evalMember(ctx: ExecutionContext, e: MemberExpr): PineValue {
@@ -421,6 +497,24 @@ function evalCall(ctx: ExecutionContext, e: CallExpr): PineValue {
 
 function evalCallT(ctx: ExecutionContext, e: CallExpr): EvalValue {
   const callee = e.callee;
+
+  // Constructor de UDT: `Type.new(args)`. El callee es un fieldAccess cuyo target
+  // es un identificador que nombra un tipo registrado y cuyo field es "new".
+  if (
+    callee.kind === "fieldAccess" &&
+    callee.target.kind === "ident" &&
+    callee.field === "new" &&
+    ctx.types.has(callee.target.name)
+  ) {
+    return constructObject(ctx, ctx.types.get(callee.target.name)!, e);
+  }
+
+  if (callee.kind === "fieldAccess") {
+    throw new PineRuntimeError(
+      `'.${callee.field}()' no está soportado (los métodos de objeto llegan en una fase posterior)`,
+      e,
+    );
+  }
 
   // input.*()/input(): NO evalúa los args (son constantes ya extraídas por
   // analyze; además el defval de input.source es un identificador, no un valor).
@@ -564,6 +658,65 @@ function colorRgb(mapped: (PineValue | undefined)[], pos: SourcePos): string {
 }
 
 /**
+ * Construye una instancia de UDT con `Type.new(args)`. Los argumentos posicionales
+ * y nombrados se mapean a los campos en orden de declaración. Los campos no provistos
+ * usan su default (evaluado en la barra actual, en cada `.new()`) o `na` si no tiene.
+ */
+function constructObject(
+  ctx: ExecutionContext,
+  desc: TypeDescriptor,
+  e: CallExpr,
+): PineObject {
+  const fieldNames = desc.fields.map((f) => f.name);
+  // values-capable arg mapping (objetos como argumentos son válidos).
+  const out: (EvalValue | undefined)[] = new Array(desc.fields.length).fill(undefined);
+  const provided: boolean[] = new Array(desc.fields.length).fill(false);
+  let positional = 0;
+  let sawNamed = false;
+  for (const a of e.args) {
+    const value = evalExprT(ctx, a.value);
+    if (a.name === null) {
+      if (sawNamed) {
+        throw new PineRuntimeError(
+          "Los argumentos posicionales deben ir antes que los nombrados",
+          a.value,
+        );
+      }
+      if (positional >= desc.fields.length) {
+        throw new PineRuntimeError(
+          `Demasiados argumentos para ${desc.name}.new() (máximo ${desc.fields.length})`,
+          a.value,
+        );
+      }
+      provided[positional] = true;
+      out[positional++] = value;
+    } else {
+      sawNamed = true;
+      const idx = fieldNames.indexOf(a.name);
+      if (idx < 0) {
+        throw new PineRuntimeError(`El tipo '${desc.name}' no tiene el campo '${a.name}'`, a.value);
+      }
+      if (provided[idx]) {
+        throw new PineRuntimeError(`Campo '${a.name}' repetido en ${desc.name}.new()`, a.value);
+      }
+      provided[idx] = true;
+      out[idx] = value;
+    }
+  }
+  const fields = new Map<string, EvalValue>();
+  desc.fields.forEach((f, i) => {
+    if (provided[i]) {
+      fields.set(f.name, out[i] ?? null);
+    } else if (f.default) {
+      fields.set(f.name, evalExprT(ctx, f.default));
+    } else {
+      fields.set(f.name, null);
+    }
+  });
+  return new PineObject(desc.name, fields);
+}
+
+/**
  * Invoca una función de usuario: evalúa los args en el scope actual, abre un
  * scope local con los parámetros enlazados y ejecuta el cuerpo. El valor es la
  * última expresión del cuerpo (puede ser una tupla `[a, b]`).
@@ -583,7 +736,8 @@ function callUserFunction(ctx: ExecutionContext, e: CallExpr, name: string): Eva
     );
   }
   // Evaluar args en el scope del llamador antes de abrir el scope local.
-  const argValues = e.args.map((a) => evalExpr(ctx, a.value));
+  // evalExprT: una función de usuario puede recibir (y devolver) objetos.
+  const argValues = e.args.map((a) => evalExprT(ctx, a.value));
 
   const scope = ctx.pushScope(String(e.callSiteId));
   try {
@@ -634,7 +788,7 @@ function resolveInput(ctx: ExecutionContext, e: CallExpr): PineValue {
   }
 }
 
-function evalHist(ctx: ExecutionContext, e: HistAccess): PineValue {
+function evalHistT(ctx: ExecutionContext, e: HistAccess): EvalValue {
   const offRaw = evalExpr(ctx, e.offset);
   const n = typeof offRaw === "number" && Number.isFinite(offRaw) ? Math.floor(offRaw) : null;
   if (n !== null && n < 0) {
@@ -655,7 +809,7 @@ function evalHist(ctx: ExecutionContext, e: HistAccess): PineValue {
   // Base arbitraria: se evalúa SIEMPRE (también con offset na) para poblar la
   // serie oculta barra a barra, y luego se lee con el offset.
   const hidden = ctx.getHiddenSeries(e.nodeId);
-  hidden.set(ctx.barIndex, evalExpr(ctx, e.base));
+  hidden.set(ctx.barIndex, evalExprT(ctx, e.base));
   return n === null ? null : hidden.get(ctx.barIndex, n);
 }
 

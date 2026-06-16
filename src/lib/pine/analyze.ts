@@ -391,6 +391,9 @@ function collectCalls(program: Program): CallExpr[] {
         visit(e.base);
         visit(e.offset);
         return;
+      case "fieldAccess":
+        visit(e.target);
+        return;
       case "ifExpr":
         for (const b of e.branches) {
           if (b.cond) visit(b.cond);
@@ -420,6 +423,10 @@ function collectCalls(program: Program): CallExpr[] {
         case "assign":
           visit(stmt.value);
           break;
+        case "fieldAssign":
+          visit(stmt.target);
+          visit(stmt.value);
+          break;
         case "exprStmt":
           visit(stmt.expr);
           break;
@@ -436,6 +443,9 @@ function collectCalls(program: Program): CallExpr[] {
           break;
         case "funcDecl":
           visitStmts(stmt.body);
+          break;
+        case "typeDecl":
+          for (const f of stmt.fields) if (f.default) visit(f.default);
           break;
         case "break":
         case "continue":

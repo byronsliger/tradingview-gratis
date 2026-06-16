@@ -8,12 +8,14 @@ export type Stmt =
   | VarDeclStmt
   | TupleDeclStmt
   | AssignStmt
+  | FieldAssignStmt
   | ExprStmt
   | IfStmt
   | ForStmt
   | BreakStmt
   | ContinueStmt
-  | FuncDeclStmt;
+  | FuncDeclStmt
+  | TypeDeclStmt;
 
 /** `x = expr` (declaración) o `var x = expr` (persistente entre barras). */
 export interface VarDeclStmt extends SourcePos {
@@ -35,6 +37,13 @@ export interface TupleDeclStmt extends SourcePos {
 export interface AssignStmt extends SourcePos {
   kind: "assign";
   name: string;
+  value: Expr;
+}
+
+/** `obj.field := expr` (o encadenado `a.b.c := expr`) — mutación de campo de un objeto. */
+export interface FieldAssignStmt extends SourcePos {
+  kind: "fieldAssign";
+  target: FieldAccess;
   value: Expr;
 }
 
@@ -79,6 +88,22 @@ export interface FuncDeclStmt extends SourcePos {
   /** Última expresión del cuerpo = valor de retorno (single-line: el único stmt). */
 }
 
+/** Campo de un UDT: `float top`, `bool crossed = false`, `array<float> xs`. */
+export interface TypeField {
+  name: string;
+  /** Anotación de tipo cruda (informativa): `float`, `pivot`, `array<float>`, … */
+  typeRef: string;
+  /** Default opcional (`= expr`); se evalúa perezosamente en cada `.new()`. */
+  default: Expr | null;
+}
+
+/** Declaración de tipo (UDT): `type Name \n <campos indentados>`. */
+export interface TypeDeclStmt extends SourcePos {
+  kind: "typeDecl";
+  name: string;
+  fields: TypeField[];
+}
+
 export type UnaryOp = "-" | "+" | "not";
 export type BinaryOp =
   | "+" | "-" | "*" | "/" | "%"
@@ -93,6 +118,7 @@ export type Expr =
   | ArrayLit
   | Identifier
   | MemberExpr
+  | FieldAccess
   | CallExpr
   | UnaryExpr
   | BinaryExpr
@@ -140,6 +166,17 @@ export interface MemberExpr extends SourcePos {
   nodeId: number;
 }
 
+/**
+ * Acceso a un campo de un objeto (UDT): `obj.field`, `trailing.barTime`,
+ * encadenable `a.b.c`. Se distingue de MemberExpr (namespace) en el parser por
+ * el identificador base: si NO es un namespace conocido, es fieldAccess.
+ */
+export interface FieldAccess extends SourcePos {
+  kind: "fieldAccess";
+  target: Expr;
+  field: string;
+}
+
 export interface CallArg {
   name: string | null;
   value: Expr;
@@ -148,7 +185,7 @@ export interface CallArg {
 /** `callSiteId` es único y estable por compilación: clave del estado de los builtins ta.*. */
 export interface CallExpr extends SourcePos {
   kind: "call";
-  callee: Identifier | MemberExpr;
+  callee: Identifier | MemberExpr | FieldAccess;
   args: CallArg[];
   callSiteId: number;
 }

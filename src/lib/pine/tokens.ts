@@ -35,4 +35,5 @@ export const KEYWORDS = new Set([
   "by",
   "while",
   "switch",
+  "type",
 ]);

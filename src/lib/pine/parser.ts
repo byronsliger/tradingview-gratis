@@ -2,12 +2,14 @@ import type {
   BinaryOp,
   CallArg,
   Expr,
+  FieldAccess,
   Identifier,
   IfBranch,
   MemberExpr,
   Program,
   Stmt,
   SwitchCase,
+  TypeField,
   UnaryOp,
 } from "./ast";
 import { PineSyntaxError, type SourcePos } from "./errors";
@@ -39,8 +41,25 @@ function posOf(t: SourcePos): SourcePos {
  * DEDENT)? En ese caso parseProgram/parseBlock no deben exigir un statement-end
  * extra. Cubre if/for/funcDecl y las asignaciones cuyo RHS es un if/switch-expr.
  */
+/**
+ * Namespaces conocidos: un `base.prop` cuyo base esté aquí es un MemberExpr de
+ * namespace (constantes/builtins). Cualquier otro `base.prop` es acceso a campo
+ * de un objeto (UDT). Incluye namespaces de fases futuras (line/label/box/…) para
+ * que sus constantes no se confundan con campos.
+ */
+const NAMESPACES = new Set([
+  "ta", "math", "color", "input", "plot", "location", "shape", "size", "hline",
+  "line", "label", "box", "chart", "barstate", "timeframe", "syminfo", "str",
+  "array", "request",
+]);
+
 function isBlockStmt(stmt: Stmt): boolean {
-  if (stmt.kind === "ifStmt" || stmt.kind === "forStmt" || stmt.kind === "funcDecl") {
+  if (
+    stmt.kind === "ifStmt" ||
+    stmt.kind === "forStmt" ||
+    stmt.kind === "funcDecl" ||
+    stmt.kind === "typeDecl"
+  ) {
     return true;
   }
   if (stmt.kind === "varDecl") return endsInBlock(stmt.init);
@@ -52,9 +71,6 @@ function isBlockStmt(stmt: Stmt): boolean {
 function endsInBlock(e: Expr): boolean {
   return e.kind === "ifExpr" || e.kind === "switchExpr";
 }
-
-/** Calificadores de tipo opcionales en declaraciones (`float x = …`). */
-const TYPE_QUALIFIERS = new Set(["int", "float", "bool", "string", "color", "series", "simple"]);
 
 function span(a: SourcePos, b: SourcePos): SourcePos {
   return { line: a.line, col: a.col, start: a.start, end: b.end };
@@ -165,7 +181,9 @@ class Parser {
     if (t.type === "keyword") {
       if (t.value === "if") return this.parseIfStmt();
       if (t.value === "for") return this.parseForStmt();
+      // `varip` se trata como `var` por ahora (mismo carry-forward; realtime en Fase D).
       if (t.value === "var" || t.value === "varip") return this.parseVarDecl(t);
+      if (t.value === "type") return this.parseTypeDecl(t);
     }
 
     // break / continue (identifiers, no reservados en Pine).
@@ -195,17 +213,18 @@ class Parser {
       if (arrow) return this.parseFuncDecl(t);
     }
 
-    // Declaración tipada sin var: `float x = …`, `int n = …`.
+    // Declaración tipada sin var con cualquier nombre de tipo (builtin o UDT):
+    // `float x = …`, `pivot p = …`. Heurística: dos identificadores seguidos antes
+    // de `=`/`:=`. El tipo es informativo (no se valida contra tipos conocidos).
     if (
       t.type === "ident" &&
-      TYPE_QUALIFIERS.has(t.value) &&
       this.peek(1).type === "ident" &&
       this.peek(2).type === "op" &&
-      this.peek(2).value === "="
+      (this.peek(2).value === "=" || this.peek(2).value === ":=")
     ) {
       this.advance(); // tipo
       const name = this.advance(); // nombre
-      this.advance(); // '='
+      this.advance(); // '=' o ':='
       const init = this.parseExpr();
       return { kind: "varDecl", isVar: false, name: name.value, init, ...span(t, init) };
     }
@@ -223,6 +242,12 @@ class Parser {
       return { kind: "assign", name: t.value, value, ...span(t, value) };
     }
     const expr = this.parseExpr();
+    // `obj.field := value` (mutación de campo, encadenable a.b.c := …).
+    if (expr.kind === "fieldAccess" && this.check("op", ":=")) {
+      this.advance();
+      const value = this.parseExpr();
+      return { kind: "fieldAssign", target: expr, value, ...span(expr, value) };
+    }
     return { kind: "exprStmt", expr, ...posOf(expr) };
   }
 
@@ -239,14 +264,87 @@ class Parser {
     return { kind: "varDecl", isVar: true, name: name.value, init, ...span(t, init) };
   }
 
-  /** Consume un calificador de tipo opcional (`float`, `int`, …) en declaraciones. */
+  /**
+   * `type Name \n <campos indentados>`. Cada campo: `<typeRef> <nombre> [= default]`.
+   * typeRef es informativo: identificador, dotado (`a.b`) o con genérico
+   * (`array<float>`) — se guarda como string crudo, sin validar.
+   */
+  private parseTypeDecl(typeTok: Token): Stmt {
+    this.advance(); // 'type'
+    const name = this.expectIdent();
+    this.expectStatementEnd();
+    this.skipBlankLines();
+    if (!this.check("indent")) {
+      throw this.fail(this.peek(), "Se esperaba un bloque indentado de campos en 'type'");
+    }
+    this.advance();
+    const fields: TypeField[] = [];
+    while (!this.check("dedent") && !this.check("eof")) {
+      if (this.check("newline")) {
+        this.advance();
+        continue;
+      }
+      const typeRef = this.parseTypeRef();
+      const fieldName = this.expectIdent();
+      let def: Expr | null = null;
+      if (this.check("op", "=")) {
+        this.advance();
+        def = this.parseExpr();
+      }
+      this.expectStatementEnd();
+      fields.push({ name: fieldName.value, typeRef, default: def });
+    }
+    if (this.check("dedent")) this.advance();
+    if (fields.length === 0) {
+      throw this.fail(this.peek(), "Un 'type' debe declarar al menos un campo");
+    }
+    return { kind: "typeDecl", name: name.value, fields, ...span(typeTok, this.peek()) };
+  }
+
+  /**
+   * Anotación de tipo cruda de un campo: identificador, dotado (`a.b`) o con
+   * genérico `array<float>` / `array<fairValueGap>`. Devuelve el texto bruto.
+   * No valida contra tipos conocidos (puede ser un UDT o un tipo de fase futura).
+   */
+  private parseTypeRef(): string {
+    let ref = this.expectIdent().value;
+    while (this.check("op", ".")) {
+      this.advance();
+      ref += "." + this.expectIdent().value;
+    }
+    if (this.check("op", "<")) {
+      // Genérico: consume hasta el `>` que cierra (balanceando anidados).
+      this.advance();
+      ref += "<";
+      let depth = 1;
+      while (depth > 0 && !this.check("eof") && !this.check("newline")) {
+        const tk = this.advance();
+        if (tk.type === "op" && tk.value === "<") depth++;
+        else if (tk.type === "op" && tk.value === ">") depth--;
+        ref += depth > 0 ? tk.value : "";
+      }
+      ref += ">";
+    }
+    return ref;
+  }
+
+  /**
+   * Consume un calificador de tipo opcional en declaraciones: builtin
+   * (`float`, `int`, …) o nombre de UDT (`pivot`, …). Heurística: un identificador
+   * seguido de otro identificador (el nombre de la variable). El genérico de un
+   * array (`array<float> xs`) también se acepta. El tipo es informativo.
+   */
   private skipTypeQualifier(): void {
     const t = this.peek();
-    if (
-      t.type === "ident" &&
-      TYPE_QUALIFIERS.has(t.value) &&
-      this.peek(1).type === "ident"
-    ) {
+    if (t.type !== "ident") return;
+    const next = this.peek(1);
+    // `array<float> xs`: tipo con genérico.
+    if (next.type === "op" && next.value === "<") {
+      this.parseTypeRef();
+      return;
+    }
+    // `float x` / `pivot p`: dos identificadores seguidos.
+    if (next.type === "ident") {
       this.advance();
     }
   }
@@ -523,27 +621,35 @@ class Parser {
     let expr = this.parsePrimary();
     for (;;) {
       if (this.check("op", ".")) {
-        if (expr.kind !== "ident") {
-          throw this.fail(this.peek(), "El acceso con '.' solo se admite sobre un namespace (ta, math, color)");
-        }
         this.advance();
         const prop = this.expectIdent();
-        expr = {
-          kind: "member",
-          object: expr.name,
-          property: prop.value,
-          nodeId: this.nextNodeId++,
-          ...span(expr, prop),
-        } satisfies MemberExpr;
+        // `base.prop` sobre un namespace conocido → MemberExpr (constante/builtin).
+        // Cualquier otra base (variable con objeto, o acceso encadenado) → fieldAccess.
+        if (expr.kind === "ident" && NAMESPACES.has(expr.name)) {
+          expr = {
+            kind: "member",
+            object: expr.name,
+            property: prop.value,
+            nodeId: this.nextNodeId++,
+            ...span(expr, prop),
+          } satisfies MemberExpr;
+        } else {
+          expr = {
+            kind: "fieldAccess",
+            target: expr,
+            field: prop.value,
+            ...span(expr, prop),
+          } satisfies FieldAccess;
+        }
       } else if (this.check("op", "(")) {
-        if (expr.kind !== "ident" && expr.kind !== "member") {
+        if (expr.kind !== "ident" && expr.kind !== "member" && expr.kind !== "fieldAccess") {
           throw this.fail(this.peek(), "Esta expresión no es invocable");
         }
         this.advance();
         const { args, closeTok } = this.parseCallArgs();
         expr = {
           kind: "call",
-          callee: expr as Identifier | MemberExpr,
+          callee: expr as Identifier | MemberExpr | FieldAccess,
           args,
           callSiteId: this.nextNodeId++,
           ...span(expr, closeTok),
