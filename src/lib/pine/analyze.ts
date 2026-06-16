@@ -1,4 +1,4 @@
-import type { CallExpr, Expr, Program } from "./ast";
+import type { CallExpr, Expr, Program, Stmt } from "./ast";
 import type { SourcePos } from "./errors";
 import {
   COLOR_CONSTANTS,
@@ -391,23 +391,59 @@ function collectCalls(program: Program): CallExpr[] {
         visit(e.base);
         visit(e.offset);
         return;
+      case "ifExpr":
+        for (const b of e.branches) {
+          if (b.cond) visit(b.cond);
+          visitStmts(b.body);
+        }
+        return;
+      case "switchExpr":
+        if (e.subject) visit(e.subject);
+        for (const c of e.cases) {
+          if (c.match) visit(c.match);
+          visitStmts(c.body);
+        }
+        return;
       default:
         return;
     }
   };
-  for (const stmt of program.statements) {
-    switch (stmt.kind) {
-      case "varDecl":
-        visit(stmt.init);
-        break;
-      case "assign":
-        visit(stmt.value);
-        break;
-      case "exprStmt":
-        visit(stmt.expr);
-        break;
+  const visitStmts = (stmts: Stmt[]): void => {
+    for (const stmt of stmts) {
+      switch (stmt.kind) {
+        case "varDecl":
+          visit(stmt.init);
+          break;
+        case "tupleDecl":
+          visit(stmt.init);
+          break;
+        case "assign":
+          visit(stmt.value);
+          break;
+        case "exprStmt":
+          visit(stmt.expr);
+          break;
+        case "ifStmt":
+          visit(stmt.cond);
+          visitStmts(stmt.then);
+          if (stmt.elseBranch) visitStmts(stmt.elseBranch);
+          break;
+        case "forStmt":
+          visit(stmt.from);
+          visit(stmt.to);
+          if (stmt.step) visit(stmt.step);
+          visitStmts(stmt.body);
+          break;
+        case "funcDecl":
+          visitStmts(stmt.body);
+          break;
+        case "break":
+        case "continue":
+          break;
+      }
     }
-  }
+  };
+  visitStmts(program.statements);
   return out;
 }
 

@@ -3,9 +3,11 @@ import type {
   CallArg,
   Expr,
   Identifier,
+  IfBranch,
   MemberExpr,
   Program,
   Stmt,
+  SwitchCase,
   UnaryOp,
 } from "./ast";
 import { PineSyntaxError, type SourcePos } from "./errors";
@@ -32,6 +34,28 @@ function posOf(t: SourcePos): SourcePos {
   return { line: t.line, col: t.col, start: t.start, end: t.end };
 }
 
+/**
+ * ¿El statement consume su propio terminador (un bloque indentado cerrado por
+ * DEDENT)? En ese caso parseProgram/parseBlock no deben exigir un statement-end
+ * extra. Cubre if/for/funcDecl y las asignaciones cuyo RHS es un if/switch-expr.
+ */
+function isBlockStmt(stmt: Stmt): boolean {
+  if (stmt.kind === "ifStmt" || stmt.kind === "forStmt" || stmt.kind === "funcDecl") {
+    return true;
+  }
+  if (stmt.kind === "varDecl") return endsInBlock(stmt.init);
+  if (stmt.kind === "tupleDecl") return endsInBlock(stmt.init);
+  if (stmt.kind === "exprStmt") return endsInBlock(stmt.expr);
+  return false;
+}
+
+function endsInBlock(e: Expr): boolean {
+  return e.kind === "ifExpr" || e.kind === "switchExpr";
+}
+
+/** Calificadores de tipo opcionales en declaraciones (`float x = …`). */
+const TYPE_QUALIFIERS = new Set(["int", "float", "bool", "string", "color", "series", "simple"]);
+
 function span(a: SourcePos, b: SourcePos): SourcePos {
   return { line: a.line, col: a.col, start: a.start, end: b.end };
 }
@@ -50,12 +74,45 @@ class Parser {
         continue;
       }
       if (this.check("indent")) {
-        throw this.fail(this.peek(), "Indentación inesperada (los bloques llegan en Fase 5)");
+        throw this.fail(this.peek(), "Indentación inesperada");
       }
-      statements.push(this.parseStatement());
-      this.expectStatementEnd();
+      const stmt = this.parseStatement();
+      statements.push(stmt);
+      if (!isBlockStmt(stmt)) this.expectStatementEnd();
     }
     return { statements };
+  }
+
+  /** Salta newlines y dedents sobrantes entre statements de un mismo bloque. */
+  private skipBlankLines(): void {
+    while (this.check("newline")) this.advance();
+  }
+
+  /**
+   * Bloque indentado: tras un NEWLINE se espera INDENT, luego N statements y un
+   * DEDENT de cierre. Se usa por if/else/for/switch y cuerpos de función.
+   */
+  private parseBlock(): Stmt[] {
+    this.skipBlankLines();
+    if (!this.check("indent")) {
+      throw this.fail(this.peek(), "Se esperaba un bloque indentado");
+    }
+    this.advance();
+    const statements: Stmt[] = [];
+    while (!this.check("dedent") && !this.check("eof")) {
+      if (this.check("newline")) {
+        this.advance();
+        continue;
+      }
+      const stmt = this.parseStatement();
+      statements.push(stmt);
+      if (!isBlockStmt(stmt)) this.expectStatementEnd();
+    }
+    if (this.check("dedent")) this.advance();
+    if (statements.length === 0) {
+      throw this.fail(this.peek(), "El bloque no puede estar vacío");
+    }
+    return statements;
   }
 
   private peek(offset = 0): Token {
@@ -104,13 +161,53 @@ class Parser {
 
   private parseStatement(): Stmt {
     const t = this.peek();
-    if (t.type === "keyword" && (t.value === "var" || t.value === "varip")) {
-      this.advance();
-      const name = this.expectIdent();
-      this.expectOp("=");
-      const init = this.parseExpr();
-      return { kind: "varDecl", isVar: true, name: name.value, init, ...span(t, init) };
+
+    if (t.type === "keyword") {
+      if (t.value === "if") return this.parseIfStmt();
+      if (t.value === "for") return this.parseForStmt();
+      if (t.value === "var" || t.value === "varip") return this.parseVarDecl(t);
     }
+
+    // break / continue (identifiers, no reservados en Pine).
+    if (t.type === "ident" && (t.value === "break" || t.value === "continue")) {
+      // Solo si no es el comienzo de una asignación/llamada (siguen otra cosa).
+      const next = this.peek(1);
+      const isStandalone =
+        next.type === "newline" || next.type === "dedent" || next.type === "eof";
+      if (isStandalone) {
+        this.advance();
+        return t.value === "break"
+          ? { kind: "break", ...posOf(t) }
+          : { kind: "continue", ...posOf(t) };
+      }
+    }
+
+    // Destructuring de tupla: `[a, b] = expr` o `var [a, b] = expr`.
+    if (t.type === "op" && t.value === "[") {
+      return this.parseTupleDecl(t, false);
+    }
+
+    // Función de usuario: `f(args) => ...`. Lookahead hasta el `=>` tras el ')'.
+    if (t.type === "ident" && this.peek(1).type === "op" && this.peek(1).value === "(") {
+      const arrow = this.findArrowAfterParen(1);
+      if (arrow) return this.parseFuncDecl(t);
+    }
+
+    // Declaración tipada sin var: `float x = …`, `int n = …`.
+    if (
+      t.type === "ident" &&
+      TYPE_QUALIFIERS.has(t.value) &&
+      this.peek(1).type === "ident" &&
+      this.peek(2).type === "op" &&
+      this.peek(2).value === "="
+    ) {
+      this.advance(); // tipo
+      const name = this.advance(); // nombre
+      this.advance(); // '='
+      const init = this.parseExpr();
+      return { kind: "varDecl", isVar: false, name: name.value, init, ...span(t, init) };
+    }
+
     if (t.type === "ident" && this.peek(1).type === "op" && this.peek(1).value === "=") {
       this.advance();
       this.advance();
@@ -127,8 +224,161 @@ class Parser {
     return { kind: "exprStmt", expr, ...posOf(expr) };
   }
 
+  private parseVarDecl(t: Token): Stmt {
+    this.advance();
+    this.skipTypeQualifier();
+    if (this.check("op", "[")) {
+      const open = this.peek();
+      return this.parseTupleDecl(open, true, t);
+    }
+    const name = this.expectIdent();
+    this.expectOp("=");
+    const init = this.parseExpr();
+    return { kind: "varDecl", isVar: true, name: name.value, init, ...span(t, init) };
+  }
+
+  /** Consume un calificador de tipo opcional (`float`, `int`, …) en declaraciones. */
+  private skipTypeQualifier(): void {
+    const t = this.peek();
+    if (
+      t.type === "ident" &&
+      TYPE_QUALIFIERS.has(t.value) &&
+      this.peek(1).type === "ident"
+    ) {
+      this.advance();
+    }
+  }
+
+  private parseTupleDecl(open: Token, isVar: boolean, varTok?: Token): Stmt {
+    this.expectOp("[");
+    const names: string[] = [];
+    for (;;) {
+      names.push(this.expectIdent().value);
+      if (this.check("op", ",")) {
+        this.advance();
+        continue;
+      }
+      break;
+    }
+    this.expectOp("]", "Se esperaba ']' en el destructuring de tupla");
+    this.expectOp("=", "Se esperaba '=' tras [a, b]");
+    const init = this.parseExpr();
+    return {
+      kind: "tupleDecl",
+      isVar,
+      names,
+      init,
+      ...span(varTok ?? open, init),
+    };
+  }
+
+  /** ¿Hay un `=>` justo tras el grupo de paréntesis que abre en `peek(open)`? */
+  private findArrowAfterParen(open: number): boolean {
+    let depth = 0;
+    let i = open;
+    for (;;) {
+      const tk = this.peek(i);
+      if (tk.type === "eof" || tk.type === "newline") return false;
+      if (tk.type === "op" && tk.value === "(") depth++;
+      else if (tk.type === "op" && tk.value === ")") {
+        depth--;
+        if (depth === 0) {
+          const after = this.peek(i + 1);
+          return after.type === "op" && after.value === "=>";
+        }
+      }
+      i++;
+    }
+  }
+
+  private parseFuncDecl(nameTok: Token): Stmt {
+    this.advance(); // nombre
+    this.expectOp("(");
+    const params: string[] = [];
+    if (!this.check("op", ")")) {
+      for (;;) {
+        params.push(this.expectIdent().value);
+        if (this.check("op", ",")) {
+          this.advance();
+          continue;
+        }
+        break;
+      }
+    }
+    this.expectOp(")", "Se esperaba ')' en la lista de parámetros");
+    this.expectOp("=>", "Se esperaba '=>' en la definición de función");
+    let body: Stmt[];
+    if (this.check("newline")) {
+      this.advance();
+      body = this.parseBlock();
+    } else {
+      const expr = this.parseExpr();
+      body = [{ kind: "exprStmt", expr, ...posOf(expr) }];
+    }
+    const last = body[body.length - 1];
+    return {
+      kind: "funcDecl",
+      name: nameTok.value,
+      params,
+      body,
+      ...span(nameTok, last),
+    };
+  }
+
+  private parseIfStmt(): Stmt {
+    const t = this.peek(); // 'if'
+    this.advance();
+    const cond = this.parseExpr();
+    this.expectStatementEnd();
+    const then = this.parseBlock();
+    let elseBranch: Stmt[] | null = null;
+    this.skipBlankLines();
+    if (this.check("keyword", "else")) {
+      this.advance();
+      if (this.check("keyword", "if")) {
+        elseBranch = [this.parseIfStmt()];
+      } else {
+        if (this.check("newline")) this.advance();
+        elseBranch = this.parseBlock();
+      }
+    }
+    const lastStmt = (elseBranch ?? then)[(elseBranch ?? then).length - 1];
+    return { kind: "ifStmt", cond, then, elseBranch, ...span(t, lastStmt) };
+  }
+
+  private parseForStmt(): Stmt {
+    const t = this.peek(); // 'for'
+    this.advance();
+    const name = this.expectIdent();
+    this.expectOp("=", "Se esperaba '=' en el bucle for");
+    const from = this.parseExpr();
+    if (!this.check("keyword", "to")) {
+      throw this.fail(this.peek(), "Se esperaba 'to' en el bucle for");
+    }
+    this.advance();
+    const to = this.parseExpr();
+    let step: Expr | null = null;
+    if (this.check("keyword", "by")) {
+      this.advance();
+      step = this.parseExpr();
+    }
+    this.expectStatementEnd();
+    const body = this.parseBlock();
+    return {
+      kind: "forStmt",
+      varName: name.value,
+      from,
+      to,
+      step,
+      body,
+      ...span(t, body[body.length - 1]),
+    };
+  }
+
   // Ternario: la precedencia más baja, asociativo a la derecha.
   private parseExpr(): Expr {
+    if (this.check("keyword", "if")) return this.parseIfExpr();
+    if (this.check("keyword", "switch")) return this.parseSwitchExpr();
     const cond = this.parseBinary(1);
     if (this.check("op", "?")) {
       this.advance();
@@ -138,6 +388,84 @@ class Parser {
       return { kind: "ternary", cond, whenTrue, whenFalse, ...span(cond, whenFalse) };
     }
     return cond;
+  }
+
+  /** `if cond \n <block> [else if ...] [else \n <block>]` como expresión. */
+  private parseIfExpr(): Expr {
+    const t = this.peek(); // 'if'
+    this.advance();
+    const branches: IfBranch[] = [];
+    const cond = this.parseExpr();
+    this.expectStatementEnd();
+    branches.push({ cond, body: this.parseBlock() });
+    let lastPos: SourcePos = branches[0].body[branches[0].body.length - 1];
+    for (;;) {
+      this.skipBlankLines();
+      if (!this.check("keyword", "else")) break;
+      this.advance();
+      if (this.check("keyword", "if")) {
+        this.advance();
+        const c = this.parseExpr();
+        this.expectStatementEnd();
+        const body = this.parseBlock();
+        branches.push({ cond: c, body });
+        lastPos = body[body.length - 1];
+      } else {
+        if (this.check("newline")) this.advance();
+        const body = this.parseBlock();
+        branches.push({ cond: null, body });
+        lastPos = body[body.length - 1];
+        break;
+      }
+    }
+    return { kind: "ifExpr", branches, ...span(t, lastPos) };
+  }
+
+  /** `switch [subject] \n match => body \n => body` como expresión. */
+  private parseSwitchExpr(): Expr {
+    const t = this.peek(); // 'switch'
+    this.advance();
+    let subject: Expr | null = null;
+    if (!this.check("newline")) {
+      subject = this.parseExpr();
+    }
+    this.expectStatementEnd();
+    this.skipBlankLines();
+    if (!this.check("indent")) {
+      throw this.fail(this.peek(), "Se esperaba un bloque indentado en switch");
+    }
+    this.advance();
+    const cases: SwitchCase[] = [];
+    let lastPos: SourcePos = t;
+    while (!this.check("dedent") && !this.check("eof")) {
+      if (this.check("newline")) {
+        this.advance();
+        continue;
+      }
+      let match: Expr | null = null;
+      if (this.check("op", "=>")) {
+        this.advance();
+      } else {
+        match = this.parseExpr();
+        this.expectOp("=>", "Se esperaba '=>' en la rama del switch");
+      }
+      let body: Stmt[];
+      if (this.check("newline")) {
+        this.advance();
+        body = this.parseBlock();
+      } else {
+        const expr = this.parseExpr();
+        body = [{ kind: "exprStmt", expr, ...posOf(expr) }];
+        this.expectStatementEnd();
+      }
+      cases.push({ match, body });
+      lastPos = body[body.length - 1];
+    }
+    if (this.check("dedent")) this.advance();
+    if (cases.length === 0) {
+      throw this.fail(this.peek(), "El switch no tiene ramas");
+    }
+    return { kind: "switchExpr", subject, cases, ...span(t, lastPos) };
   }
 
   private parseBinary(minPrec: number): Expr {

@@ -4,13 +4,30 @@ export interface Program {
   statements: Stmt[];
 }
 
-export type Stmt = VarDeclStmt | AssignStmt | ExprStmt;
+export type Stmt =
+  | VarDeclStmt
+  | TupleDeclStmt
+  | AssignStmt
+  | ExprStmt
+  | IfStmt
+  | ForStmt
+  | BreakStmt
+  | ContinueStmt
+  | FuncDeclStmt;
 
 /** `x = expr` (declaración) o `var x = expr` (persistente entre barras). */
 export interface VarDeclStmt extends SourcePos {
   kind: "varDecl";
   isVar: boolean;
   name: string;
+  init: Expr;
+}
+
+/** `[a, b] = f()` — destructuring de tuplas devueltas por una función. */
+export interface TupleDeclStmt extends SourcePos {
+  kind: "tupleDecl";
+  isVar: boolean;
+  names: string[];
   init: Expr;
 }
 
@@ -24,6 +41,42 @@ export interface AssignStmt extends SourcePos {
 export interface ExprStmt extends SourcePos {
   kind: "exprStmt";
   expr: Expr;
+}
+
+/** `if cond \n <block> [else if cond \n <block>] [else \n <block>]` como statement. */
+export interface IfStmt extends SourcePos {
+  kind: "ifStmt";
+  cond: Expr;
+  then: Stmt[];
+  /** else-if encadenados o else final (un único IfStmt anidado o un bloque). */
+  elseBranch: Stmt[] | null;
+}
+
+/** `for i = inicio to fin [by paso] \n <block>`. */
+export interface ForStmt extends SourcePos {
+  kind: "forStmt";
+  varName: string;
+  from: Expr;
+  to: Expr;
+  step: Expr | null;
+  body: Stmt[];
+}
+
+export interface BreakStmt extends SourcePos {
+  kind: "break";
+}
+
+export interface ContinueStmt extends SourcePos {
+  kind: "continue";
+}
+
+/** Función de usuario `f(a, b) => expr` o multilínea con cuerpo indentado. */
+export interface FuncDeclStmt extends SourcePos {
+  kind: "funcDecl";
+  name: string;
+  params: string[];
+  body: Stmt[];
+  /** Última expresión del cuerpo = valor de retorno (single-line: el único stmt). */
 }
 
 export type UnaryOp = "-" | "+" | "not";
@@ -44,7 +97,9 @@ export type Expr =
   | UnaryExpr
   | BinaryExpr
   | TernaryExpr
-  | HistAccess;
+  | HistAccess
+  | IfExpr
+  | SwitchExpr;
 
 export interface NumberLit extends SourcePos {
   kind: "number";
@@ -124,4 +179,29 @@ export interface HistAccess extends SourcePos {
   base: Expr;
   offset: Expr;
   nodeId: number;
+}
+
+/** Rama de un if-expresión/statement: `cond` (null en el `else` final) + cuerpo. */
+export interface IfBranch {
+  cond: Expr | null;
+  body: Stmt[];
+}
+
+/** `if cond \n ... else ...` usado como expresión (devuelve la última expr de la rama). */
+export interface IfExpr extends SourcePos {
+  kind: "ifExpr";
+  branches: IfBranch[];
+}
+
+/** Caso de un switch: `match` (null en el `=> default`) + cuerpo. */
+export interface SwitchCase {
+  match: Expr | null;
+  body: Stmt[];
+}
+
+/** `switch [subject] \n caseExpr => body ...` como expresión. */
+export interface SwitchExpr extends SourcePos {
+  kind: "switchExpr";
+  subject: Expr | null;
+  cases: SwitchCase[];
 }

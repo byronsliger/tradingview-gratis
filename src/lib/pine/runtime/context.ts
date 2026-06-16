@@ -1,4 +1,5 @@
 import type { Candle } from "@/lib/binance/types";
+import type { FuncDeclStmt } from "../ast";
 import { PineRuntimeError, type SourcePos } from "../errors";
 import type { InputDef, RunOptions } from "../types";
 import { Series } from "./series";
@@ -11,13 +12,35 @@ export interface VarSlot {
   isVar: boolean;
 }
 
+/** Función de usuario registrada (cuerpo + parámetros). */
+export interface FuncDef {
+  params: string[];
+  decl: FuncDeclStmt;
+}
+
 /** Estado de una ejecución completa del script (se crea uno nuevo por run). */
 export class ExecutionContext {
   readonly candles: Candle[];
   readonly inputs: Record<string, number | string | boolean>;
   barIndex = 0;
 
-  readonly vars = new Map<string, VarSlot>();
+  /** Pila de scopes léxicos: índice 0 = global. */
+  readonly scopes: Map<string, VarSlot>[] = [new Map()];
+
+  /** Scope global (donde viven `var`/`:=` de nivel superior y las funciones). */
+  get vars(): Map<string, VarSlot> {
+    return this.scopes[0];
+  }
+
+  /** Definiciones de funciones de usuario por nombre. */
+  readonly functions = new Map<string, FuncDef>();
+
+  /**
+   * Prefijo del estado por call-site, derivado de la pila de llamadas a funciones
+   * de usuario. Garantiza que cada sitio de invocación tenga su propio estado ta.*.
+   */
+  private callStackKey = "";
+  private readonly callKeyStack: string[] = [];
   /** Resultado de plot() por callSiteId; sparse cuando hay na. */
   readonly plotValues = new Map<number, (number | null)[]>();
   /** Color dinámico por barra de cada plot(); solo se puebla si llega un color. */
@@ -29,8 +52,8 @@ export class ExecutionContext {
    */
   readonly shapeMarks = new Map<number, (string | null | undefined)[]>();
 
-  private readonly callSiteStates = new Map<number, unknown>();
-  private readonly hiddenSeries = new Map<number, Series>();
+  private readonly callSiteStates = new Map<string, unknown>();
+  private readonly hiddenSeries = new Map<string, Series>();
   private readonly inputDefsByCallSite = new Map<number, InputDef>();
   private fuelBar = 0;
   private fuelTotal = 0;
@@ -77,21 +100,72 @@ export class ExecutionContext {
     }
   }
 
-  /** Estado por call-site de los builtins ta.* — vive solo durante el run actual. */
+  /**
+   * Estado por call-site de los builtins ta.* — vive solo durante el run actual.
+   * La clave combina la pila de llamadas a funciones de usuario con el callSiteId
+   * del AST, de modo que un mismo ta.* dentro de una función tenga estado propio
+   * por cada sitio de invocación del llamador.
+   */
   getState<T>(callSiteId: number, init: () => T): T {
-    const existing = this.callSiteStates.get(callSiteId);
+    const key = this.callStackKey + "#" + callSiteId;
+    const existing = this.callSiteStates.get(key);
     if (existing !== undefined) return existing as T;
     const created = init();
-    this.callSiteStates.set(callSiteId, created);
+    this.callSiteStates.set(key, created);
     return created;
   }
 
+  /** Empuja un scope local (con un prefijo de call-stack único por call-site). */
+  pushScope(invocationKey: string): Map<string, VarSlot> {
+    const scope = new Map<string, VarSlot>();
+    this.scopes.push(scope);
+    this.callKeyStack.push(this.callStackKey);
+    this.callStackKey = this.callStackKey + "/" + invocationKey;
+    return scope;
+  }
+
+  popScope(): void {
+    this.scopes.pop();
+    this.callStackKey = this.callKeyStack.pop() ?? "";
+  }
+
+  /** Busca una variable en el scope actual y luego en el global. */
+  lookupVar(name: string): VarSlot | undefined {
+    const local = this.scopes[this.scopes.length - 1];
+    const hit = local.get(name);
+    if (hit) return hit;
+    if (local !== this.scopes[0]) return this.scopes[0].get(name);
+    return undefined;
+  }
+
+  /** Scope activo (para declarar variables locales). */
+  currentScope(): Map<string, VarSlot> {
+    return this.scopes[this.scopes.length - 1];
+  }
+
+  /**
+   * Slot persistente entre barras para un `var` local de función, keyed por la
+   * pila de llamadas + nombre. Permite que `var` dentro de una función conserve
+   * su valor por sitio de invocación, igual que en Pine.
+   */
+  persistentVarSlot(name: string): { slot: VarSlot; existed: boolean } {
+    const key = this.callStackKey + "::" + name;
+    const existing = this.localVarSlots.get(key);
+    if (existing) return { slot: existing, existed: true };
+    const slot: VarSlot = { series: new Series(), isVar: true };
+    this.localVarSlots.set(key, slot);
+    return { slot, existed: false };
+  }
+
+  private readonly localVarSlots = new Map<string, VarSlot>();
+
   /** Serie oculta para `expr[n]` cuando la base no es un identificador. */
   getHiddenSeries(nodeId: number): Series {
-    let s = this.hiddenSeries.get(nodeId);
+    const key = this.callStackKey + "#" + nodeId;
+    let s = this.hiddenSeries.get(key);
     if (!s) {
       s = new Series();
-      this.hiddenSeries.set(nodeId, s);
+      this.hiddenSeries.set(key, s);
     }
     return s;
   }

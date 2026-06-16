@@ -2,8 +2,8 @@
 // Cada sesión LEE este archivo al empezar y lo ACTUALIZA al terminar (o antes de agotar tokens).
 // Plan completo: plans/pine-script-engine.md
 module.exports = {
-  updatedAt: "2026-06-16T09:45:00Z",
-  currentPhase: 4,
+  updatedAt: "2026-06-16T11:05:00Z",
+  currentPhase: 5,
   branch: "pinescript (sale de master@cbdea78=Fase 3; Fases 1-3 estan en master, Fase 4 en adelante en pinescript)",
   done: [
     "Plan aprobado y guardado en plans/pine-script-engine.md",
@@ -45,10 +45,19 @@ module.exports = {
     "Fase 4 UI: PriceChart.tsx construye scriptPills desde scripts+scriptMeta+scriptLastValues+scriptErrors y los parte en overlayScriptPills / subPaneScriptPills",
     "Fase 4 UI: ScriptSettingsDialog.tsx (nuevo, montado en page.tsx) — autogenera controles desde compile(source).inputs (useMemo, sin set-state-in-effect, todo controlado por el store); int/float→number min/max/step o select si options, bool→checkbox, string→text/select, color→SimpleColorRow, source→select de open/high/low/close/volume/hl2/hlc3/ohlc4; guarda overrides en script.inputs vía updateScript; botón 'Restaurar valores' (inputs={})",
     "Fase 4 UI: chart-store ya tenía SettingsTarget=IndicatorKey|`script:${string}`; IndicatorSettingsDialog ignora targets script:* (los toma ScriptSettingsDialog)",
+    "Fase 5 COMPLETA (puro motor, sin tocar UI): control de flujo + funciones de usuario + builtins ampliados. 115/115 tests verdes (77 previos + 38 nuevos), lint+tsc limpios.",
+    "Fase 5 lenguaje: if/else/else-if como statement Y como expresión (x = if cond \\n 1 \\n else \\n 2); for i = a to b [by paso] con break/continue (cada iteración consume fuel → for enorme aborta con PineRuntimeError); switch como expresión con y sin sujeto (rama '=> default'); [a,b]=f() destructuring de tuplas; funciones de usuario f(x)=>expr una-línea y multilínea (cuerpo indentado, última expr = retorno); declaraciones tipadas 'float x = …' y 'var float x = …' (el calificador de tipo se ignora).",
+    "Fase 5 ast.ts: nuevos Stmt (tupleDecl, ifStmt, forStmt, break, continue, funcDecl) y Expr (ifExpr con IfBranch[], switchExpr con SwitchCase[]).",
+    "Fase 5 lexer.ts: '=>' SACADO de CONT_OPS (en Pine abre bloque multilínea de función/switch, debe permitir NEWLINE/INDENT tras él). El resto del lexer intacto.",
+    "Fase 5 parser.ts: parseBlock() consume INDENT..DEDENT; isBlockStmt()+endsInBlock() deciden si un stmt ya consumió su terminador (if/for/funcDecl y varDecl/exprStmt cuyo RHS es if/switch-expr) para no exigir expectStatementEnd extra; findArrowAfterParen() distingue f(x)=>… de una llamada; TYPE_QUALIFIERS=int/float/bool/string/color/series/simple se saltan como prefijo de tipo.",
+    "Fase 5 context.ts: scopes léxicos (scopes[]: 0=global) con pushScope/popScope/lookupVar/currentScope; callStackKey deriva el prefijo de estado de la pila de llamadas; getState(callSiteId) y getHiddenSeries(nodeId) ahora keyed por callStackKey+'#'+id → estado ta.* propio por sitio de invocación de función; persistentVarSlot(name) keyed por callStackKey+'::'+name para que un `var` dentro de función persista entre barras por call-site; FuncDef registrado en ctx.functions.",
+    "Fase 5 interpreter.ts: EvalValue=PineValue|TupleValue (en runtime/values.ts para evitar import circular con builtins-ta); evalExprT() tuple-capable (call/array/if/switch); scalar() exige escalar; callUserFunction() evalúa args en scope del llamador, abre scope local con params, ejecuta cuerpo, devuelve última expr (puede ser tupla [a,b]); evalBlockValue() = última expr de un bloque; color.new(c,transp 0-100→alpha hex #rrggbbaa) y color.rgb(r,g,b[,t]); 'not na'→na corregido (antes daba true).",
+    "Fase 5 builtins-ta: añadidos macd/bb/kc (devuelven TupleValue), linreg(src,len,offset=0) (= linreg de squeeze-momentum.ts), wma, vwma, mom, roc, cross, barssince, valuewhen, cum, sum. macd alineado con indicators/macd.ts (EMAs seedeadas con SMA); bb basis=sma; kc basis=ema, range=ema(tr|high-low).",
+    "Fase 5 builtins-math: añadidos sum, sign, sin, cos, tan, todegrees, toradians.",
+    "Fase 5 golden (phase5-golden.test.ts): Squeeze Momentum [LazyBear] y DMI/ADX escritos en Pine real, 300 velas mulberry32(seed=42), tolerancia relativa 1e-8. Squeeze compara `val` (linreg) ≡ squeezeMomentum().val. ADX reconstruye el seeding exacto de adx.ts (rma con startIndex; plusDI/minusDI con carry-forward vía `var`+`:=` dentro de if; adxRma desde dilen-1 con dxSeed = ta.sma(dx,adxlen) calculado FUERA del if). Ambos pasan a 1e-8.",
   ],
   inProgress: [],
   pending: [
-    "Fase 5: control de flujo (if/else, for, switch), [a,b]=f(), funciones de usuario, builtins ampliados (ta.macd/bb/kc/linreg/valuewhen/barssince, color.new/rgb) — paridad copy/paste; golden: Squeeze Momentum LazyBear y DMI/ADX ≡ builtins",
     "Fase 6: Drive sync v2 (SyncedState+scripts, version 2 con migración), badges de error en pills, autocomplete de builtins",
   ],
   notes: [
@@ -80,5 +89,15 @@ module.exports = {
     "addScript(name, source, opts?) ahora DEVUELVE el id y acepta {onChart} — duplicar usa onChart:false; 'Guardar' de un script nuevo usa onChart:false y 'Guardar y añadir' onChart:true solo si compila",
     "Para Fase 4: ScriptSettingsDialog puede seguir el patrón keyed-body de PineEditorDialog para evitar set-state-in-effect; settingsTarget del store debe ampliarse a IndicatorKey | `script:<id>` | null",
     "Verificación manual Fase 3: npm run dev → Indicadores → 'Nuevo script Pine…' → editor grande con highlighting; escribir plot(ta.sma(close 14)) → subrayado rojo en la coma faltante (~300ms); Guardar y añadir al chart → aparece en el chart y en la lista con punto azul; lápiz en el menú reabre con el script cargado; renombrar inline (doble click o lápiz en la lista), duplicar y eliminar con confirm; cambiar tema light/dark → el editor cambia de paleta",
+    "FASE 5 — DECISIÓN DE SEMÁNTICA DE RAMAS (clave): se eligió la OPCIÓN (b) — flujo normal. Los ta.* dentro de una rama if/for/switch NO tomada NO se ejecutan (a diferencia de TradingView, que los evalúa siempre para mantener su estado de serie). Razón: es lo pragmático y los golden objetivo no necesitan (a). GOTCHA descubierto: el ADX original de TV pone `ta.sma(dx, adxlen)` dentro de un `if bar_index==seedBar` — con flujo normal ese sma solo acumula 1 valor y da na. Solución en el golden: sacar el `ta.sma` FUERA del if (dxSeed = ta.sma(dx,adxlen) siempre, luego `if … adxVal := dxSeed`). LIMITACIÓN para el usuario: scripts copy/paste que dependan de ta.* en ramas no tomadas pueden divergir de TV — hay que mover esos ta.* fuera de la rama. La opción (a) (ejecución 'siempre' de series) queda como mejora futura (Fase 6) si aparecen scripts reales que la necesiten.",
+    "FASE 5 — limitaciones/gotchas para Fase 6:",
+    "Las funciones de usuario son indentation-based y de una sola expresión de retorno (la última del cuerpo). No hay early-return, ni recursión protegida (una función que se llame a sí misma agotará fuel/stack — no probado a fondo). Args solo posicionales (sin nombre, sin defaults).",
+    "El `var` dentro de una función persiste por sitio de invocación vía ctx.persistentVarSlot (keyed callStackKey+'::'+name). Funciona para el caso simple; no testeado exhaustivamente con anidación profunda de funciones que comparten nombres de var.",
+    "switch con sujeto usa igualdad estricta (===) y na nunca matchea (valuesEqual); switch sin sujeto evalúa truthiness de cada rama. La rama default es `=> body` (match=null).",
+    "color.new/color.rgb devuelven #rrggbbaa (8 hex). lightweight-charts acepta alpha hex; las pills/plots ya consumían colores hex en Fase 4. Verificar visualmente en Fase 6 que el alpha se respeta en las series.",
+    "ta.bb/ta.kc: bb basis=sma (Pine real); kc basis=ema, range=ema(tr|high-low) — APROXIMACIÓN razonable, NO verificada bit-a-bit contra ta.kc de TradingView (TV puede usar otra MA por defecto). El Squeeze golden NO usa ta.bb/ta.kc (escribe sma/stdev/linreg a mano), así que la aproximación de kc no afecta los golden. Si en Fase 6 alguien pega un script que use ta.kc y discrepe, revisar el tipo de MA.",
+    "TupleValue vive en src/lib/pine/runtime/values.ts (clase + type EvalValue). builtins-ta lo importa de ahí (no de interpreter) para evitar ciclo. Un ta.* que deba devolver tupla retorna `new TupleValue([...])`; en contexto escalar, scalar() lanza PineRuntimeError 'Se usó una tupla donde se esperaba un valor'.",
+    "break/continue fuera de un for → PineRuntimeError posicionado (convertido en runProgram desde la señal LoopSignal interna). El for consume fuel por iteración además de por statement.",
+    "Para que analyze() encuentre plots/inputs dentro de if/for/switch/funciones, collectCalls() ahora recorre TODOS los nuevos Stmt/Expr (visitStmts recursivo). Si en Fase 6 se añaden nodos AST nuevos, actualizar también collectCalls.",
   ],
 };

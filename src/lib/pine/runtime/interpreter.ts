@@ -26,6 +26,7 @@ import { mathBuiltins } from "./builtins-math";
 import { taBuiltins } from "./builtins-ta";
 import { ExecutionContext } from "./context";
 import { Series } from "./series";
+import { TupleValue, type EvalValue } from "./values";
 
 const MATH_CONSTANTS: Record<string, number> = {
   pi: Math.PI,
@@ -46,11 +47,32 @@ export function runProgram(
   inputDefs: InputDef[] = [],
 ): ExecutionContext {
   const ctx = new ExecutionContext(candles, inputs, options, inputDefs);
+  // Registrar funciones de usuario antes de ejecutar barras (hoisting).
+  for (const stmt of program.statements) {
+    if (stmt.kind === "funcDecl") {
+      ctx.functions.set(stmt.name, { params: stmt.params, decl: stmt });
+    }
+  }
   for (let bar = 0; bar < candles.length; bar++) {
     ctx.startBar(bar);
-    for (const stmt of program.statements) execStmt(ctx, stmt);
+    for (const stmt of program.statements) {
+      try {
+        execStmt(ctx, stmt);
+      } catch (sig) {
+        // break/continue fuera de un for: error posicionado en vez de crash.
+        if (sig instanceof LoopSignal) {
+          throw new PineRuntimeError(`'${sig.kind}' solo es válido dentro de un bucle for`, stmt);
+        }
+        throw sig;
+      }
+    }
   }
   return ctx;
+}
+
+/** Señal de control de flujo lanzada por break/continue dentro de un for. */
+class LoopSignal {
+  constructor(readonly kind: "break" | "continue") {}
 }
 
 function execStmt(ctx: ExecutionContext, stmt: Stmt): void {
@@ -60,20 +82,34 @@ function execStmt(ctx: ExecutionContext, stmt: Stmt): void {
       if (SERIES_BUILTINS.has(stmt.name) || stmt.name === "na") {
         throw new PineRuntimeError(`No se puede redeclarar el builtin '${stmt.name}'`, stmt);
       }
-      const existing = ctx.vars.get(stmt.name);
-      if (stmt.isVar && existing) {
-        // `var`: el init solo corre en la primera barra; en las siguientes arrastra
-        // el último valor de la barra anterior (que pudo cambiar vía `:=`).
-        existing.series.set(ctx.barIndex, existing.series.get(ctx.barIndex, 1));
-        return;
+      declareVar(ctx, stmt.isVar, stmt.name, () => evalExpr(ctx, stmt.init), stmt);
+      return;
+    }
+    case "tupleDecl": {
+      const value = evalExprT(ctx, stmt.init);
+      if (!(value instanceof TupleValue)) {
+        throw new PineRuntimeError(
+          "El lado derecho de [a, b] = … debe devolver una tupla",
+          stmt,
+        );
       }
-      const slot = existing ?? { series: new Series(), isVar: stmt.isVar };
-      if (!existing) ctx.vars.set(stmt.name, slot);
-      slot.series.set(ctx.barIndex, evalExpr(ctx, stmt.init));
+      if (value.values.length !== stmt.names.length) {
+        throw new PineRuntimeError(
+          `La tupla tiene ${value.values.length} valores pero se desestructuran ${stmt.names.length}`,
+          stmt,
+        );
+      }
+      stmt.names.forEach((name, i) => {
+        if (SERIES_BUILTINS.has(name) || name === "na") {
+          throw new PineRuntimeError(`No se puede redeclarar el builtin '${name}'`, stmt);
+        }
+        const v = value.values[i];
+        declareVar(ctx, stmt.isVar, name, () => v, stmt);
+      });
       return;
     }
     case "assign": {
-      const slot = ctx.vars.get(stmt.name);
+      const slot = ctx.lookupVar(stmt.name);
       if (!slot) {
         throw new PineRuntimeError(
           `No se puede asignar a '${stmt.name}' con ':=' porque no está declarada`,
@@ -83,9 +119,99 @@ function execStmt(ctx: ExecutionContext, stmt: Stmt): void {
       slot.series.set(ctx.barIndex, evalExpr(ctx, stmt.value));
       return;
     }
+    case "ifStmt": {
+      if (toBool(evalExpr(ctx, stmt.cond))) {
+        execBlock(ctx, stmt.then);
+      } else if (stmt.elseBranch) {
+        execBlock(ctx, stmt.elseBranch);
+      }
+      return;
+    }
+    case "forStmt":
+      execFor(ctx, stmt);
+      return;
+    case "break":
+      throw new LoopSignal("break");
+    case "continue":
+      throw new LoopSignal("continue");
+    case "funcDecl":
+      // Ya registrada en runProgram (hoisting); no-op por barra.
+      return;
     case "exprStmt":
       evalExpr(ctx, stmt.expr);
       return;
+  }
+}
+
+function execBlock(ctx: ExecutionContext, stmts: Stmt[]): void {
+  for (const s of stmts) execStmt(ctx, s);
+}
+
+/**
+ * Declara/actualiza una variable. En scope local de función, los `var` persisten
+ * entre barras vía persistentVarSlot; el resto vive en el scope (recreado por call).
+ */
+function declareVar(
+  ctx: ExecutionContext,
+  isVar: boolean,
+  name: string,
+  computeInit: () => PineValue,
+  pos: Stmt,
+): void {
+  const inFunction = ctx.currentScope() !== ctx.vars;
+  if (isVar && inFunction) {
+    const { slot, existed } = ctx.persistentVarSlot(name);
+    ctx.currentScope().set(name, slot);
+    if (existed) {
+      slot.series.set(ctx.barIndex, slot.series.get(ctx.barIndex, 1));
+    } else {
+      slot.series.set(ctx.barIndex, computeInit());
+    }
+    return;
+  }
+  const scope = ctx.currentScope();
+  const existing = scope.get(name);
+  if (isVar && existing) {
+    existing.series.set(ctx.barIndex, existing.series.get(ctx.barIndex, 1));
+    return;
+  }
+  const slot = existing ?? { series: new Series(), isVar };
+  if (!existing) scope.set(name, slot);
+  slot.series.set(ctx.barIndex, computeInit());
+  void pos;
+}
+
+function execFor(ctx: ExecutionContext, stmt: Extract<Stmt, { kind: "forStmt" }>): void {
+  const fromV = evalExpr(ctx, stmt.from);
+  const toV = evalExpr(ctx, stmt.to);
+  if (typeof fromV !== "number" || typeof toV !== "number") {
+    throw new PineRuntimeError("Los límites de 'for' deben ser numéricos", stmt);
+  }
+  const step = stmt.step ? evalExpr(ctx, stmt.step) : null;
+  if (step !== null && typeof step !== "number") {
+    throw new PineRuntimeError("El paso de 'for' debe ser numérico", stmt);
+  }
+  let stepN = typeof step === "number" ? step : toV >= fromV ? 1 : -1;
+  if (stepN === 0) stepN = toV >= fromV ? 1 : -1;
+
+  // Slot del contador en el scope actual.
+  const scope = ctx.currentScope();
+  const slot: { series: Series; isVar: boolean } = { series: new Series(), isVar: false };
+  scope.set(stmt.varName, slot);
+
+  const ascending = stepN > 0;
+  for (let i = fromV; ascending ? i <= toV : i >= toV; i += stepN) {
+    ctx.consumeFuel(stmt); // cada iteración consume fuel
+    slot.series.set(ctx.barIndex, i);
+    try {
+      execBlock(ctx, stmt.body);
+    } catch (sig) {
+      if (sig instanceof LoopSignal) {
+        if (sig.kind === "break") break;
+        continue;
+      }
+      throw sig;
+    }
   }
 }
 
@@ -105,7 +231,8 @@ function evalExpr(ctx: ExecutionContext, e: Expr): PineValue {
       return evalCall(ctx, e);
     case "unary": {
       const v = evalExpr(ctx, e.operand);
-      if (e.op === "not") return !toBool(v);
+      // `not na` → na (semántica lógica de Pine); `not bool` invierte.
+      if (e.op === "not") return v === null ? null : !toBool(v);
       if (typeof v !== "number") return null; // na (o tipo no numérico) propaga na
       return e.op === "-" ? clean(-v) : clean(v);
     }
@@ -125,6 +252,9 @@ function evalExpr(ctx: ExecutionContext, e: Expr): PineValue {
     }
     case "hist":
       return evalHist(ctx, e);
+    case "ifExpr":
+    case "switchExpr":
+      return scalar(evalExprT(ctx, e), e);
     case "array":
       throw new PineRuntimeError(
         "Los arrays solo están soportados como 'options' de input.*",
@@ -133,10 +263,65 @@ function evalExpr(ctx: ExecutionContext, e: Expr): PineValue {
   }
 }
 
+/** Exige un valor escalar; una tupla en contexto escalar es un error. */
+function scalar(v: EvalValue, pos: SourcePos): PineValue {
+  if (v instanceof TupleValue) {
+    throw new PineRuntimeError("Se usó una tupla donde se esperaba un valor", pos);
+  }
+  return v;
+}
+
+/** Variante tuple-capable de evalExpr (call/if/switch/array pueden devolver tuplas). */
+function evalExprT(ctx: ExecutionContext, e: Expr): EvalValue {
+  if (e.kind === "call") return evalCallT(ctx, e);
+  // `[a, b]` como valor de retorno de una función → tupla.
+  if (e.kind === "array") {
+    return new TupleValue(e.elements.map((el) => scalar(evalExprT(ctx, el), el)));
+  }
+  if (e.kind === "ifExpr") {
+    for (const branch of e.branches) {
+      if (branch.cond === null || toBool(evalExpr(ctx, branch.cond))) {
+        return evalBlockValue(ctx, branch.body);
+      }
+    }
+    return null; // ninguna rama y sin else → na
+  }
+  if (e.kind === "switchExpr") {
+    const subject = e.subject ? evalExpr(ctx, e.subject) : null;
+    for (const c of e.cases) {
+      if (c.match === null) return evalBlockValue(ctx, c.body); // rama default
+      const m = evalExpr(ctx, c.match);
+      const matches = e.subject ? valuesEqual(subject, m) : toBool(m);
+      if (matches) return evalBlockValue(ctx, c.body);
+    }
+    return null;
+  }
+  return evalExpr(ctx, e);
+}
+
+/** Ejecuta un bloque y devuelve el valor de su última expresión (como en Pine). */
+function evalBlockValue(ctx: ExecutionContext, stmts: Stmt[]): EvalValue {
+  let value: EvalValue = null;
+  for (let i = 0; i < stmts.length; i++) {
+    const s = stmts[i];
+    if (i === stmts.length - 1 && s.kind === "exprStmt") {
+      value = evalExprT(ctx, s.expr);
+    } else {
+      execStmt(ctx, s);
+    }
+  }
+  return value;
+}
+
+function valuesEqual(a: PineValue, b: PineValue): boolean {
+  if (a === null || b === null) return false;
+  return a === b;
+}
+
 function evalIdent(ctx: ExecutionContext, e: Identifier): PineValue {
   if (e.name === "na") return null;
   if (SERIES_BUILTINS.has(e.name)) return builtinSeriesValue(ctx, e.name, ctx.barIndex);
-  const slot = ctx.vars.get(e.name);
+  const slot = ctx.lookupVar(e.name);
   if (slot) return slot.series.get(ctx.barIndex);
   throw new PineRuntimeError(`Variable '${e.name}' no definida`, e);
 }
@@ -161,7 +346,7 @@ function evalMember(ctx: ExecutionContext, e: MemberExpr): PineValue {
   }
   // `ta.tr` se puede usar como variable (sin llamar); su estado vive en nodeId.
   if (e.object === "ta" && e.property === "tr") {
-    return taBuiltins.tr.fn(ctx, e.nodeId, []);
+    return scalar(taBuiltins.tr.fn(ctx, e.nodeId, []), e);
   }
   throw new PineRuntimeError(`'${e.object}.${e.property}' no está soportado como valor`, e);
 }
@@ -227,6 +412,10 @@ function mapArgs(
 }
 
 function evalCall(ctx: ExecutionContext, e: CallExpr): PineValue {
+  return scalar(evalCallT(ctx, e), e);
+}
+
+function evalCallT(ctx: ExecutionContext, e: CallExpr): EvalValue {
   const callee = e.callee;
 
   // input.*()/input(): NO evalúa los args (son constantes ya extraídas por
@@ -236,6 +425,13 @@ function evalCall(ctx: ExecutionContext, e: CallExpr): PineValue {
     (callee.kind === "member" && callee.object === "input")
   ) {
     return resolveInput(ctx, e);
+  }
+
+  // Funciones de usuario: se evalúan los args y se ejecuta el cuerpo en un scope
+  // local propio. El call-site se usa para que el estado ta.* interno sea único
+  // por sitio de invocación.
+  if (callee.kind === "ident" && ctx.functions.has(callee.name)) {
+    return callUserFunction(ctx, e, callee.name);
   }
 
   const evaluated = evalArgs(ctx, e.args);
@@ -304,7 +500,90 @@ function evalCall(ctx: ExecutionContext, e: CallExpr): PineValue {
     const mapped = mapArgs(e, evaluated, builtin.params, builtin.required, builtin.variadic === true);
     return builtin.fn(mapped);
   }
+  if (callee.object === "color") {
+    if (callee.property === "new") {
+      const mapped = mapArgs(e, evaluated, ["color", "transp"], 2);
+      return colorNew(mapped[0], mapped[1], e);
+    }
+    if (callee.property === "rgb") {
+      const mapped = mapArgs(e, evaluated, ["red", "green", "blue", "transp"], 3);
+      return colorRgb(mapped, e);
+    }
+    throw new PineRuntimeError(`'color.${callee.property}()' aún no está soportado`, e);
+  }
   throw new PineRuntimeError(`Función '${callee.object}.${callee.property}' desconocida`, e);
+}
+
+function clamp255(v: number): number {
+  return Math.max(0, Math.min(255, Math.round(v)));
+}
+
+/** transp 0-100 → alpha 255-0 → byte hex. */
+function transpToAlphaHex(transp: PineValue | undefined): string {
+  const t = typeof transp === "number" && Number.isFinite(transp) ? transp : 0;
+  const alpha = clamp255(255 * (1 - Math.max(0, Math.min(100, t)) / 100));
+  return alpha.toString(16).padStart(2, "0").toUpperCase();
+}
+
+/** color.new(color, transp): aplica transparencia → #rrggbbaa. */
+function colorNew(base: PineValue | undefined, transp: PineValue | undefined, pos: SourcePos): string {
+  if (typeof base !== "string" || !/^#[0-9a-fA-F]{6,8}$/.test(base)) {
+    throw new PineRuntimeError("color.new() requiere un color válido", pos);
+  }
+  const rgb = base.slice(1, 7).toUpperCase();
+  return "#" + rgb + transpToAlphaHex(transp);
+}
+
+/** color.rgb(r, g, b, transp?): construye #rrggbb[aa]. */
+function colorRgb(mapped: (PineValue | undefined)[], pos: SourcePos): string {
+  const r = mapped[0];
+  const g = mapped[1];
+  const b = mapped[2];
+  if (typeof r !== "number" || typeof g !== "number" || typeof b !== "number") {
+    throw new PineRuntimeError("color.rgb() requiere componentes numéricos", pos);
+  }
+  const hex =
+    "#" +
+    clamp255(r).toString(16).padStart(2, "0") +
+    clamp255(g).toString(16).padStart(2, "0") +
+    clamp255(b).toString(16).padStart(2, "0");
+  const out = hex.toUpperCase();
+  return mapped[3] === undefined ? out : out + transpToAlphaHex(mapped[3]);
+}
+
+/**
+ * Invoca una función de usuario: evalúa los args en el scope actual, abre un
+ * scope local con los parámetros enlazados y ejecuta el cuerpo. El valor es la
+ * última expresión del cuerpo (puede ser una tupla `[a, b]`).
+ */
+function callUserFunction(ctx: ExecutionContext, e: CallExpr, name: string): EvalValue {
+  const def = ctx.functions.get(name);
+  if (!def) throw new PineRuntimeError(`Función '${name}' desconocida`, e);
+  for (const a of e.args) {
+    if (a.name !== null) {
+      throw new PineRuntimeError("Las funciones de usuario no admiten argumentos nombrados", e);
+    }
+  }
+  if (e.args.length !== def.params.length) {
+    throw new PineRuntimeError(
+      `'${name}' espera ${def.params.length} argumento(s), recibió ${e.args.length}`,
+      e,
+    );
+  }
+  // Evaluar args en el scope del llamador antes de abrir el scope local.
+  const argValues = e.args.map((a) => evalExpr(ctx, a.value));
+
+  const scope = ctx.pushScope(String(e.callSiteId));
+  try {
+    def.params.forEach((p, i) => {
+      const slot = { series: new Series(), isVar: false };
+      slot.series.set(ctx.barIndex, argValues[i]);
+      scope.set(p, slot);
+    });
+    return evalBlockValue(ctx, def.decl.body);
+  } finally {
+    ctx.popScope();
+  }
 }
 
 /**
@@ -354,7 +633,7 @@ function evalHist(ctx: ExecutionContext, e: HistAccess): PineValue {
     if (SERIES_BUILTINS.has(name)) {
       return n === null ? null : builtinSeriesValue(ctx, name, ctx.barIndex - n);
     }
-    const slot = ctx.vars.get(name);
+    const slot = ctx.lookupVar(name);
     if (slot) return n === null ? null : slot.series.get(ctx.barIndex, n);
     throw new PineRuntimeError(`Variable '${name}' no definida`, e.base);
   }

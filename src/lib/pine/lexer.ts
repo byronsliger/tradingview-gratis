@@ -16,10 +16,12 @@ const TAB_WIDTH = 4;
 // continuación cuando el paréntesis/corchete sigue abierto, o cuando la línea
 // anterior termina en operador binario, coma, '?', ':', '=', ':=', '=>', '.' o en
 // 'and'/'or'/'not'. Cubre los scripts del subset de Fase 1.
+// `=>` NO está aquí: en Pine abre un bloque multilínea (cuerpo de función o rama
+// de switch), así que debe permitir que se emitan NEWLINE/INDENT tras él.
 const CONT_OPS = new Set([
   "+", "-", "*", "/", "%",
   "==", "!=", "<", "<=", ">", ">=",
-  "=", ":=", "=>", "?", ":", ",", ".", "(", "[",
+  "=", ":=", "?", ":", ",", ".", "(", "[",
 ]);
 const CONT_KEYWORDS = new Set(["and", "or", "not"]);
 

@@ -76,4 +76,11 @@ export const mathBuiltins: Record<string, PureBuiltin> = {
   max: variadic((vs) => Math.max(...vs), 2),
   min: variadic((vs) => Math.min(...vs), 2),
   avg: variadic((vs) => vs.reduce((acc, v) => acc + v, 0) / vs.length, 1),
+  sum: variadic((vs) => vs.reduce((acc, v) => acc + v, 0), 1),
+  sign: unary(Math.sign),
+  sin: unary(Math.sin),
+  cos: unary(Math.cos),
+  tan: unary(Math.tan),
+  todegrees: unary((x) => (x * 180) / Math.PI),
+  toradians: unary((x) => (x * Math.PI) / 180),
 };
