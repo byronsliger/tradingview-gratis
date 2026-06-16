@@ -172,8 +172,8 @@ export function ScriptSettingsDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) setTarget(null); }}>
-      <DialogContent className="max-w-none sm:max-w-sm bg-tv-panel">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[85vh] flex-col gap-0 max-w-none sm:max-h-[80vh] sm:max-w-sm bg-tv-panel">
+        <DialogHeader className="shrink-0 pb-3 pr-8">
           <DialogTitle className="text-sm font-semibold">
             {record?.name ?? "Script"} — Configuración
           </DialogTitle>
@@ -184,19 +184,21 @@ export function ScriptSettingsDialog() {
             Este script no tiene parámetros configurables.
           </p>
         ) : (
-          <div className="flex flex-col divide-y divide-tv-border/50">
-            {inputs.map((def) => (
-              <InputControl
-                key={def.id}
-                def={def}
-                value={currentValue(def, record!.inputs)}
-                onChange={(v) => handleChange(def.id, v)}
-              />
-            ))}
+          <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+            <div className="flex flex-col divide-y divide-tv-border/50">
+              {inputs.map((def) => (
+                <InputControl
+                  key={def.id}
+                  def={def}
+                  value={currentValue(def, record!.inputs)}
+                  onChange={(v) => handleChange(def.id, v)}
+                />
+              ))}
+            </div>
           </div>
         )}
 
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex shrink-0 justify-end border-t border-tv-border/50 pt-3">
           <button
             type="button"
             onClick={handleReset}
