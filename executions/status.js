@@ -2,8 +2,9 @@
 // Cada sesión LEE este archivo al empezar y lo ACTUALIZA al terminar (o antes de agotar tokens).
 // Plan completo: plans/pine-script-engine.md
 module.exports = {
-  updatedAt: "2026-06-11T19:35:00Z",
-  currentPhase: 3,
+  updatedAt: "2026-06-16T09:00:00Z",
+  currentPhase: 4,
+  branch: "pinescript (sale de master@cbdea78=Fase 3; Fases 1-3 estan en master, Fase 4 en adelante en pinescript)",
   done: [
     "Plan aprobado y guardado en plans/pine-script-engine.md",
     "Carpeta executions/ creada con este archivo de estado",
@@ -31,12 +32,23 @@ module.exports = {
     "Fase 3: page.tsx — AddScriptDialog eliminado; PineEditorDialog cargado con next/dynamic ssr:false y montado solo tras la primera apertura (ref everOpened) para no entrar en el chunk inicial",
     "Fase 3: src/components/pine/AddScriptDialog.tsx ELIMINADO",
     "Fase 3: npm run lint limpio, npx tsc --noEmit limpio, npm test 56/56 verdes, npm run build ok",
+    "Fase 4 MOTOR COMPLETO (commit c3d056a en rama pinescript): mitad de motor de la Fase 4, 77/77 tests verdes, lint+tsc limpios",
+    "Fase 4 motor: analyze.ts extrae InputDef[] {id,type,title,defval,minval,maxval,step,options}; input.int/float/bool/string/color/source + input() genérico (infiere tipo del defval); id = title o 'input{N}' posicional estable; titles duplicados caen a posicional; defval no constante = error de compilación; input.source limitado a open/high/low/close/volume/hl2/hlc3/ohlc4",
+    "Fase 4 motor: runScript resuelve input.* por override en el Record inputs → si no, defval; int se clampa a minval/maxval y se redondea; source devuelve la serie elegida",
+    "Fase 4 motor: PlotSpec gana style ('line'|'stepline'|'histogram'|'columns'|'area'|'circles'|'cross', default 'line') y linewidth (default 1); color dinámico por barra → cada punto de ScriptResult.plots[].points gana color?:string (hex resuelto)",
+    "Fase 4 motor: hline() estática → script.hlines: HLineSpec[] {price,title,color,linestyle}; precio no literal = error 'constante numérica'",
+    "Fase 4 motor: plotshape()/plotchar() → script.shapes + ScriptResult.shapes[].points {time,position:'aboveBar'|'belowBar',shape:'arrowUp'|'arrowDown'|'circle',color,text?}; mapeo shape.triangleup→arrowUp, triangledown→arrowDown, circle→circle; location.belowbar/abovebar/absolute→belowBar/aboveBar (absolute→aboveBar con warning); plotchar usa el char como text del marker",
   ],
-  inProgress: [],
+  inProgress: [
+    "Fase 4 UI/RENDER — PENDIENTE (la mitad de motor ya está hecha y commiteada). Falta SOLO la UI:",
+    "  (a) useUserScriptPanes.ts: crear series según PlotSpec.style (line/stepline=LineSeries lineType, histogram/columns=HistogramSeries color por punto, area=AreaSeries, circles/cross=LineSeries pointMarkersVisible); hlines→series.createPriceLine (remover en cleanup); shapes→createSeriesMarkers (import de lightweight-charts v5) sobre la 1ª serie del script, refrescar en cada update y limpiar; PASAR script.inputs a runScript; exponer lastValues por scriptId y error por script para las pills",
+    "  (b) src/components/pine/ScriptSettingsDialog.tsx (nuevo): dialog autogenerado desde script.inputs (InputDef[]) — int/float→number con min/max/step, bool→switch, string→text o select si options, color→color picker; reutiliza controles de src/components/chart/indicator-settings/shared.tsx; guarda overrides en script.inputs vía updateScript (recalcula solo, layoutKey ya incluye inputs); botón 'Restaurar valores'; usar patrón keyed-body de PineEditorDialog para evitar set-state-in-effect",
+    "  (c) chart-store.ts: ampliar settingsTarget de IndicatorKey|null a IndicatorKey|`script:${string}`|null; IndicatorSettingsDialog.tsx enruta 'script:*' al ScriptSettingsDialog (o montarlo aparte)",
+    "  (d) Pills: scripts overlay→ChartLegend.tsx, no-overlay→SubPaneLegend.tsx en su pane (usar paneOffsets como RSI/MACD); cada pill (diseño de IndicatorPill.tsx): nombre (title de indicator() o name), último valor del 1er plot, ojo (toggleScriptHidden), engranaje (settingsTarget=`script:id`), X (quitar del chart = onChart:false, NO borra), lápiz (abre editor Pine)",
+  ],
   pending: [
-    "Fase 4: inputs autogenerados, estilos de plot, legend pills",
-    "Fase 5: control de flujo, funciones de usuario, builtins ampliados (paridad copy/paste)",
-    "Fase 6: Drive sync v2, badges de error, autocomplete",
+    "Fase 5: control de flujo (if/else, for, switch), [a,b]=f(), funciones de usuario, builtins ampliados (ta.macd/bb/kc/linreg/valuewhen/barssince, color.new/rgb) — paridad copy/paste; golden: Squeeze Momentum LazyBear y DMI/ADX ≡ builtins",
+    "Fase 6: Drive sync v2 (SyncedState+scripts, version 2 con migración), badges de error en pills, autocomplete de builtins",
   ],
   notes: [
     "API pública: compile(source) → {ok,script|diagnostics}; runScript(script, candles, inputs?, options?) → ScriptResult; runScript LANZA PineRuntimeError (runtime/fuel) — el caller debe capturarlo (useUserScriptPanes ya lo hace)",
