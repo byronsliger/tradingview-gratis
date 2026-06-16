@@ -238,4 +238,19 @@ describe("fase 5: funciones de usuario", () => {
     ].join("\n");
     expect(plotValues(src, [5, 5])).toEqual([100, 100]);
   });
+
+  it("función con tupla literal de retorno destructurada en el llamador", () => {
+    // Reproduce el patrón dirmov() del DMI: la última línea es `[plus, minus]`
+    // (literal de tupla), NO una declaración `[a, b] = …`.
+    const src = [
+      "sumdiff(a, b) =>",
+      "    s = a + b",
+      "    d = a - b",
+      "    [s, d]",
+      "[suma, resta] = sumdiff(high, low)",
+      "plot(suma - resta)",
+    ].join("\n");
+    // suma - resta = (high+low) - (high-low) = 2*low; low = close - 1
+    expect(plotValues(src, [10, 20])).toEqual([2 * 9, 2 * 19]);
+  });
 });

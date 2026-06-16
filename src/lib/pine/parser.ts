@@ -182,8 +182,10 @@ class Parser {
       }
     }
 
-    // Destructuring de tupla: `[a, b] = expr` o `var [a, b] = expr`.
-    if (t.type === "op" && t.value === "[") {
+    // Destructuring de tupla: `[a, b] = expr` (solo si tras el `]` hay un `=`).
+    // Si no, `[a, b]` es un literal de tupla como expresión — p. ej. el valor de
+    // retorno de una función: `dirmov(len) => ... \n [plus, minus]`.
+    if (t.type === "op" && t.value === "[" && this.tupleDeclAhead()) {
       return this.parseTupleDecl(t, false);
     }
 
@@ -246,6 +248,28 @@ class Parser {
       this.peek(1).type === "ident"
     ) {
       this.advance();
+    }
+  }
+
+  /**
+   * Lookahead: ¿el `[` actual abre una desestructuración `[a, b] = …`?
+   * Escanea hasta el `]` que cierra y comprueba si le sigue un `=`. Si no,
+   * es un literal de tupla en posición de expresión (valor de retorno).
+   */
+  private tupleDeclAhead(): boolean {
+    let depth = 0;
+    for (let i = 0; ; i++) {
+      const tk = this.peek(i);
+      if (tk.type === "eof") return false;
+      if (tk.type === "op" && tk.value === "[") {
+        depth++;
+      } else if (tk.type === "op" && tk.value === "]") {
+        depth--;
+        if (depth === 0) {
+          const next = this.peek(i + 1);
+          return next.type === "op" && next.value === "=";
+        }
+      }
     }
   }
 
