@@ -2,6 +2,7 @@ import type {
   DrawingDefaults,
   IndicatorConfig,
   IndicatorKey,
+  PineScriptRecord,
   PriceLine,
   Theme,
 } from "@/lib/store/chart-store";
@@ -24,10 +25,13 @@ export interface SyncedState {
   priceLines: PriceLine[];
   drawings: Drawing[];
   drawingDefaults: DrawingDefaults;
+  /** Scripts Pine del usuario (añadido en v2 del documento) */
+  scripts: PineScriptRecord[];
 }
 
 export interface DriveSyncDocument {
-  version: 1;
+  /** v1: sin scripts. v2: SyncedState.scripts presente. Migración en lectura. */
+  version: 2;
   /** Epoch ms del momento en que se subió el documento (last-write-wins) */
   updatedAt: number;
   state: SyncedState;

@@ -14,6 +14,8 @@ import {
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching, indentUnit, syntaxHighlighting } from "@codemirror/language";
 import { lintGutter, lintKeymap } from "@codemirror/lint";
+import { autocompletion, completionKeymap } from "@codemirror/autocomplete";
+import { pineCompletions } from "@/lib/pine/editor/pine-complete";
 import type { Theme } from "@/lib/store/chart-store";
 import {
   pineHighlightDark,
@@ -130,7 +132,14 @@ export function PineEditor({ value, onChange, theme, className }: PineEditorProp
         dropCursor(),
         bracketMatching(),
         indentUnit.of("    "),
-        keymap.of([...defaultKeymap, ...historyKeymap, ...lintKeymap, indentWithTab]),
+        autocompletion({ override: [pineCompletions], icons: false }),
+        keymap.of([
+          ...completionKeymap,
+          ...defaultKeymap,
+          ...historyKeymap,
+          ...lintKeymap,
+          indentWithTab,
+        ]),
         pineLanguage,
         pineLinter(),
         lintGutter(),

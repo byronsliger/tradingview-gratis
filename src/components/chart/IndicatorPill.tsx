@@ -45,7 +45,9 @@ export function IndicatorPill({
       />
       <span className="font-medium text-tv-text">{name}</span>
       {error ? (
-        <AlertTriangle className="h-3 w-3 shrink-0 text-tv-red" aria-label="Error" />
+        <span title={error} aria-label={error} className="flex shrink-0">
+          <AlertTriangle className="h-3 w-3 text-tv-red" />
+        </span>
       ) : (
         value !== undefined && (
           <span className="tabular-nums text-tv-text-muted">{value}</span>

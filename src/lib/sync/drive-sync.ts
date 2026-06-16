@@ -75,11 +75,27 @@ function buildSnapshot(): SyncedState {
     priceLines: s.priceLines,
     drawings: s.drawings,
     drawingDefaults: s.drawingDefaults,
+    scripts: s.scripts,
   };
 }
 
 function makeDocument(): DriveSyncDocument {
-  return { version: 1, updatedAt: Date.now(), state: buildSnapshot() };
+  return { version: 2, updatedAt: Date.now(), state: buildSnapshot() };
+}
+
+/**
+ * Normaliza un documento descargado al formato v2. Los documentos v1 (sin
+ * `scripts`) se migran en lectura añadiendo `scripts: []` — last-write-wins
+ * por documento completo, así que no se pierde nada del resto del estado.
+ */
+function migrateDocument(doc: DriveSyncDocument): DriveSyncDocument {
+  // `scripts` ausente (o no array) ⇒ documento v1 ⇒ migrar a v2.
+  if (Array.isArray(doc.state?.scripts)) return doc;
+  return {
+    ...doc,
+    version: 2,
+    state: { ...doc.state, scripts: [] },
+  };
 }
 
 /**
@@ -96,6 +112,8 @@ function applyRemote(doc: DriveSyncDocument, full: boolean): void {
     indicators: { ...current.indicators, ...remote.indicators },
     hidden: { ...current.hidden, ...remote.hidden },
     config: { ...DEFAULT_CONFIG, ...remote.config },
+    // Scripts Pine: last-write-wins del array completo (igual que drawings).
+    scripts: remote.scripts ?? [],
   };
   if (full) {
     patch.theme = remote.theme ?? current.theme;
@@ -207,6 +225,8 @@ async function pullOnce(mode: SyncMode = "background"): Promise<void> {
       s.setStatus("synced");
       return;
     }
+    // Migración v1→v2 en lectura (añade scripts:[] si falta).
+    doc = migrateDocument(doc);
     const s = useSyncStore.getState();
     s.setFileId(fileId);
     if (!s.bootstrapped) {
@@ -257,7 +277,8 @@ function handleStoreChange(state: ChartSnapshot, prev: ChartSnapshot): void {
     state.indicators !== prev.indicators ||
     state.hidden !== prev.hidden ||
     state.config !== prev.config ||
-    state.drawingDefaults !== prev.drawingDefaults;
+    state.drawingDefaults !== prev.drawingDefaults ||
+    state.scripts !== prev.scripts;
   if (changed) schedulePush();
 }
 
