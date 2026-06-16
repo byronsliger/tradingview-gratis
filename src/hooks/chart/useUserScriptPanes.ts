@@ -32,6 +32,8 @@ interface ScriptEntry {
   series: AnySeries[];
   /** PlotSpec.style alineado con `series` (para saber cómo volcar los datos) */
   styles: PlotStyle[];
+  /** Último color de línea aplicado por serie (para color dinámico sin churn) */
+  lineColors: (string | undefined)[];
   /** Handles de las hline() creadas sobre la primera serie del script */
   priceLines: IPriceLine[];
   /** Plugin de markers sobre la primera serie (plotshape/plotchar) */
@@ -50,6 +52,15 @@ interface ScriptEntry {
 }
 
 type PlotStyle = PlotSpec["style"];
+
+/**
+ * Color totalmente transparente (#rrggbb00). Es el idioma de TradingView para
+ * "ocultar" un plot en ciertas barras (p. ej. `cond ? realColor : color.new(x, 100)`
+ * en indicadores de divergencia). En esas barras la línea se corta (hueco).
+ */
+function isFullyTransparent(color: string): boolean {
+  return color.length === 9 && color.slice(7, 9).toLowerCase() === "00";
+}
 
 /** Metadata por script para construir las pills de la leyenda. */
 export interface ScriptPillMeta {
@@ -163,9 +174,23 @@ export function useUserScriptPanes(
           );
         } else {
           // Line / stepline / area / circles / cross comparten el shape {time,value}.
-          (series as ISeriesApi<"Line" | "Area">).setData(
-            plot.points.map((p) => ({ time: p.time as UTCTimestamp, value: p.value })),
-          );
+          // Color dinámico: un punto totalmente transparente se vuelve hueco
+          // (whitespace) para que la línea solo se vea donde tiene color real
+          // (idioma de divergencias `cond ? color : color.new(x, 100)`).
+          let lineColor: string | undefined;
+          const data: ({ time: UTCTimestamp; value: number } | { time: UTCTimestamp })[] =
+            plot.points.map((p) => {
+              const c = p.color;
+              if (c && isFullyTransparent(c)) return { time: p.time as UTCTimestamp };
+              if (c && lineColor === undefined) lineColor = c;
+              return { time: p.time as UTCTimestamp, value: p.value };
+            });
+          (series as ISeriesApi<"Line" | "Area">).setData(data);
+          // Aplica el primer color real de la serie (solo si cambió, sin churn).
+          if (lineColor && entry.lineColors[i] !== lineColor) {
+            entry.lineColors[i] = lineColor;
+            series.applyOptions(style === "area" ? { lineColor } : { color: lineColor });
+          }
         }
         if (i === 0) {
           // Último valor finito del primer plot para la pill.
@@ -304,6 +329,7 @@ export function useUserScriptPanes(
           compiled: null,
           series: [],
           styles: [],
+          lineColors: [],
           priceLines: [],
           markers: null,
           lastValue: null,
