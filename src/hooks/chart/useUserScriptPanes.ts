@@ -20,6 +20,7 @@ import { compile, runScript, PineRuntimeError, type CompiledScript, type Compile
 import type { PlotSpec } from "@/lib/pine/types";
 import type { Candle } from "@/lib/binance/types";
 import type { PineScriptRecord } from "@/lib/store/chart-store";
+import { LineSegmentsPrimitive, type LineSegment } from "@/lib/chart/LineSegmentsPrimitive";
 
 const DEFAULT_PLOT_COLOR = "#2962ff";
 
@@ -34,6 +35,8 @@ interface ScriptEntry {
   styles: PlotStyle[];
   /** Último color de línea aplicado por serie (para color dinámico sin churn) */
   lineColors: (string | undefined)[];
+  /** Primitive de segmentos por serie (color por segmento, p. ej. divergencias) */
+  segments: (LineSegmentsPrimitive | null)[];
   /** Handles de las hline() creadas sobre la primera serie del script */
   priceLines: IPriceLine[];
   /** Plugin de markers sobre la primera serie (plotshape/plotchar) */
@@ -175,33 +178,47 @@ export function useUserScriptPanes(
         } else {
           // Line / stepline / area / circles / cross comparten el shape {time,value}.
           const pts = plot.points;
-          // Color dinámico por barra (p. ej. divergencias `cond ? color : color.new(x,100)`).
-          // TradingView pinta el segmento i-1→i con el color del punto i; si ese color
-          // es transparente, el segmento es invisible. Como lightweight-charts no soporta
-          // color por segmento, dejamos VALUE solo en los puntos que son extremo de algún
-          // segmento visible (color no transparente), y hueco (whitespace) en el resto.
-          // Resultado: la línea solo aparece donde el script la marca (las divergencias),
-          // sin las líneas espurias que recorrían todo el panel.
-          const hasDynColor = pts.some((p) => p.color !== undefined);
-          let lineColor: string | undefined;
-          let data: ({ time: UTCTimestamp; value: number } | { time: UTCTimestamp })[];
-          if (hasDynColor) {
-            const visible = pts.map((p) => p.color !== undefined && !isFullyTransparent(p.color));
-            lineColor = pts.find((p) => p.color && !isFullyTransparent(p.color))?.color;
-            data = pts.map((p, k) => {
-              const keep = visible[k] || (k + 1 < pts.length && visible[k + 1]);
-              return keep
-                ? { time: p.time as UTCTimestamp, value: p.value }
-                : { time: p.time as UTCTimestamp };
-            });
+          const lineSeries = series as ISeriesApi<"Line" | "Area">;
+          // La serie siempre lleva todos los datos (necesario para el autoescala).
+          lineSeries.setData(pts.map((p) => ({ time: p.time as UTCTimestamp, value: p.value })));
+
+          const hasTransparent = pts.some((p) => p.color !== undefined && isFullyTransparent(p.color));
+          if (style !== "area" && hasTransparent) {
+            // Idioma de divergencias: `cond ? color : color.new(x, 100)`. Cada segmento
+            // i-1→i se pinta con el color del punto i; transparente = invisible. Como un
+            // LineSeries no soporta color por segmento, ocultamos su línea (color
+            // transparente) y dibujamos los segmentos visibles con un primitive.
+            if (entry.lineColors[i] !== "__seg__") {
+              entry.lineColors[i] = "__seg__";
+              lineSeries.applyOptions({ color: "rgba(0,0,0,0)" });
+            }
+            const width = entry.compiled?.plots[i]?.linewidth ?? 1;
+            const segs: LineSegment[] = [];
+            for (let k = 1; k < pts.length; k++) {
+              const c = pts[k].color;
+              if (c && !isFullyTransparent(c)) {
+                segs.push({
+                  t1: pts[k - 1].time, p1: pts[k - 1].value,
+                  t2: pts[k].time, p2: pts[k].value,
+                  color: c, width,
+                });
+              }
+            }
+            let prim = entry.segments[i];
+            if (!prim) {
+              prim = new LineSegmentsPrimitive();
+              lineSeries.attachPrimitive(prim);
+              entry.segments[i] = prim;
+            }
+            prim.update(segs);
           } else {
-            data = pts.map((p) => ({ time: p.time as UTCTimestamp, value: p.value }));
-          }
-          (series as ISeriesApi<"Line" | "Area">).setData(data);
-          // Aplica el primer color real de la serie (solo si cambió, sin churn).
-          if (lineColor && entry.lineColors[i] !== lineColor) {
-            entry.lineColors[i] = lineColor;
-            series.applyOptions(style === "area" ? { lineColor } : { color: lineColor });
+            // Color dinámico sin transparencia (p. ej. ADX azul/naranja): un solo
+            // color por serie (primer color real) — limitación documentada.
+            const dyn = pts.find((p) => p.color && !isFullyTransparent(p.color))?.color;
+            if (dyn && entry.lineColors[i] !== dyn) {
+              entry.lineColors[i] = dyn;
+              lineSeries.applyOptions(style === "area" ? { lineColor: dyn } : { color: dyn });
+            }
           }
         }
         if (i === 0) {
@@ -317,6 +334,11 @@ export function useUserScriptPanes(
       for (const pl of entry.priceLines) {
         try { first?.removePriceLine(pl); } catch {}
       }
+      entry.segments.forEach((prim, idx) => {
+        if (prim) {
+          try { entry.series[idx]?.detachPrimitive(prim); } catch {}
+        }
+      });
       for (const s of entry.series) {
         try { chart?.removeSeries(s); } catch {}
       }
@@ -342,6 +364,7 @@ export function useUserScriptPanes(
           series: [],
           styles: [],
           lineColors: [],
+          segments: [],
           priceLines: [],
           markers: null,
           lastValue: null,
