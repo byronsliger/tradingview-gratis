@@ -441,6 +441,10 @@ function collectCalls(program: Program): CallExpr[] {
           if (stmt.step) visit(stmt.step);
           visitStmts(stmt.body);
           break;
+        case "forInStmt":
+          visit(stmt.iterable);
+          visitStmts(stmt.body);
+          break;
         case "funcDecl":
           visitStmts(stmt.body);
           break;

@@ -26,6 +26,8 @@ import {
 import { mathBuiltins } from "./builtins-math";
 import { taBuiltins } from "./builtins-ta";
 import { ExecutionContext } from "./context";
+import { PineArray } from "./arrays";
+import { arrayNewFromGeneric, callArrayMethod } from "./array-methods";
 import { PineObject, type FieldDef, type TypeDescriptor } from "./objects";
 import { Series } from "./series";
 import { TupleValue, type EvalValue } from "./values";
@@ -168,6 +170,9 @@ function execStmt(ctx: ExecutionContext, stmt: Stmt): void {
     case "forStmt":
       execFor(ctx, stmt);
       return;
+    case "forInStmt":
+      execForIn(ctx, stmt);
+      return;
     case "break":
       throw new LoopSignal("break");
     case "continue":
@@ -257,6 +262,46 @@ function execFor(ctx: ExecutionContext, stmt: Extract<Stmt, { kind: "forStmt" }>
   }
 }
 
+/**
+ * `for [i, v] in arr` / `for v in arr`. Itera sobre un snapshot del tamaño inicial
+ * del array (mutar el array durante la iteración no cambia el nº de vueltas). Iterar
+ * sobre `na` lanza (como Pine). Cada iteración consume fuel; soporta break/continue.
+ */
+function execForIn(ctx: ExecutionContext, stmt: Extract<Stmt, { kind: "forInStmt" }>): void {
+  const iterable = evalExprT(ctx, stmt.iterable);
+  if (iterable === null) {
+    throw new PineRuntimeError("No se puede iterar sobre un array na", stmt);
+  }
+  if (!(iterable instanceof PineArray)) {
+    throw new PineRuntimeError("'for ... in' requiere un array", stmt);
+  }
+
+  const scope = ctx.currentScope();
+  const valueSlot: { series: Series; isVar: boolean } = { series: new Series(), isVar: false };
+  scope.set(stmt.valueVar, valueSlot);
+  let indexSlot: { series: Series; isVar: boolean } | null = null;
+  if (stmt.indexVar !== null) {
+    indexSlot = { series: new Series(), isVar: false };
+    scope.set(stmt.indexVar, indexSlot);
+  }
+
+  const count = iterable.items.length; // snapshot del tamaño inicial
+  for (let i = 0; i < count; i++) {
+    ctx.consumeFuel(stmt); // cada iteración consume fuel
+    valueSlot.series.set(ctx.barIndex, iterable.items[i] ?? null);
+    if (indexSlot) indexSlot.series.set(ctx.barIndex, i);
+    try {
+      execBlock(ctx, stmt.body);
+    } catch (sig) {
+      if (sig instanceof LoopSignal) {
+        if (sig.kind === "break") break;
+        continue;
+      }
+      throw sig;
+    }
+  }
+}
+
 function evalExpr(ctx: ExecutionContext, e: Expr): PineValue {
   ctx.consumeFuel(e);
   switch (e.kind) {
@@ -315,6 +360,12 @@ function scalar(v: EvalValue, pos: SourcePos): PineValue {
   if (v instanceof PineObject) {
     throw new PineRuntimeError(
       `Se usó un objeto de tipo '${v.typeName}' donde se esperaba un valor escalar`,
+      pos,
+    );
+  }
+  if (v instanceof PineArray) {
+    throw new PineRuntimeError(
+      "Se usó un array donde se esperaba un valor escalar",
       pos,
     );
   }
@@ -509,7 +560,15 @@ function evalCallT(ctx: ExecutionContext, e: CallExpr): EvalValue {
     return constructObject(ctx, ctx.types.get(callee.target.name)!, e);
   }
 
+  // Método sobre un array: `arr.push(x)`, `arr.get(i)`, … El callee es un fieldAccess
+  // cuyo target evalúa a un PineArray. (Un fieldAccess que no resuelve a array da el
+  // error genérico de "método de objeto no soportado".)
   if (callee.kind === "fieldAccess") {
+    const target = evalExprT(ctx, callee.target);
+    if (target instanceof PineArray) {
+      const argValues = e.args.map((a) => evalExprT(ctx, a.value));
+      return callArrayMethod(target, callee.field, argValues, e);
+    }
     throw new PineRuntimeError(
       `'.${callee.field}()' no está soportado (los métodos de objeto llegan en una fase posterior)`,
       e,
@@ -530,6 +589,27 @@ function evalCallT(ctx: ExecutionContext, e: CallExpr): EvalValue {
   // por sitio de invocación.
   if (callee.kind === "ident" && ctx.functions.has(callee.name)) {
     return callUserFunction(ctx, e, callee.name);
+  }
+
+  // Namespace `array.*`: constructores (new/new_float/…) y forma funcional
+  // `array.metodo(arr, args)`. Los args se evalúan tuple-/array-/objeto-capable.
+  if (callee.kind === "member" && callee.object === "array") {
+    const argValues = e.args.map((a) => evalExprT(ctx, a.value));
+    if (callee.property.startsWith("new")) {
+      return arrayNewFromGeneric(callee.property, argValues, e);
+    }
+    // Forma funcional: el primer argumento es el array, el resto los parámetros.
+    if (argValues.length === 0) {
+      throw new PineRuntimeError(`'array.${callee.property}()' requiere el array como primer argumento`, e);
+    }
+    const arr = argValues[0];
+    if (!(arr instanceof PineArray)) {
+      throw new PineRuntimeError(
+        `El primer argumento de 'array.${callee.property}()' debe ser un array`,
+        e,
+      );
+    }
+    return callArrayMethod(arr, callee.property, argValues.slice(1), e);
   }
 
   const evaluated = evalArgs(ctx, e.args);

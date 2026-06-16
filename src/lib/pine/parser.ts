@@ -57,6 +57,7 @@ function isBlockStmt(stmt: Stmt): boolean {
   if (
     stmt.kind === "ifStmt" ||
     stmt.kind === "forStmt" ||
+    stmt.kind === "forInStmt" ||
     stmt.kind === "funcDecl" ||
     stmt.kind === "typeDecl"
   ) {
@@ -471,6 +472,14 @@ class Parser {
   private parseForStmt(): Stmt {
     const t = this.peek(); // 'for'
     this.advance();
+    // for-in: `for [i, v] in arr` o `for v in arr`. Se detecta por el `[` inicial
+    // (destructuring del par índice/valor) o por un identificador seguido de `in`.
+    if (this.check("op", "[")) {
+      return this.parseForInStmt(t, true);
+    }
+    if (this.check("ident") && this.peek(1).type === "ident" && this.peek(1).value === "in") {
+      return this.parseForInStmt(t, false);
+    }
     const name = this.expectIdent();
     this.expectOp("=", "Se esperaba '=' en el bucle for");
     const from = this.parseExpr();
@@ -494,6 +503,36 @@ class Parser {
       step,
       body,
       ...span(t, body[body.length - 1]),
+    };
+  }
+
+  /** `for [i, v] in arr` (withIndex) o `for v in arr` (¡el `in` es un ident, no keyword!). */
+  private parseForInStmt(forTok: Token, withIndex: boolean): Stmt {
+    let indexVar: string | null = null;
+    let valueVar: string;
+    if (withIndex) {
+      this.expectOp("[");
+      indexVar = this.expectIdent().value;
+      this.expectOp(",", "Se esperaba ',' en 'for [index, value]'");
+      valueVar = this.expectIdent().value;
+      this.expectOp("]", "Se esperaba ']' en 'for [index, value]'");
+    } else {
+      valueVar = this.expectIdent().value;
+    }
+    if (!(this.check("ident") && this.peek().value === "in")) {
+      throw this.fail(this.peek(), "Se esperaba 'in' en el bucle for-in");
+    }
+    this.advance(); // 'in'
+    const iterable = this.parseExpr();
+    this.expectStatementEnd();
+    const body = this.parseBlock();
+    return {
+      kind: "forInStmt",
+      indexVar,
+      valueVar,
+      iterable,
+      body,
+      ...span(forTok, body[body.length - 1]),
     };
   }
 
@@ -641,6 +680,14 @@ class Parser {
             ...span(expr, prop),
           } satisfies FieldAccess;
         }
+      } else if (
+        this.check("op", "<") &&
+        expr.kind === "member" &&
+        this.genericBeforeCall()
+      ) {
+        // Genérico informativo de una llamada: `array.new<float>()`. Se consume y
+        // descarta el `<...>` (el runtime es dinámico). Solo si tras el `>` viene `(`.
+        this.consumeGeneric();
       } else if (this.check("op", "(")) {
         if (expr.kind !== "ident" && expr.kind !== "member" && expr.kind !== "fieldAccess") {
           throw this.fail(this.peek(), "Esta expresión no es invocable");
@@ -664,6 +711,41 @@ class Parser {
       }
     }
     return expr;
+  }
+
+  /**
+   * Lookahead: ¿el `<` actual abre un genérico de constructor (`<float>(`) en vez de
+   * una comparación? Verdadero solo si tras el `>` que cierra (balanceando `<>` y sin
+   * cruzar NEWLINE) viene un `(`. Así `a < b` (comparación) no se confunde.
+   */
+  private genericBeforeCall(): boolean {
+    let depth = 0;
+    for (let i = 0; ; i++) {
+      const tk = this.peek(i);
+      if (tk.type === "eof" || tk.type === "newline") return false;
+      if (tk.type === "op" && tk.value === "<") depth++;
+      else if (tk.type === "op" && tk.value === ">") {
+        depth--;
+        if (depth === 0) {
+          const after = this.peek(i + 1);
+          return after.type === "op" && after.value === "(";
+        }
+      } else if (tk.type === "op" && (tk.value === "(" || tk.value === ")")) {
+        // Un paréntesis dentro del supuesto genérico → no es un genérico.
+        return false;
+      }
+    }
+  }
+
+  /** Consume y descarta `<...>` balanceado (genérico informativo). */
+  private consumeGeneric(): void {
+    this.expectOp("<");
+    let depth = 1;
+    while (depth > 0 && !this.check("eof") && !this.check("newline")) {
+      const tk = this.advance();
+      if (tk.type === "op" && tk.value === "<") depth++;
+      else if (tk.type === "op" && tk.value === ">") depth--;
+    }
   }
 
   private parseCallArgs(): { args: CallArg[]; closeTok: Token } {

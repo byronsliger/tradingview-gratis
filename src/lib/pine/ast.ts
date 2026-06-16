@@ -12,6 +12,7 @@ export type Stmt =
   | ExprStmt
   | IfStmt
   | ForStmt
+  | ForInStmt
   | BreakStmt
   | ContinueStmt
   | FuncDeclStmt
@@ -68,6 +69,16 @@ export interface ForStmt extends SourcePos {
   from: Expr;
   to: Expr;
   step: Expr | null;
+  body: Stmt[];
+}
+
+/** `for [index, value] in arr \n <block>` o `for value in arr \n <block>`. */
+export interface ForInStmt extends SourcePos {
+  kind: "forInStmt";
+  /** Variable de índice (forma `[i, v]`); null en la forma `v`. */
+  indexVar: string | null;
+  valueVar: string;
+  iterable: Expr;
   body: Stmt[];
 }
 
