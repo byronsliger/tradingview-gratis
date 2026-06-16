@@ -37,6 +37,7 @@ export type Expr =
   | StringLit
   | BoolLit
   | ColorLit
+  | ArrayLit
   | Identifier
   | MemberExpr
   | CallExpr
@@ -63,6 +64,12 @@ export interface BoolLit extends SourcePos {
 export interface ColorLit extends SourcePos {
   kind: "color";
   value: string;
+}
+
+/** Array literal `[a, b, c]` — solo soportado como `options=` de input.* (Fase 4). */
+export interface ArrayLit extends SourcePos {
+  kind: "array";
+  elements: Expr[];
 }
 
 export interface Identifier extends SourcePos {

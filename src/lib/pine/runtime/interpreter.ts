@@ -10,12 +10,17 @@ import type {
   Stmt,
 } from "../ast";
 import { PineRuntimeError, type SourcePos } from "../errors";
-import type { PineValue, RunOptions } from "../types";
+import type { InputDef, PineValue, RunOptions } from "../types";
 import {
   COLOR_CONSTANTS,
+  HLINE_PARAMS,
   INDICATOR_PARAMS,
+  NAMESPACE_CONSTANTS,
+  PLOTCHAR_PARAMS,
+  PLOTSHAPE_PARAMS,
   PLOT_PARAMS,
   SERIES_BUILTINS,
+  SOURCE_NAMES,
 } from "./builtins-core";
 import { mathBuiltins } from "./builtins-math";
 import { taBuiltins } from "./builtins-ta";
@@ -38,8 +43,9 @@ export function runProgram(
   candles: Candle[],
   inputs: Record<string, number | string | boolean> = {},
   options?: RunOptions,
+  inputDefs: InputDef[] = [],
 ): ExecutionContext {
-  const ctx = new ExecutionContext(candles, inputs, options);
+  const ctx = new ExecutionContext(candles, inputs, options, inputDefs);
   for (let bar = 0; bar < candles.length; bar++) {
     ctx.startBar(bar);
     for (const stmt of program.statements) execStmt(ctx, stmt);
@@ -119,6 +125,11 @@ function evalExpr(ctx: ExecutionContext, e: Expr): PineValue {
     }
     case "hist":
       return evalHist(ctx, e);
+    case "array":
+      throw new PineRuntimeError(
+        "Los arrays solo están soportados como 'options' de input.*",
+        e,
+      );
   }
 }
 
@@ -135,6 +146,13 @@ function evalMember(ctx: ExecutionContext, e: MemberExpr): PineValue {
     const c = COLOR_CONSTANTS[e.property];
     if (c !== undefined) return c;
     throw new PineRuntimeError(`'color.${e.property}' no existe`, e);
+  }
+  // Constantes de namespace: plot.style_*, hline.style_*, location.*, shape.*, size.*
+  const nsTable = NAMESPACE_CONSTANTS[e.object];
+  if (nsTable && e.object !== "color") {
+    const v = nsTable[e.property];
+    if (v !== undefined) return v;
+    throw new PineRuntimeError(`'${e.object}.${e.property}' no existe`, e);
   }
   if (e.object === "math") {
     const v = MATH_CONSTANTS[e.property];
@@ -209,20 +227,51 @@ function mapArgs(
 }
 
 function evalCall(ctx: ExecutionContext, e: CallExpr): PineValue {
-  const evaluated = evalArgs(ctx, e.args);
   const callee = e.callee;
+
+  // input.*()/input(): NO evalúa los args (son constantes ya extraídas por
+  // analyze; además el defval de input.source es un identificador, no un valor).
+  if (
+    (callee.kind === "ident" && callee.name === "input") ||
+    (callee.kind === "member" && callee.object === "input")
+  ) {
+    return resolveInput(ctx, e);
+  }
+
+  const evaluated = evalArgs(ctx, e.args);
 
   if (callee.kind === "ident") {
     switch (callee.name) {
       case "plot": {
         const mapped = mapArgs(e, evaluated, PLOT_PARAMS, 1);
         const v = mapped[0];
-        ctx.recordPlot(e.callSiteId, typeof v === "number" && Number.isFinite(v) ? v : null);
+        const c = mapped[2];
+        ctx.recordPlot(
+          e.callSiteId,
+          typeof v === "number" && Number.isFinite(v) ? v : null,
+          typeof c === "string" ? c : null,
+        );
         return null;
       }
       case "indicator":
         mapArgs(e, evaluated, INDICATOR_PARAMS, 0);
         return null;
+      case "hline":
+        // Estática: analyze ya extrajo el HLineSpec; en runtime es un no-op.
+        mapArgs(e, evaluated, HLINE_PARAMS, 1);
+        return null;
+      case "plotshape": {
+        const mapped = mapArgs(e, evaluated, PLOTSHAPE_PARAMS, 1);
+        const c = mapped[4];
+        ctx.recordShape(e.callSiteId, toBool(mapped[0] ?? null), typeof c === "string" ? c : null);
+        return null;
+      }
+      case "plotchar": {
+        const mapped = mapArgs(e, evaluated, PLOTCHAR_PARAMS, 1);
+        const c = mapped[4];
+        ctx.recordShape(e.callSiteId, toBool(mapped[0] ?? null), typeof c === "string" ? c : null);
+        return null;
+      }
       case "nz": {
         const mapped = mapArgs(e, evaluated, ["source", "replacement"], 1);
         const v = mapped[0];
@@ -233,10 +282,6 @@ function evalCall(ctx: ExecutionContext, e: CallExpr): PineValue {
         const mapped = mapArgs(e, evaluated, ["source"], 1);
         return mapped[0] === null;
       }
-      case "hline":
-      case "plotshape":
-      case "plotchar":
-      case "input":
       case "alertcondition":
         throw new PineRuntimeError(
           `'${callee.name}()' aún no está soportado (llega en una fase posterior)`,
@@ -259,10 +304,41 @@ function evalCall(ctx: ExecutionContext, e: CallExpr): PineValue {
     const mapped = mapArgs(e, evaluated, builtin.params, builtin.required, builtin.variadic === true);
     return builtin.fn(mapped);
   }
-  if (callee.object === "input") {
-    throw new PineRuntimeError(`'input.${callee.property}()' llega en Fase 4`, e);
-  }
   throw new PineRuntimeError(`Función '${callee.object}.${callee.property}' desconocida`, e);
+}
+
+/**
+ * Resuelve un input.*() en runtime: override del usuario (por id) → defval.
+ * Devuelve el mismo valor en todas las barras (salvo source, que lee la serie).
+ */
+function resolveInput(ctx: ExecutionContext, e: CallExpr): PineValue {
+  const def = ctx.inputDef(e.callSiteId);
+  if (!def) {
+    throw new PineRuntimeError("input.* sin definición analizada (error interno)", e);
+  }
+  const override = ctx.inputs[def.id];
+  const raw = override !== undefined ? override : def.defval;
+  switch (def.type) {
+    case "int":
+    case "float": {
+      let n = typeof raw === "number" ? raw : Number(raw);
+      if (!Number.isFinite(n)) n = Number(def.defval);
+      if (def.type === "int") n = Math.round(n);
+      if (def.minval !== undefined && n < def.minval) n = def.minval;
+      if (def.maxval !== undefined && n > def.maxval) n = def.maxval;
+      return n;
+    }
+    case "bool":
+      return raw === true || raw === "true" || raw === 1;
+    case "string":
+    case "color":
+      return String(raw);
+    case "source": {
+      const name = String(raw);
+      const src = SOURCE_NAMES.has(name) ? name : String(def.defval);
+      return builtinSeriesValue(ctx, src, ctx.barIndex);
+    }
+  }
 }
 
 function evalHist(ctx: ExecutionContext, e: HistAccess): PineValue {

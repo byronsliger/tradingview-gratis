@@ -1,6 +1,6 @@
 import type { Candle } from "@/lib/binance/types";
 import { PineRuntimeError, type SourcePos } from "../errors";
-import type { RunOptions } from "../types";
+import type { InputDef, RunOptions } from "../types";
 import { Series } from "./series";
 
 export const DEFAULT_FUEL_PER_BAR = 50_000;
@@ -20,19 +20,39 @@ export class ExecutionContext {
   readonly vars = new Map<string, VarSlot>();
   /** Resultado de plot() por callSiteId; sparse cuando hay na. */
   readonly plotValues = new Map<number, (number | null)[]>();
+  /** Color dinámico por barra de cada plot(); solo se puebla si llega un color. */
+  readonly plotColors = new Map<number, (string | undefined)[]>();
+  /**
+   * Barras disparadas de cada plotshape/plotchar (por callSiteId).
+   * Valor: color dinámico (string) o null (usar el color del spec).
+   * Las barras no disparadas quedan como huecos (undefined).
+   */
+  readonly shapeMarks = new Map<number, (string | null | undefined)[]>();
 
   private readonly callSiteStates = new Map<number, unknown>();
   private readonly hiddenSeries = new Map<number, Series>();
+  private readonly inputDefsByCallSite = new Map<number, InputDef>();
   private fuelBar = 0;
   private fuelTotal = 0;
   private readonly maxFuelPerBar: number;
   private readonly maxFuelTotal: number;
 
-  constructor(candles: Candle[], inputs: Record<string, number | string | boolean>, options?: RunOptions) {
+  constructor(
+    candles: Candle[],
+    inputs: Record<string, number | string | boolean>,
+    options?: RunOptions,
+    inputDefs: InputDef[] = [],
+  ) {
     this.candles = candles;
     this.inputs = inputs;
     this.maxFuelPerBar = options?.maxFuelPerBar ?? DEFAULT_FUEL_PER_BAR;
     this.maxFuelTotal = options?.maxFuelTotal ?? DEFAULT_FUEL_TOTAL;
+    for (const def of inputDefs) this.inputDefsByCallSite.set(def.callSiteId, def);
+  }
+
+  /** InputDef del input.*() en ese call-site (extraído por analyze). */
+  inputDef(callSiteId: number): InputDef | undefined {
+    return this.inputDefsByCallSite.get(callSiteId);
   }
 
   startBar(barIndex: number): void {
@@ -76,12 +96,30 @@ export class ExecutionContext {
     return s;
   }
 
-  recordPlot(callSiteId: number, value: number | null): void {
+  recordPlot(callSiteId: number, value: number | null, color: string | null = null): void {
     let arr = this.plotValues.get(callSiteId);
     if (!arr) {
       arr = [];
       this.plotValues.set(callSiteId, arr);
     }
     arr[this.barIndex] = value;
+    if (color !== null) {
+      let colors = this.plotColors.get(callSiteId);
+      if (!colors) {
+        colors = [];
+        this.plotColors.set(callSiteId, colors);
+      }
+      colors[this.barIndex] = color;
+    }
+  }
+
+  /** Marca (o no) la barra actual de un plotshape/plotchar. */
+  recordShape(callSiteId: number, triggered: boolean, color: string | null): void {
+    let arr = this.shapeMarks.get(callSiteId);
+    if (!arr) {
+      arr = [];
+      this.shapeMarks.set(callSiteId, arr);
+    }
+    if (triggered) arr[this.barIndex] = color;
   }
 }

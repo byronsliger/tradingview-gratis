@@ -258,6 +258,23 @@ class Parser {
           this.expectOp(")", "Se esperaba ')'");
           return inner;
         }
+        if (t.value === "[") {
+          // Array literal: solo tiene sentido como `options=[...]` de input.*
+          this.advance();
+          const elements: Expr[] = [];
+          if (!this.check("op", "]")) {
+            for (;;) {
+              elements.push(this.parseExpr());
+              if (this.check("op", ",")) {
+                this.advance();
+                continue;
+              }
+              break;
+            }
+          }
+          const closeTok = this.expectOp("]", "Se esperaba ']' del array");
+          return { kind: "array", elements, ...span(t, closeTok) };
+        }
         break;
       default:
         break;
