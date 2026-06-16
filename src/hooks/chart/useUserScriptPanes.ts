@@ -174,17 +174,29 @@ export function useUserScriptPanes(
           );
         } else {
           // Line / stepline / area / circles / cross comparten el shape {time,value}.
-          // Color dinámico: un punto totalmente transparente se vuelve hueco
-          // (whitespace) para que la línea solo se vea donde tiene color real
-          // (idioma de divergencias `cond ? color : color.new(x, 100)`).
+          const pts = plot.points;
+          // Color dinámico por barra (p. ej. divergencias `cond ? color : color.new(x,100)`).
+          // TradingView pinta el segmento i-1→i con el color del punto i; si ese color
+          // es transparente, el segmento es invisible. Como lightweight-charts no soporta
+          // color por segmento, dejamos VALUE solo en los puntos que son extremo de algún
+          // segmento visible (color no transparente), y hueco (whitespace) en el resto.
+          // Resultado: la línea solo aparece donde el script la marca (las divergencias),
+          // sin las líneas espurias que recorrían todo el panel.
+          const hasDynColor = pts.some((p) => p.color !== undefined);
           let lineColor: string | undefined;
-          const data: ({ time: UTCTimestamp; value: number } | { time: UTCTimestamp })[] =
-            plot.points.map((p) => {
-              const c = p.color;
-              if (c && isFullyTransparent(c)) return { time: p.time as UTCTimestamp };
-              if (c && lineColor === undefined) lineColor = c;
-              return { time: p.time as UTCTimestamp, value: p.value };
+          let data: ({ time: UTCTimestamp; value: number } | { time: UTCTimestamp })[];
+          if (hasDynColor) {
+            const visible = pts.map((p) => p.color !== undefined && !isFullyTransparent(p.color));
+            lineColor = pts.find((p) => p.color && !isFullyTransparent(p.color))?.color;
+            data = pts.map((p, k) => {
+              const keep = visible[k] || (k + 1 < pts.length && visible[k + 1]);
+              return keep
+                ? { time: p.time as UTCTimestamp, value: p.value }
+                : { time: p.time as UTCTimestamp };
             });
+          } else {
+            data = pts.map((p) => ({ time: p.time as UTCTimestamp, value: p.value }));
+          }
           (series as ISeriesApi<"Line" | "Area">).setData(data);
           // Aplica el primer color real de la serie (solo si cambió, sin churn).
           if (lineColor && entry.lineColors[i] !== lineColor) {
