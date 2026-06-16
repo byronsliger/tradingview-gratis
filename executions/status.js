@@ -4,7 +4,7 @@
 module.exports = {
   updatedAt: "2026-06-16T15:15:00Z",
   currentPhase: 6,
-  branch: "pinescript (sale de master@cbdea78=Fase 3; Fases 1-3 estan en master, Fase 4 en adelante en pinescript)",
+  branch: "master (pinescript fusionado a master por fast-forward; TODO el trabajo Fases 1-6 + fixes de divergencias ya esta en master). Antes los fixes solo estaban en pinescript, por eso el usuario que corria master veia 'igual'.",
   done: [
     "Plan aprobado y guardado en plans/pine-script-engine.md",
     "Carpeta executions/ creada con este archivo de estado",
