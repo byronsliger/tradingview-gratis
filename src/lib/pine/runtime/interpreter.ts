@@ -564,25 +564,34 @@ function evalSyminfoConst(ctx: ExecutionContext, e: MemberExpr): PineValue {
 }
 
 /**
- * barstate.* — todas las barras son históricas en el motor (no hay realtime):
- * isfirst (barra 0), islast/islastconfirmedhistory (última barra), ishistory true,
- * isnew true (una pasada por barra), isrealtime false (documentado).
+ * barstate.* — modelamos la ÚLTIMA vela como la barra "en formación" (realtime),
+ * igual que TradingView: la última vela del feed (REST/WS) es el periodo en curso,
+ * aún sin cerrar. Por eso:
+ *  - islast = última barra (la viva).
+ *  - islastconfirmedhistory = PENÚLTIMA barra (el último periodo CERRADO). Clave
+ *    para que indicadores tipo SMC anclen sus niveles (PDH/PDL) al día anterior
+ *    cerrado y no al día en curso.
+ *  - isrealtime = false: el motor no re-ejecuta por tick, así que los caminos
+ *    `isrealtime and newBar` no corren (evita que el nivel salte al día en curso).
  */
 function evalBarstateConst(ctx: ExecutionContext, e: MemberExpr): PineValue {
   const last = ctx.candles.length - 1;
+  // Penúltima barra = último periodo cerrado (la última se considera en formación).
+  const lastConfirmed = last > 0 ? last - 1 : 0;
   switch (e.property) {
     case "isfirst":
       return ctx.barIndex === 0;
     case "islast":
-    case "islastconfirmedhistory":
       return ctx.barIndex === last;
+    case "islastconfirmedhistory":
+      return ctx.barIndex === lastConfirmed;
     case "ishistory":
       return true;
     case "isnew":
       return true;
     case "isrealtime":
     case "isconfirmed":
-      // En el motor no hay realtime: todas las barras son históricas confirmadas.
+      // En el motor no hay realtime por tick: todas las barras son históricas.
       return e.property === "isconfirmed";
     default:
       throw new PineRuntimeError(`'barstate.${e.property}' aún no está soportado`, e);

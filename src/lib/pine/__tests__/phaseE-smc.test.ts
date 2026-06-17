@@ -98,6 +98,29 @@ describe("LuxAlgo SMC end-to-end", () => {
     expect(() => runWith({ Style: "Monochrome" })).not.toThrow();
   });
 
+  it("los niveles diarios usan el día CERRADO anterior (penúltima vela), no el actual", () => {
+    // La última vela se considera 'en formación' (realtime), así que
+    // barstate.islastconfirmedhistory cae en la penúltima → drawLevels ancla
+    // PDH/PDL al día cerrado anterior, como TradingView.
+    const n = 40;
+    const daily: Candle[] = [];
+    let p = 100;
+    for (let i = 0; i < n; i++) {
+      const o = p; p = p + 1;
+      daily.push({ time: 1_700_000_000 + i * 86400, open: o, high: 100 + i + 5, low: 100 + i - 5, close: p, volume: 100 });
+    }
+    const res = compile(SRC);
+    if (!res.ok) throw new Error("no compila");
+    const out = runScript(res.script, daily, {
+      Daily: true, "Show Internal Structure": false, "Show Swing Structure": false,
+      "Internal Order Blocks": false, "Show Strong/Weak High/Low": false,
+    }, undefined, { symbol: "BTCUSDT", timeframe: "D", htf: { D: daily } });
+    const topLevels = out.drawings!.lines.map((l) => l.p1.price);
+    // high de la penúltima vela (día cerrado) = 143; la última (en formación) = 144.
+    expect(topLevels).toContain(daily[n - 2].high);
+    expect(topLevels).not.toContain(daily[n - 1].high);
+  });
+
   it("no lanza al mitigar order blocks (for-in que muta el array durante 1500 velas)", () => {
     // Serie larga con ondas → crea y mitiga order blocks, ejercitando
     // deleteOrderBlocks (remove(index) dentro de un for-in). Regresión del
