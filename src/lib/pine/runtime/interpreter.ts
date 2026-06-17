@@ -11,7 +11,7 @@ import type {
   Stmt,
 } from "../ast";
 import { PineRuntimeError, type SourcePos } from "../errors";
-import type { InputDef, PineValue, RunOptions } from "../types";
+import type { InputDef, PineValue, RunContext, RunOptions } from "../types";
 import {
   COLOR_CONSTANTS,
   HLINE_PARAMS,
@@ -38,7 +38,14 @@ import {
 } from "./draw-methods";
 import { ChartPoint, PineBox, PineLabel, PineLine } from "./drawings";
 import { PineObject, type FieldDef, type TypeDescriptor } from "./objects";
+import {
+  BARMERGE_LOOKAHEAD_ON,
+  evalRequestSecurity,
+  lookaheadArgExpr,
+  timeframeArgExpr,
+} from "./security";
 import { Series } from "./series";
+import { parseTimeframe, periodId } from "./timeframe";
 import { TupleValue, type EvalValue } from "./values";
 
 const MATH_CONSTANTS: Record<string, number> = {
@@ -59,8 +66,9 @@ export function runProgram(
   options?: RunOptions,
   inputDefs: InputDef[] = [],
   limits?: DrawingLimits,
+  runCtx?: RunContext,
 ): ExecutionContext {
-  const ctx = new ExecutionContext(candles, inputs, options, inputDefs, limits);
+  const ctx = new ExecutionContext(candles, inputs, options, inputDefs, limits, runCtx);
   // Registrar funciones de usuario y tipos (UDTs) antes de ejecutar barras (hoisting).
   for (const stmt of program.statements) {
     if (stmt.kind === "funcDecl") {
@@ -498,7 +506,122 @@ function evalMember(ctx: ExecutionContext, e: MemberExpr): PineValue {
   if (e.object === "ta" && e.property === "tr") {
     return scalar(taBuiltins.tr.fn(ctx, e.nodeId, []), e);
   }
+  if (e.object === "barmerge") return evalBarmergeConst(e);
+  if (e.object === "syminfo") return evalSyminfoConst(ctx, e);
+  if (e.object === "barstate") return evalBarstateConst(ctx, e);
+  if (e.object === "timeframe") return evalTimeframeConst(ctx, e);
   throw new PineRuntimeError(`'${e.object}.${e.property}' no está soportado como valor`, e);
+}
+
+/** barmerge.lookahead_on/off, barmerge.gaps_on/off → strings simbólicos. */
+function evalBarmergeConst(e: MemberExpr): PineValue {
+  switch (e.property) {
+    case "lookahead_on":
+      return "lookahead_on";
+    case "lookahead_off":
+      return "lookahead_off";
+    case "gaps_on":
+      return "gaps_on";
+    case "gaps_off":
+      return "gaps_off";
+    default:
+      throw new PineRuntimeError(`'barmerge.${e.property}' no existe`, e);
+  }
+}
+
+/** syminfo.tickerid/.ticker → símbolo del runCtx (o ""); resto mínimo. */
+function evalSyminfoConst(ctx: ExecutionContext, e: MemberExpr): PineValue {
+  switch (e.property) {
+    case "tickerid":
+    case "ticker":
+      return ctx.symbol;
+    case "prefix":
+      return "";
+    case "mintick":
+      return 0;
+    default:
+      throw new PineRuntimeError(`'syminfo.${e.property}' aún no está soportado`, e);
+  }
+}
+
+/**
+ * barstate.* — todas las barras son históricas en el motor (no hay realtime):
+ * isfirst (barra 0), islast/islastconfirmedhistory (última barra), ishistory true,
+ * isnew true (una pasada por barra), isrealtime false (documentado).
+ */
+function evalBarstateConst(ctx: ExecutionContext, e: MemberExpr): PineValue {
+  const last = ctx.candles.length - 1;
+  switch (e.property) {
+    case "isfirst":
+      return ctx.barIndex === 0;
+    case "islast":
+    case "islastconfirmedhistory":
+      return ctx.barIndex === last;
+    case "ishistory":
+      return true;
+    case "isnew":
+      return true;
+    case "isrealtime":
+    case "isconfirmed":
+      // En el motor no hay realtime: todas las barras son históricas confirmadas.
+      return e.property === "isconfirmed";
+    default:
+      throw new PineRuntimeError(`'barstate.${e.property}' aún no está soportado`, e);
+  }
+}
+
+/** timeframe.period/multiplier/isdaily/isweekly/ismonthly (del tf actual). */
+function evalTimeframeConst(ctx: ExecutionContext, e: MemberExpr): PineValue {
+  const info = parseTimeframe(ctx.timeframe);
+  switch (e.property) {
+    case "period":
+      return ctx.timeframe;
+    case "multiplier":
+      return info ? info.multiplier : null;
+    case "isdaily":
+      return info?.unit === "day";
+    case "isweekly":
+      return info?.unit === "week";
+    case "ismonthly":
+      return info?.unit === "month";
+    case "isintraday":
+      return info?.unit === "minute";
+    case "isseconds":
+      return false;
+    case "isminutes":
+      return info?.unit === "minute";
+    default:
+      throw new PineRuntimeError(`'timeframe.${e.property}' aún no está soportado`, e);
+  }
+}
+
+/**
+ * Llamadas timeframe.*: in_seconds(tf?) → segundos del tf (o del actual);
+ * change(tf) → true en la primera barra de un nuevo periodo del tf dado.
+ */
+function evalTimeframeCall(ctx: ExecutionContext, e: CallExpr, prop: string): PineValue {
+  const argExprs = e.args.map((a) => a.value);
+  if (prop === "in_seconds") {
+    const tf =
+      argExprs.length > 0 ? evalExpr(ctx, argExprs[0]) : ctx.timeframe;
+    const tfStr = typeof tf === "string" ? tf : ctx.timeframe;
+    const info = parseTimeframe(tfStr === "" ? ctx.timeframe : tfStr);
+    return info ? info.seconds : null;
+  }
+  if (prop === "change") {
+    if (argExprs.length === 0) {
+      throw new PineRuntimeError("timeframe.change() requiere un timeframe", e);
+    }
+    const tf = evalExpr(ctx, argExprs[0]);
+    const tfStr = typeof tf === "string" ? tf : "";
+    const info = parseTimeframe(tfStr);
+    if (!info) return false;
+    const cur = ctx.candles[ctx.barIndex];
+    if (ctx.barIndex === 0) return true; // primera barra = inicio de periodo
+    const prev = ctx.candles[ctx.barIndex - 1];
+    return periodId(cur.time, info) !== periodId(prev.time, info);
+  }
+  throw new PineRuntimeError(`'timeframe.${prop}()' aún no está soportado`, e);
 }
 
 interface EvaluatedArg {
@@ -630,6 +753,25 @@ function evalCallT(ctx: ExecutionContext, e: CallExpr): EvalValue {
   // por sitio de invocación.
   if (callee.kind === "ident" && ctx.functions.has(callee.name)) {
     return callUserFunction(ctx, e, callee.name);
+  }
+
+  // request.security(symbol, timeframe, expr, lookahead?, gaps?): el 3er arg (expr)
+  // NO se evalúa como escalar (puede ser una serie builtin o una tupla); el módulo
+  // security lo interpreta. Aquí solo resolvemos timeframe y lookahead a escalares.
+  if (callee.kind === "member" && callee.object === "request" && callee.property === "security") {
+    const tfExpr = timeframeArgExpr(e);
+    if (!tfExpr) throw new PineRuntimeError("request.security requiere un timeframe", e);
+    const tfValue = evalExpr(ctx, tfExpr);
+    const lookaheadExpr = lookaheadArgExpr(e);
+    const lookaheadOn = lookaheadExpr
+      ? evalExpr(ctx, lookaheadExpr) === BARMERGE_LOOKAHEAD_ON
+      : false;
+    return evalRequestSecurity(ctx, e, typeof tfValue === "string" ? tfValue : "", lookaheadOn);
+  }
+
+  // timeframe.in_seconds(tf?) / timeframe.change(tf): builtins temporales con args.
+  if (callee.kind === "member" && callee.object === "timeframe") {
+    return evalTimeframeCall(ctx, e, callee.property);
   }
 
   // Namespace `array.*`: constructores (new/new_float/…) y forma funcional

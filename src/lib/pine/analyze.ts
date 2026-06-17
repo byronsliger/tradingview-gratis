@@ -37,13 +37,15 @@ export interface Analysis {
   shapes: ShapeSpec[];
   candleSpecs: CandleSpec[];
   limits: DrawingLimitsSpec;
+  /** Timeframes pedidos vía request.security (literales o input con default literal). */
+  requestedTimeframes: string[];
   warnings: Diagnostic[];
   errors: Diagnostic[];
 }
 
 const TOP_OF_FILE: SourcePos = { line: 1, col: 1, start: 0, end: 0 };
 
-const INPUT_TYPES = new Set(["int", "float", "bool", "string", "color", "source"]);
+const INPUT_TYPES = new Set(["int", "float", "bool", "string", "color", "source", "timeframe"]);
 const HLINE_DEFAULT_COLOR = "#787B86";
 
 /**
@@ -270,7 +272,87 @@ export function analyze(program: Program): Analysis {
     warn(TOP_OF_FILE, "El script no tiene ningún plot(): no dibujará nada");
   }
 
-  return { meta, plots, inputs, hlines, shapes, candleSpecs, limits, warnings, errors };
+  // ---- requestedTimeframes (request.security) -----------------------------
+  const requestedTimeframes = collectRequestedTimeframes(program, calls);
+
+  return {
+    meta,
+    plots,
+    inputs,
+    hlines,
+    shapes,
+    candleSpecs,
+    limits,
+    requestedTimeframes,
+    warnings,
+    errors,
+  };
+}
+
+/**
+ * Extrae los timeframes que el script pide vía request.security. Resuelve el 2º
+ * argumento (timeframe) si es: (a) un string literal, o (b) una variable ligada a
+ * un input.timeframe/input.string/input() con default string literal. Los tf
+ * dinámicos (no resolubles) se omiten (la app no puede prefetchearlos).
+ *
+ * NOTA: drawLevels()/inputs cuyo timeframe acaba en una de esas variables ya quedan
+ * cubiertos: el alias variable→default se resuelve aquí. El '' (timeframe del chart)
+ * se descarta.
+ */
+function collectRequestedTimeframes(program: Program, calls: CallExpr[]): string[] {
+  // Mapa de variable → string default, para variables ligadas a input.timeframe/
+  // input.string/input() cuyo defval sea un literal string.
+  const varDefaults = new Map<string, string>();
+  for (const stmt of program.statements) {
+    if (stmt.kind !== "varDecl") continue;
+    if (stmt.init.kind !== "call") continue;
+    const callee = stmt.init.callee;
+    const isInput =
+      (callee.kind === "ident" && callee.name === "input") ||
+      (callee.kind === "member" && callee.object === "input");
+    if (!isInput) continue;
+    const params =
+      callee.kind === "member" ? INPUT_PARAMS[callee.property] : INPUT_PARAMS.generic;
+    if (!params) continue;
+    const defvalExpr = argExpr(stmt.init, params, "defval");
+    const lit = defvalExpr ? literalOf(defvalExpr) : undefined;
+    if (typeof lit === "string") varDefaults.set(stmt.name, lit);
+  }
+
+  const out = new Set<string>();
+  const securityCalls = calls.filter(
+    (c) => c.callee.kind === "member" && c.callee.object === "request" && c.callee.property === "security",
+  );
+  for (const call of securityCalls) {
+    const tfExpr = securityTimeframeArg(call);
+    if (!tfExpr) continue;
+    // (a) literal string directo.
+    const lit = literalOf(tfExpr);
+    if (typeof lit === "string") {
+      if (lit.trim() !== "") out.add(lit);
+      continue;
+    }
+    // (b) variable ligada a un input con default string.
+    if (tfExpr.kind === "ident") {
+      const def = varDefaults.get(tfExpr.name);
+      if (def !== undefined && def.trim() !== "") out.add(def);
+    }
+    // Cualquier otra forma: dinámica/no resoluble → se omite (no se puede prefetch).
+  }
+  return [...out];
+}
+
+/** 2º argumento (timeframe) de request.security, sea posicional o nombrado. */
+function securityTimeframeArg(call: CallExpr): Expr | undefined {
+  let positional = 0;
+  for (const arg of call.args) {
+    if (arg.name === "timeframe") return arg.value;
+    if (arg.name === null) {
+      if (positional === 1) return arg.value;
+      positional++;
+    }
+  }
+  return undefined;
 }
 
 interface Reporter {
@@ -324,6 +406,9 @@ function analyzeInput(
     }
     if (typeName === "generic") {
       type = inferInputType(defvalExpr, lit);
+    } else if (typeName === "timeframe") {
+      // input.timeframe se modela como un input.string (su valor es un tf-string).
+      type = "string";
     } else {
       type = typeName as InputType;
     }

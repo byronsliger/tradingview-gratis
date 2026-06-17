@@ -1,3 +1,4 @@
+import type { Candle } from "@/lib/binance/types";
 import type { Program } from "./ast";
 
 /** Diagnóstico de compilación con posición exacta en el fuente. */
@@ -114,6 +115,13 @@ export interface CompiledScript {
   shapes: ShapeSpec[];
   candleSpecs: CandleSpec[];
   limits: DrawingLimitsSpec;
+  /**
+   * Timeframes que el script pide vía request.security (literales o input.timeframe/
+   * input.string con default literal). Sin duplicados y sin el '' (timeframe del
+   * chart). La app los usa para saber qué velas HTF prefetchear. Los timeframes
+   * dinámicos (no resolubles estáticamente) NO aparecen aquí.
+   */
+  requestedTimeframes: string[];
   warnings: Diagnostic[];
   program: Program;
 }
@@ -219,4 +227,17 @@ export type CompileResult =
 export interface RunOptions {
   maxFuelPerBar?: number;
   maxFuelTotal?: number;
+}
+
+/**
+ * Contexto de ejecución multi-timeframe / temporal opcional para runScript.
+ * - `symbol`: símbolo actual (syminfo.tickerid/.ticker). Default "".
+ * - `timeframe`: timeframe del chart (timeframe.period). Default "".
+ * - `htf`: mapa timeframe-string → velas ya fetcheadas por la app para ese tf
+ *   (request.security las usa para alinear con la barra del chart). Default {}.
+ */
+export interface RunContext {
+  symbol?: string;
+  timeframe?: string;
+  htf?: Record<string, Candle[]>;
 }

@@ -14,6 +14,7 @@ import type {
   LineDrawing,
   PlotPoint,
   PlotResult,
+  RunContext,
   RunOptions,
   ScriptResult,
   ShapePoint,
@@ -44,6 +45,7 @@ export function compile(source: string): CompileResult {
         shapes: analysis.shapes,
         candleSpecs: analysis.candleSpecs,
         limits: analysis.limits,
+        requestedTimeframes: analysis.requestedTimeframes,
         warnings: analysis.warnings,
         program,
       },
@@ -91,12 +93,21 @@ export function runScript(
   candles: Candle[],
   inputs: Record<string, number | string | boolean> = {},
   options?: RunOptions,
+  runCtx?: RunContext,
 ): ScriptResult {
-  const ctx = runProgram(script.program, candles, inputs, options, script.inputs, {
-    maxLabels: script.limits.maxLabels,
-    maxLines: script.limits.maxLines,
-    maxBoxes: script.limits.maxBoxes,
-  });
+  const ctx = runProgram(
+    script.program,
+    candles,
+    inputs,
+    options,
+    script.inputs,
+    {
+      maxLabels: script.limits.maxLabels,
+      maxLines: script.limits.maxLines,
+      maxBoxes: script.limits.maxBoxes,
+    },
+    runCtx,
+  );
 
   const plots: PlotResult[] = script.plots.map((spec) => {
     const values = ctx.plotValues.get(spec.id);
@@ -228,6 +239,7 @@ export type {
   PlotResult,
   PlotSpec,
   PlotStyle,
+  RunContext,
   RunOptions,
   ScriptResult,
   ShapePoint,

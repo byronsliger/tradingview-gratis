@@ -1,7 +1,7 @@
 import type { Candle } from "@/lib/binance/types";
 import type { FuncDeclStmt } from "../ast";
 import { PineRuntimeError, type SourcePos } from "../errors";
-import type { InputDef, RunOptions } from "../types";
+import type { InputDef, RunContext, RunOptions } from "../types";
 import type { TypeDescriptor } from "./objects";
 import { DrawingStore } from "./drawings";
 import { Series } from "./series";
@@ -44,6 +44,15 @@ export class ExecutionContext {
   readonly candles: Candle[];
   readonly inputs: Record<string, number | string | boolean>;
   barIndex = 0;
+
+  /** Símbolo actual del chart (syminfo.tickerid/.ticker). "" si no se proveyó. */
+  readonly symbol: string;
+  /** Timeframe del chart (timeframe.period). "" si no se proveyó. */
+  readonly timeframe: string;
+  /** Velas HTF por timeframe-string (request.security las usa para alinear). */
+  readonly htf: Record<string, Candle[]>;
+  /** Timeframes ya advertidos como ausentes en htf (warning una sola vez). */
+  private readonly warnedHtf = new Set<string>();
 
   /** Pila de scopes léxicos: índice 0 = global. */
   readonly scopes: Map<string, VarSlot>[] = [new Map()];
@@ -96,9 +105,13 @@ export class ExecutionContext {
     options?: RunOptions,
     inputDefs: InputDef[] = [],
     limits?: DrawingLimits,
+    runCtx?: RunContext,
   ) {
     this.candles = candles;
     this.inputs = inputs;
+    this.symbol = runCtx?.symbol ?? "";
+    this.timeframe = runCtx?.timeframe ?? "";
+    this.htf = runCtx?.htf ?? {};
     this.maxFuelPerBar = options?.maxFuelPerBar ?? DEFAULT_FUEL_PER_BAR;
     this.maxFuelTotal = options?.maxFuelTotal ?? DEFAULT_FUEL_TOTAL;
     this.drawings = new DrawingStore(
@@ -107,6 +120,15 @@ export class ExecutionContext {
       limits?.maxBoxes ?? 50,
     );
     for (const def of inputDefs) this.inputDefsByCallSite.set(def.callSiteId, def);
+  }
+
+  /** Advierte (una sola vez por tf) que no hay velas HTF para un timeframe pedido. */
+  warnMissingHtf(tf: string): void {
+    if (this.warnedHtf.has(tf)) return;
+    this.warnedHtf.add(tf);
+    console.warn(
+      `request.security: no hay velas para el timeframe '${tf}' (se devuelve na). La app debe proveerlas vía runCtx.htf.`,
+    );
   }
 
   /** Registra el OHLC + colores de un plotcandle() en la barra actual. */

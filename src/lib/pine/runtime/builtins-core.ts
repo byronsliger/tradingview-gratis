@@ -155,6 +155,14 @@ export const EXTEND_CONSTANTS: Record<string, string> = {
   both: "both",
 };
 
+/** Constantes barmerge.* → strings simbólicos (lookahead/gaps de request.security). */
+export const BARMERGE_CONSTANTS: Record<string, string> = {
+  lookahead_on: "lookahead_on",
+  lookahead_off: "lookahead_off",
+  gaps_on: "gaps_on",
+  gaps_off: "gaps_off",
+};
+
 /** Constantes size.* SIMBÓLICAS para labels (size.* numérico vive en SIZE_CONSTANTS para plotshape). */
 export const LABEL_SIZE_NAMES: Record<string, string> = {
   auto: "auto",
@@ -178,6 +186,7 @@ export const NAMESPACE_CONSTANTS: Record<string, Record<string, string | number>
   box: LINE_STYLE_CONSTANTS,
   xloc: XLOC_CONSTANTS,
   extend: EXTEND_CONSTANTS,
+  barmerge: BARMERGE_CONSTANTS,
 };
 
 /** Parámetros de hline() (price/title/color/linestyle/linewidth tienen efecto). */
@@ -243,6 +252,7 @@ export const INPUT_PARAMS: Record<string, string[]> = {
   string: ["defval", "title", "options", "tooltip", "inline", "group", "confirm", "display"],
   color: ["defval", "title", "tooltip", "inline", "group", "confirm", "display"],
   source: ["defval", "title", "tooltip", "inline", "group", "display"],
+  timeframe: ["defval", "title", "options", "tooltip", "inline", "group", "confirm", "display"],
   generic: ["defval", "title", "tooltip", "inline", "group", "confirm", "display"],
 };
 
