@@ -6,7 +6,9 @@ import {
   HLINE_PARAMS,
   INDICATOR_PARAMS,
   INPUT_PARAMS,
+  LABEL_SIZE_NAMES,
   NAMESPACE_CONSTANTS,
+  SIZE_CONSTANTS,
   PLOTCANDLE_PARAMS,
   PLOTCHAR_PARAMS,
   PLOTSHAPE_PARAMS,
@@ -62,6 +64,7 @@ export function analyze(program: Program): Analysis {
   const warn = (pos: SourcePos, message: string): void => diag(warnings, pos, message, "warning");
   const error = (pos: SourcePos, message: string): void => diag(errors, pos, message, "error");
 
+  const constEnv = collectTopLevelConsts(program);
   const calls = collectCalls(program);
   const indicatorCalls = calls.filter((c) => isBareCall(c, "indicator"));
   const plotCalls = calls.filter((c) => isBareCall(c, "plot"));
@@ -85,25 +88,25 @@ export function analyze(program: Program): Analysis {
     const ind = indicatorCalls[0];
     const titleExpr = argExpr(ind, INDICATOR_PARAMS, "title");
     if (titleExpr) {
-      const title = literalOf(titleExpr);
+      const title = literalOf(titleExpr, constEnv);
       if (typeof title === "string") meta.title = title;
       else warn(titleExpr, "El título de indicator() debe ser una cadena literal");
     }
     const shortExpr = argExpr(ind, INDICATOR_PARAMS, "shorttitle");
     if (shortExpr) {
-      const short = literalOf(shortExpr);
+      const short = literalOf(shortExpr, constEnv);
       if (typeof short === "string") meta.shorttitle = short;
     }
     const overlayExpr = argExpr(ind, INDICATOR_PARAMS, "overlay");
     if (overlayExpr) {
-      const overlay = literalOf(overlayExpr);
+      const overlay = literalOf(overlayExpr, constEnv);
       if (typeof overlay === "boolean") meta.overlay = overlay;
       else warn(overlayExpr, "overlay debe ser true o false literal");
     }
     const limitArg = (name: string): number | undefined => {
       const expr = argExpr(ind, INDICATOR_PARAMS, name);
       if (!expr) return undefined;
-      const lit = literalOf(expr);
+      const lit = literalOf(expr, constEnv);
       if (typeof lit === "number" && Number.isFinite(lit) && lit >= 0) return Math.round(lit);
       warn(expr, `'${name}' de indicator() debe ser un número literal; se usa 50`);
       return undefined;
@@ -117,7 +120,7 @@ export function analyze(program: Program): Analysis {
   const inputs: InputDef[] = [];
   const usedIds = new Set<string>();
   inputCalls.forEach((call, i) => {
-    const def = analyzeInput(call, i + 1, usedIds, { warn, error });
+    const def = analyzeInput(call, i + 1, usedIds, { warn, error }, constEnv);
     if (def) {
       inputs.push(def);
       usedIds.add(def.id);
@@ -127,20 +130,20 @@ export function analyze(program: Program): Analysis {
   // ---- plots --------------------------------------------------------------
   const plots: PlotSpec[] = plotCalls.map((call, i) => {
     const titleExpr = argExpr(call, PLOT_PARAMS, "title");
-    const titleLit = titleExpr ? literalOf(titleExpr) : undefined;
+    const titleLit = titleExpr ? literalOf(titleExpr, constEnv) : undefined;
     const colorExpr = argExpr(call, PLOT_PARAMS, "color");
-    const colorLit = colorExpr ? literalOf(colorExpr) : undefined;
+    const colorLit = colorExpr ? literalOf(colorExpr, constEnv) : undefined;
     let style: PlotStyle = "line";
     const styleExpr = argExpr(call, PLOT_PARAMS, "style");
     if (styleExpr) {
-      const styleLit = literalOf(styleExpr);
+      const styleLit = literalOf(styleExpr, constEnv);
       if (typeof styleLit === "string" && isPlotStyle(styleLit)) style = styleLit;
       else warn(styleExpr, "style de plot() no reconocido; se usa plot.style_line");
     }
     let linewidth = 1;
     const lwExpr = argExpr(call, PLOT_PARAMS, "linewidth");
     if (lwExpr) {
-      const lw = literalOf(lwExpr);
+      const lw = literalOf(lwExpr, constEnv);
       if (typeof lw === "number" && Number.isFinite(lw)) linewidth = Math.max(1, Math.min(4, Math.round(lw)));
       else warn(lwExpr, "linewidth debe ser un número literal; se usa 1");
     }
@@ -157,7 +160,7 @@ export function analyze(program: Program): Analysis {
   const hlines: HLineSpec[] = [];
   for (const call of hlineCalls) {
     const priceExpr = argExpr(call, HLINE_PARAMS, "price");
-    const price = priceExpr ? literalOf(priceExpr) : undefined;
+    const price = priceExpr ? literalOf(priceExpr, constEnv) : undefined;
     if (typeof price !== "number" || !Number.isFinite(price)) {
       error(
         priceExpr ?? call,
@@ -166,13 +169,13 @@ export function analyze(program: Program): Analysis {
       continue;
     }
     const titleExpr = argExpr(call, HLINE_PARAMS, "title");
-    const titleLit = titleExpr ? literalOf(titleExpr) : undefined;
+    const titleLit = titleExpr ? literalOf(titleExpr, constEnv) : undefined;
     const colorExpr = argExpr(call, HLINE_PARAMS, "color");
-    const colorLit = colorExpr ? literalOf(colorExpr) : undefined;
+    const colorLit = colorExpr ? literalOf(colorExpr, constEnv) : undefined;
     const styleExpr = argExpr(call, HLINE_PARAMS, "linestyle");
-    const styleLit = styleExpr ? literalOf(styleExpr) : undefined;
+    const styleLit = styleExpr ? literalOf(styleExpr, constEnv) : undefined;
     const lwExpr = argExpr(call, HLINE_PARAMS, "linewidth");
-    const lwLit = lwExpr ? literalOf(lwExpr) : undefined;
+    const lwLit = lwExpr ? literalOf(lwExpr, constEnv) : undefined;
     hlines.push({
       id: call.callSiteId,
       price,
@@ -188,13 +191,13 @@ export function analyze(program: Program): Analysis {
     const isChar = isBareCall(call, "plotchar");
     const params = isChar ? PLOTCHAR_PARAMS : PLOTSHAPE_PARAMS;
     const titleExpr = argExpr(call, params, "title");
-    const titleLit = titleExpr ? literalOf(titleExpr) : undefined;
+    const titleLit = titleExpr ? literalOf(titleExpr, constEnv) : undefined;
 
     let style = isChar ? "char" : "xcross";
     if (!isChar) {
       const styleExpr = argExpr(call, params, "style");
       if (styleExpr) {
-        const s = literalOf(styleExpr);
+        const s = literalOf(styleExpr, constEnv);
         if (typeof s === "string" && SHAPE_CONSTANTS[s] !== undefined) style = s;
         else warn(styleExpr, "style de plotshape() no reconocido; se usa shape.xcross");
       }
@@ -203,7 +206,7 @@ export function analyze(program: Program): Analysis {
     let location: ShapeSpec["location"] = "abovebar";
     const locExpr = argExpr(call, params, "location");
     if (locExpr) {
-      const l = literalOf(locExpr);
+      const l = literalOf(locExpr, constEnv);
       if (l === "abovebar" || l === "belowbar" || l === "absolute" || l === "top" || l === "bottom") {
         location = l;
         if (l === "absolute") {
@@ -215,20 +218,22 @@ export function analyze(program: Program): Analysis {
     }
 
     const colorExpr = argExpr(call, params, "color");
-    const colorLit = colorExpr ? literalOf(colorExpr) : undefined;
+    const colorLit = colorExpr ? literalOf(colorExpr, constEnv) : undefined;
     const textExpr = argExpr(call, params, "text");
-    const textLit = textExpr ? literalOf(textExpr) : undefined;
+    const textLit = textExpr ? literalOf(textExpr, constEnv) : undefined;
     let size = 1;
     const sizeExpr = argExpr(call, params, "size");
     if (sizeExpr) {
-      const s = literalOf(sizeExpr);
-      if (typeof s === "number" && Number.isFinite(s)) size = s;
+      const s = literalOf(sizeExpr, constEnv);
+      // size.* ahora resuelve a nombre simbólico ('tiny'…); lo remapeamos a su factor.
+      if (typeof s === "string" && SIZE_CONSTANTS[s] !== undefined) size = SIZE_CONSTANTS[s];
+      else if (typeof s === "number" && Number.isFinite(s)) size = s;
       else warn(sizeExpr, "size de plotshape/plotchar no reconocido; se usa size.auto");
     }
     let char: string | undefined;
     if (isChar) {
       const charExpr = argExpr(call, params, "char");
-      const c = charExpr ? literalOf(charExpr) : undefined;
+      const c = charExpr ? literalOf(charExpr, constEnv) : undefined;
       char = typeof c === "string" && c.length > 0 ? c : "★";
     }
 
@@ -247,7 +252,7 @@ export function analyze(program: Program): Analysis {
   // ---- plotcandle ---------------------------------------------------------
   const candleSpecs: CandleSpec[] = candleCalls.map((call, i) => {
     const titleExpr = argExpr(call, PLOTCANDLE_PARAMS, "title");
-    const titleLit = titleExpr ? literalOf(titleExpr) : undefined;
+    const titleLit = titleExpr ? literalOf(titleExpr, constEnv) : undefined;
     return {
       id: call.callSiteId,
       title: typeof titleLit === "string" ? titleLit : `Candle ${i + 1}`,
@@ -273,7 +278,7 @@ export function analyze(program: Program): Analysis {
   }
 
   // ---- requestedTimeframes (request.security) -----------------------------
-  const requestedTimeframes = collectRequestedTimeframes(program, calls);
+  const requestedTimeframes = collectRequestedTimeframes(program, calls, constEnv);
 
   return {
     meta,
@@ -299,7 +304,11 @@ export function analyze(program: Program): Analysis {
  * cubiertos: el alias variable→default se resuelve aquí. El '' (timeframe del chart)
  * se descarta.
  */
-function collectRequestedTimeframes(program: Program, calls: CallExpr[]): string[] {
+function collectRequestedTimeframes(
+  program: Program,
+  calls: CallExpr[],
+  constEnv: Map<string, number | string | boolean>,
+): string[] {
   // Mapa de variable → string default, para variables ligadas a input.timeframe/
   // input.string/input() cuyo defval sea un literal string.
   const varDefaults = new Map<string, string>();
@@ -315,7 +324,7 @@ function collectRequestedTimeframes(program: Program, calls: CallExpr[]): string
       callee.kind === "member" ? INPUT_PARAMS[callee.property] : INPUT_PARAMS.generic;
     if (!params) continue;
     const defvalExpr = argExpr(stmt.init, params, "defval");
-    const lit = defvalExpr ? literalOf(defvalExpr) : undefined;
+    const lit = defvalExpr ? literalOf(defvalExpr, constEnv) : undefined;
     if (typeof lit === "string") varDefaults.set(stmt.name, lit);
   }
 
@@ -327,7 +336,7 @@ function collectRequestedTimeframes(program: Program, calls: CallExpr[]): string
     const tfExpr = securityTimeframeArg(call);
     if (!tfExpr) continue;
     // (a) literal string directo.
-    const lit = literalOf(tfExpr);
+    const lit = literalOf(tfExpr, constEnv);
     if (typeof lit === "string") {
       if (lit.trim() !== "") out.add(lit);
       continue;
@@ -366,6 +375,7 @@ function analyzeInput(
   ordinal: number,
   usedIds: Set<string>,
   { warn, error }: Reporter,
+  constEnv: Map<string, number | string | boolean>,
 ): InputDef | null {
   let typeName: string;
   if (call.callee.kind === "member") {
@@ -386,9 +396,16 @@ function analyzeInput(
   }
 
   // defval: para source es un identificador (close, hl2, …); para el resto un literal.
+  // Un `input(NAME)` cuyo NAME es una constante de nivel superior (p.ej. `GREEN`,
+  // `HISTORICAL`) NO es un source: se resuelve a su valor constante más abajo.
+  const isSourceDefval =
+    typeName === "source" ||
+    (typeName === "generic" &&
+      defvalExpr.kind === "ident" &&
+      constEnv.get(defvalExpr.name) === undefined);
   let defval: number | string | boolean;
   let type: InputType;
-  if (typeName === "source" || (typeName === "generic" && defvalExpr.kind === "ident")) {
+  if (isSourceDefval) {
     if (defvalExpr.kind !== "ident" || !SOURCE_NAMES.has(defvalExpr.name)) {
       error(
         defvalExpr,
@@ -399,7 +416,7 @@ function analyzeInput(
     type = "source";
     defval = defvalExpr.name;
   } else {
-    const lit = literalOf(defvalExpr);
+    const lit = literalOf(defvalExpr, constEnv);
     if (lit === undefined) {
       error(defvalExpr, "El valor por defecto de input.* debe ser una constante");
       return null;
@@ -429,7 +446,7 @@ function analyzeInput(
   }
 
   const titleExpr = argExpr(call, params, "title");
-  const titleLit = titleExpr ? literalOf(titleExpr) : undefined;
+  const titleLit = titleExpr ? literalOf(titleExpr, constEnv) : undefined;
   let title: string | undefined;
   if (titleExpr) {
     if (typeof titleLit === "string") title = titleLit;
@@ -439,7 +456,7 @@ function analyzeInput(
   const numericArg = (name: string): number | undefined => {
     const expr = argExpr(call, params, name);
     if (!expr) return undefined;
-    const lit = literalOf(expr);
+    const lit = literalOf(expr, constEnv);
     if (typeof lit === "number" && Number.isFinite(lit)) return lit;
     warn(expr, `'${name}' de input.* debe ser un número literal; se ignora`);
     return undefined;
@@ -457,7 +474,7 @@ function analyzeInput(
     }
     options = [];
     for (const el of optionsExpr.elements) {
-      const v = literalOf(el);
+      const v = literalOf(el, constEnv);
       if (typeof v === "string" || typeof v === "number") options.push(v);
       else {
         error(el, "Cada opción de options debe ser un literal (número o cadena)");
@@ -476,9 +493,11 @@ function analyzeInput(
 function inferInputType(expr: Expr, lit: number | string | boolean): InputType {
   if (typeof lit === "boolean") return "bool";
   if (typeof lit === "number") return Number.isInteger(lit) ? "int" : "float";
-  // string: color si el literal era #hex o una constante color.*
+  // string: color si el literal era #hex, una constante color.* o un valor #rrggbb[aa]
+  // (p.ej. `input(GREEN)` con `GREEN = #F23645` resuelto vía constEnv).
   if (expr.kind === "color") return "color";
   if (expr.kind === "member" && expr.object === "color") return "color";
+  if (typeof lit === "string" && /^#[0-9a-fA-F]{6,8}$/.test(lit)) return "color";
   return "string";
 }
 
@@ -606,10 +625,14 @@ function argExpr(call: CallExpr, params: string[], name: string): Expr | undefin
 
 /**
  * Valor de un literal estático; undefined si la expresión no es constante.
- * Resuelve también las constantes de namespace (color.*, plot.style_*, hline.style_*,
- * location.*, shape.*, size.*).
+ * Resuelve: literales, constantes de namespace (color.*, plot.style_*, …), `-x`,
+ * identificadores ligados a constantes de nivel superior (constEnv), y las llamadas
+ * constantes `color.new(c, t)` / `color.rgb(r, g, b[, t])` (las usa input.color del SMC).
  */
-function literalOf(expr: Expr): number | string | boolean | undefined {
+function literalOf(
+  expr: Expr,
+  constEnv?: Map<string, number | string | boolean>,
+): number | string | boolean | undefined {
   switch (expr.kind) {
     case "number":
     case "string":
@@ -618,12 +641,65 @@ function literalOf(expr: Expr): number | string | boolean | undefined {
       return expr.value;
     case "unary": {
       if (expr.op !== "-") return undefined;
-      const v = literalOf(expr.operand);
+      const v = literalOf(expr.operand, constEnv);
       return typeof v === "number" ? -v : undefined;
     }
     case "member":
+      // size.* es numérico en NAMESPACE_CONSTANTS (para plotshape), pero como valor
+      // de input.string/label-size lo queremos como nombre simbólico ('tiny'…). El
+      // único consumidor numérico (plotshape size) lo remapea con sizeNameToNumber().
+      if (expr.object === "size") return LABEL_SIZE_NAMES[expr.property] ?? undefined;
       return NAMESPACE_CONSTANTS[expr.object]?.[expr.property];
+    case "ident":
+      return constEnv?.get(expr.name);
+    case "call":
+      return constColorCall(expr, constEnv);
     default:
       return undefined;
   }
+}
+
+/** Evalúa estáticamente `color.new(c, transp)` / `color.rgb(r,g,b[,t])` con args constantes. */
+function constColorCall(
+  call: CallExpr,
+  constEnv?: Map<string, number | string | boolean>,
+): string | undefined {
+  if (call.callee.kind !== "member" || call.callee.object !== "color") return undefined;
+  const args = call.args.map((a) => literalOf(a.value, constEnv));
+  const clamp255 = (v: number): string =>
+    Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0").toUpperCase();
+  const alphaHex = (transp: unknown): string => {
+    const t = typeof transp === "number" && Number.isFinite(transp) ? transp : 0;
+    return Math.max(0, Math.min(255, Math.round(255 * (1 - Math.max(0, Math.min(100, t)) / 100))))
+      .toString(16)
+      .padStart(2, "0")
+      .toUpperCase();
+  };
+  if (call.callee.property === "new") {
+    const base = args[0];
+    if (typeof base !== "string" || !/^#[0-9a-fA-F]{6,8}$/.test(base)) return undefined;
+    return "#" + base.slice(1, 7).toUpperCase() + alphaHex(args[1]);
+  }
+  if (call.callee.property === "rgb") {
+    const [r, g, b, t] = args;
+    if (typeof r !== "number" || typeof g !== "number" || typeof b !== "number") return undefined;
+    const hex = "#" + clamp255(r) + clamp255(g) + clamp255(b);
+    return t === undefined ? hex : hex + alphaHex(t);
+  }
+  return undefined;
+}
+
+/**
+ * Mapa de constantes de nivel superior: `NAME = <literal>`. Resuelve referencias entre
+ * constantes en orden de declaración (p.ej. `TINY = size.tiny`, luego usado en options).
+ * Solo varDecl de nivel superior con init constante; el resto se omite.
+ */
+function collectTopLevelConsts(program: Program): Map<string, number | string | boolean> {
+  const env = new Map<string, number | string | boolean>();
+  for (const stmt of program.statements) {
+    if (stmt.kind !== "varDecl") continue;
+    const v = literalOf(stmt.init, env);
+    if (v !== undefined) env.set(stmt.name, v);
+  }
+  return env;
 }

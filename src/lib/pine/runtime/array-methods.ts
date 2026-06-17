@@ -180,8 +180,10 @@ export function callArrayMethod(
     case "binary_search":
     case "binary_search_leftmost":
     case "binary_search_rightmost": {
-      const value = numericArg(args[0], pos, "value");
-      return binarySearch(items, value, method);
+      // Buscar con na no debe tumbar el script (Pine es tolerante): devuelve -1.
+      const v = args[0];
+      if (typeof v !== "number" || !Number.isFinite(v)) return -1;
+      return binarySearch(items, v, method);
     }
     default:
       throw new PineRuntimeError(`'array.${method}()' no está soportado`, pos);

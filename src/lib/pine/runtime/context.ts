@@ -1,5 +1,5 @@
 import type { Candle } from "@/lib/binance/types";
-import type { FuncDeclStmt } from "../ast";
+import type { Expr, FuncDeclStmt } from "../ast";
 import { PineRuntimeError, type SourcePos } from "../errors";
 import type { InputDef, RunContext, RunOptions } from "../types";
 import type { TypeDescriptor } from "./objects";
@@ -29,6 +29,8 @@ export interface VarSlot {
 /** Función de usuario registrada (cuerpo + parámetros). */
 export interface FuncDef {
   params: string[];
+  /** Default por parámetro (mismo índice que params); null si no tiene. */
+  paramDefaults: (Expr | null)[];
   decl: FuncDeclStmt;
 }
 

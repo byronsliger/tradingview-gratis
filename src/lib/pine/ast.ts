@@ -95,6 +95,8 @@ export interface FuncDeclStmt extends SourcePos {
   kind: "funcDecl";
   name: string;
   params: string[];
+  /** Default opcional por parámetro (`f(bool x = false)`); null si no tiene. */
+  paramDefaults: (Expr | null)[];
   body: Stmt[];
   /** Última expresión del cuerpo = valor de retorno (single-line: el único stmt). */
 }

@@ -2,12 +2,17 @@
 // Cada sesión LEE este archivo al empezar y lo ACTUALIZA al terminar (o antes de agotar tokens).
 // Plan completo: plans/pine-script-engine.md
 module.exports = {
-  updatedAt: "2026-06-16T20:45:00Z",
-  currentPhase: 6,
+  updatedAt: "2026-06-17T00:55:00Z",
+  currentPhase: "E (Pine v5 avanzado completo)",
   branch: "pinescript. TODO el trabajo (Fases 1-6 + fixes de divergencias) vive en pinescript; master sigue en cbdea78 (Fase 3) por decisión del usuario (aún NO fusionar a master). El merge a master es fast-forward cuando se quiera. IMPORTANTE: para ver los cambios, correr el dev server estando en pinescript.",
   done: [
     "Plan aprobado y guardado en plans/pine-script-engine.md",
     "Carpeta executions/ creada con este archivo de estado",
+    "FASE E COMPLETA — PROYECTO PINE v5 AVANZADO (Fases A-E) TERMINADO. El indicador real LuxAlgo Smart Money Concepts (~400 líneas) COMPILA y CORRE de punta a punta produciendo labels/lines/boxes/plotcandle, en 4 escenarios (defaults, todas las features, niveles MTF D/W/M con str.format+request.security, monochrome). 204 tests verdes, lint+tsc limpios, npm run build OK.",
+    "Fase E — sorpresa: el SMC ya compilaba y corría con defaults gracias al trabajo de Fases A-D (UDTs, arrays, drawings, MTF, default-params, namespaces-como-identificadores, str.format/last_bar_time/last_bar_index/alertcondition ya existían). Solo hubo 2 fixes reales:",
+    "Fase E fix 1: array.binary_search/leftmost/rightmost ahora TOLERA na (devuelve -1) en vez de lanzar — Pine no crashea. Desbloqueaba drawLevels cuando time[1] del HTF es na (nivel mensual sin barra previa cuando el chart cabe en el primer mes).",
+    "Fase E fix 2 (importante): el ternario `cond ? a : b` ahora CORTOCIRCUITA (solo evalúa la rama tomada), como Pine real — antes evaluaba AMBAS ramas. Crasheaba el patrón guard `size > 0 ? arr.get(i) : fallback` (get(-1) en la rama no tomada). Efecto colateral aceptado: un ta.* en la rama no tomada del ternario NO avanza ese tick (los golden de Fase 5 siguen verdes porque ya tenían los ta.* fuera de ramas). El cambio se aplicó en evalExpr Y evalExprT (interpreter.ts).",
+    "Fase E: fixture del SMC en src/lib/pine/__tests__/fixtures/smc-luxalgo.pine; test de regresión en __tests__/phaseE-smc.test.ts (compila + corre + produce drawings en los 4 escenarios).",
     "Fase 1 COMPLETA: src/lib/pine/ (errors, types, tokens, lexer, ast, parser, analyze, index) + runtime/ (series, context, interpreter, builtins-core/math/ta)",
     "Fase 1: vitest configurado (vitest.config.ts, script npm test) — 56 tests verdes en 4 suites (lexer, parser, interpreter, ta-golden)",
     "Fase 1: golden tests vs src/lib/indicators/{rsi,ema,sma}.ts pasan con tolerancia relativa 1e-8 (mismo nº de puntos)",

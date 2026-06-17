@@ -35,6 +35,9 @@ export const SERIES_BUILTINS = new Set([
   "hl2",
   "hlc3",
   "ohlc4",
+  // Variables del último bar del dataset (no dependen del bar actual).
+  "last_bar_time",
+  "last_bar_index",
 ]);
 
 /** Parámetros aceptados por plot(); series/title/color/linewidth/style tienen efecto. */

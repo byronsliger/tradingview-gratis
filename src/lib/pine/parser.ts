@@ -214,9 +214,25 @@ class Parser {
       if (arrow) return this.parseFuncDecl(t);
     }
 
+    // Declaración tipada con genérico sin var: `array<orderBlock> obs = …`,
+    // `array<float> a_rray = na`. El tipo (con su genérico) es informativo.
+    if (
+      t.type === "ident" &&
+      this.peek(1).type === "op" &&
+      this.peek(1).value === "<" &&
+      this.genericTypedDeclAhead()
+    ) {
+      this.parseTypeRef(); // consume `array<...>` (descartado)
+      const name = this.expectIdent();
+      this.expectOp("=");
+      const init = this.parseExpr();
+      return { kind: "varDecl", isVar: false, name: name.value, init, ...span(t, init) };
+    }
+
     // Declaración tipada sin var con cualquier nombre de tipo (builtin o UDT):
-    // `float x = …`, `pivot p = …`. Heurística: dos identificadores seguidos antes
-    // de `=`/`:=`. El tipo es informativo (no se valida contra tipos conocidos).
+    // `float x = …`, `pivot p = …`, `box b_ox = …`. Heurística: dos identificadores
+    // seguidos antes de `=`/`:=`. El tipo es informativo (no se valida). Aquí el tipo
+    // puede ser un nombre de namespace (box/line/label/size) usado como tipo de UDT.
     if (
       t.type === "ident" &&
       this.peek(1).type === "ident" &&
@@ -250,6 +266,33 @@ class Parser {
       return { kind: "fieldAssign", target: expr, value, ...span(expr, value) };
     }
     return { kind: "exprStmt", expr, ...posOf(expr) };
+  }
+
+  /**
+   * Lookahead: ¿la secuencia actual es `Type<...> nombre = …` (declaración tipada con
+   * genérico)? Escanea el `<...>` balanceado desde el `<` en peek(1); tras el `>` que
+   * cierra debe venir un identificador y luego un `=`. Así `a < b` (comparación) no se
+   * confunde con un genérico.
+   */
+  private genericTypedDeclAhead(): boolean {
+    let depth = 0;
+    let i = 1; // peek(1) es el `<`
+    for (;;) {
+      const tk = this.peek(i);
+      if (tk.type === "eof" || tk.type === "newline") return false;
+      if (tk.type === "op" && tk.value === "<") depth++;
+      else if (tk.type === "op" && tk.value === ">") {
+        depth--;
+        if (depth === 0) {
+          const name = this.peek(i + 1);
+          const after = this.peek(i + 2);
+          return name.type === "ident" && after.type === "op" && after.value === "=";
+        }
+      } else if (tk.type === "op" && (tk.value === "(" || tk.value === ")")) {
+        return false;
+      }
+      i++;
+    }
   }
 
   private parseVarDecl(t: Token): Stmt {
@@ -418,9 +461,22 @@ class Parser {
     this.advance(); // nombre
     this.expectOp("(");
     const params: string[] = [];
+    const paramDefaults: (Expr | null)[] = [];
     if (!this.check("op", ")")) {
       for (;;) {
+        // Calificador de tipo opcional (`int size`, `pivot p_ivot`, `bool x`,
+        // `array<orderBlock> obs`). Tras él, el nombre del parámetro. Tanto el tipo
+        // como el nombre pueden ser nombres de namespace (size/box/line/label) usados
+        // como identificadores — aquí NO son acceso a namespace.
+        this.skipParamTypeQualifier();
         params.push(this.expectIdent().value);
+        // Default opcional: `bool internal = false`.
+        if (this.check("op", "=")) {
+          this.advance();
+          paramDefaults.push(this.parseExpr());
+        } else {
+          paramDefaults.push(null);
+        }
         if (this.check("op", ",")) {
           this.advance();
           continue;
@@ -443,9 +499,32 @@ class Parser {
       kind: "funcDecl",
       name: nameTok.value,
       params,
+      paramDefaults,
       body,
       ...span(nameTok, last),
     };
+  }
+
+  /**
+   * Calificador de tipo opcional de un parámetro de función. Es un tipo seguido del
+   * nombre del parámetro (`int size`, `pivot p_ivot`, `array<float> xs`). Heurística:
+   * si el token actual es un identificador (posible tipo) y NO va seguido de `,`/`)`/`=`
+   * (que indicarían que ese identificador ES el nombre del parámetro), se consume como
+   * tipo. Soporta el genérico `array<T>`.
+   */
+  private skipParamTypeQualifier(): void {
+    const t = this.peek();
+    if (t.type !== "ident") return;
+    const next = this.peek(1);
+    // `array<float> xs` — tipo con genérico: consume el genérico y queda el nombre.
+    if (next.type === "op" && next.value === "<") {
+      this.parseTypeRef();
+      return;
+    }
+    // `int size` / `pivot p_ivot`: dos identificadores seguidos → el 1º es el tipo.
+    if (next.type === "ident") {
+      this.advance();
+    }
   }
 
   private parseIfStmt(): Stmt {

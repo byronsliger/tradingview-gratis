@@ -72,7 +72,11 @@ export function runProgram(
   // Registrar funciones de usuario y tipos (UDTs) antes de ejecutar barras (hoisting).
   for (const stmt of program.statements) {
     if (stmt.kind === "funcDecl") {
-      ctx.functions.set(stmt.name, { params: stmt.params, decl: stmt });
+      ctx.functions.set(stmt.name, {
+        params: stmt.params,
+        paramDefaults: stmt.paramDefaults,
+        decl: stmt,
+      });
     } else if (stmt.kind === "typeDecl") {
       const descriptor: TypeDescriptor = {
         name: stmt.name,
@@ -354,11 +358,12 @@ function evalExpr(ctx: ExecutionContext, e: Expr): PineValue {
       return applyBinary(e.op, l, r);
     }
     case "ternary": {
-      const cond = toBool(evalExpr(ctx, e.cond));
-      // Ambas ramas se evalúan siempre (semántica de series de Pine).
-      const whenTrue = evalExpr(ctx, e.whenTrue);
-      const whenFalse = evalExpr(ctx, e.whenFalse);
-      return cond ? whenTrue : whenFalse;
+      // Cortocircuito como Pine: solo se evalúa la rama tomada. Esto evita
+      // crashes en patrones guard (`size > 0 ? arr.get(i) : fallback`). Efecto
+      // colateral aceptado: un ta.* en la rama no tomada no avanza ese tick.
+      return toBool(evalExpr(ctx, e.cond))
+        ? evalExpr(ctx, e.whenTrue)
+        : evalExpr(ctx, e.whenFalse);
     }
     case "hist":
       return scalar(evalHistT(ctx, e), e);
@@ -408,6 +413,16 @@ function evalExprT(ctx: ExecutionContext, e: Expr): EvalValue {
   if (e.kind === "ident") return evalIdentT(ctx, e);
   if (e.kind === "hist") return evalHistT(ctx, e);
   if (e.kind === "fieldAccess") return evalFieldAccess(ctx, e);
+  // Ternario object-capable: las ramas pueden devolver objetos/arrays/handles
+  // (p.ej. `internal ? internalHigh : swingHigh`). Ambas se evalúan (semántica de
+  // series de Pine) en modo tuple-/objeto-capable.
+  if (e.kind === "ternary") {
+    ctx.consumeFuel(e);
+    // Cortocircuito como Pine: solo la rama tomada (object-/tuple-capable).
+    return toBool(evalExpr(ctx, e.cond))
+      ? evalExprT(ctx, e.whenTrue)
+      : evalExprT(ctx, e.whenFalse);
+  }
   // `[a, b]` como valor de retorno de una función → tupla (elementos pueden ser objetos).
   if (e.kind === "array") {
     return new TupleValue(e.elements.map((el) => evalExprT(ctx, el)));
@@ -903,16 +918,21 @@ function evalCallT(ctx: ExecutionContext, e: CallExpr): EvalValue {
         if (v !== null && v !== undefined) st.last = v;
         return st.last;
       }
-      case "alertcondition":
-        throw new PineRuntimeError(
-          `'${callee.name}()' aún no está soportado (llega en una fase posterior)`,
-          e,
-        );
+      case "alertcondition": {
+        // No-op: registra la condición (no dispara nada en el motor). NO debe lanzar.
+        // Firma: alertcondition(condition, title, message). Se evalúan los args (por
+        // si tienen efectos de serie ta.*) pero el resultado se descarta.
+        mapArgs(e, evaluated, ["condition", "title", "message"], 1);
+        return null;
+      }
       default:
         throw new PineRuntimeError(`Función '${callee.name}' desconocida`, e);
     }
   }
 
+  if (callee.object === "str") {
+    return evalStrCall(callee.property, evaluated, e);
+  }
   if (callee.object === "ta") {
     const builtin = taBuiltins[callee.property];
     if (!builtin) throw new PineRuntimeError(`'ta.${callee.property}' aún no está soportado`, e);
@@ -937,6 +957,71 @@ function evalCallT(ctx: ExecutionContext, e: CallExpr): EvalValue {
     throw new PineRuntimeError(`'color.${callee.property}()' aún no está soportado`, e);
   }
   throw new PineRuntimeError(`Función '${callee.object}.${callee.property}' desconocida`, e);
+}
+
+/** Convierte un PineValue a su representación de texto (estilo Pine str.tostring). */
+function pineToString(v: PineValue): string {
+  if (v === null) return "NaN";
+  if (typeof v === "boolean") return v ? "true" : "false";
+  if (typeof v === "number") {
+    if (!Number.isFinite(v)) return "NaN";
+    // Enteros sin decimales; el resto con hasta ~10 cifras significativas sin ceros sobrantes.
+    if (Number.isInteger(v)) return String(v);
+    return String(Number(v.toFixed(10)));
+  }
+  return v;
+}
+
+/**
+ * str.* — subset usado por el SMC:
+ * - str.format(fmt, ...args): sustituye {0},{1},… por los args (números formateados).
+ * - str.tostring(x[, fmt]): x a texto.
+ * - str.length/contains/replace_all/upper/lower/split como extras razonables.
+ */
+function evalStrCall(prop: string, evaluated: EvaluatedArg[], e: CallExpr): PineValue {
+  const vals = evaluated.map((a) => a.value);
+  switch (prop) {
+    case "format": {
+      const fmt = vals[0];
+      if (typeof fmt !== "string") {
+        throw new PineRuntimeError("str.format() requiere una cadena de formato", e);
+      }
+      const args = vals.slice(1);
+      return fmt.replace(/\{(\d+)(?::[^}]*)?\}/g, (_m, idx: string) => {
+        const i = Number(idx);
+        return i >= 0 && i < args.length ? pineToString(args[i]) : "";
+      });
+    }
+    case "tostring":
+      return pineToString(vals[0] ?? null);
+    case "tonumber": {
+      const v = vals[0];
+      if (typeof v === "number") return v;
+      if (typeof v === "string") {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      }
+      return null;
+    }
+    case "length":
+      return typeof vals[0] === "string" ? vals[0].length : 0;
+    case "upper":
+      return typeof vals[0] === "string" ? vals[0].toUpperCase() : "";
+    case "lower":
+      return typeof vals[0] === "string" ? vals[0].toLowerCase() : "";
+    case "contains":
+      return typeof vals[0] === "string" && typeof vals[1] === "string"
+        ? vals[0].includes(vals[1])
+        : false;
+    case "replace_all":
+      return typeof vals[0] === "string" && typeof vals[1] === "string" && typeof vals[2] === "string"
+        ? vals[0].split(vals[1]).join(vals[2])
+        : typeof vals[0] === "string"
+          ? vals[0]
+          : "";
+    default:
+      throw new PineRuntimeError(`'str.${prop}()' aún no está soportado`, e);
+  }
 }
 
 function clamp255(v: number): number {
@@ -1048,13 +1133,13 @@ function callUserFunction(ctx: ExecutionContext, e: CallExpr, name: string): Eva
       throw new PineRuntimeError("Las funciones de usuario no admiten argumentos nombrados", e);
     }
   }
-  if (e.args.length !== def.params.length) {
+  if (e.args.length > def.params.length) {
     throw new PineRuntimeError(
       `'${name}' espera ${def.params.length} argumento(s), recibió ${e.args.length}`,
       e,
     );
   }
-  // Evaluar args en el scope del llamador antes de abrir el scope local.
+  // Evaluar los args provistos en el scope del llamador antes de abrir el scope local.
   // evalExprT: una función de usuario puede recibir (y devolver) objetos.
   const argValues = e.args.map((a) => evalExprT(ctx, a.value));
 
@@ -1063,8 +1148,21 @@ function callUserFunction(ctx: ExecutionContext, e: CallExpr, name: string): Eva
     def.params.forEach((p, i) => {
       // Parámetro como serie persistente: `p[1]` lee el valor pasado en la barra
       // anterior por este mismo sitio de invocación (semántica de series de Pine).
+      // Si no se pasó (menos args que params), se usa el default del parámetro;
+      // si tampoco tiene default → error.
+      let value: EvalValue;
+      if (i < argValues.length) {
+        value = argValues[i];
+      } else if (def.paramDefaults[i]) {
+        value = evalExprT(ctx, def.paramDefaults[i]!);
+      } else {
+        throw new PineRuntimeError(
+          `'${name}' requiere el argumento '${p}' (sin valor por defecto)`,
+          e,
+        );
+      }
       const { slot } = ctx.persistentVarSlot(p, false);
-      slot.series.set(ctx.barIndex, argValues[i]);
+      slot.series.set(ctx.barIndex, value);
       scope.set(p, slot);
     });
     return evalBlockValue(ctx, def.decl.body);
@@ -1133,6 +1231,14 @@ function evalHistT(ctx: ExecutionContext, e: HistAccess): EvalValue {
 }
 
 function builtinSeriesValue(ctx: ExecutionContext, name: string, index: number): PineValue {
+  // last_bar_*: tiempo/índice de la ÚLTIMA vela del dataset (independiente de `index`).
+  if (name === "last_bar_time") {
+    const last = ctx.candles[ctx.candles.length - 1];
+    return last ? last.time * 1000 : null;
+  }
+  if (name === "last_bar_index") {
+    return ctx.candles.length - 1;
+  }
   if (index < 0 || index >= ctx.candles.length) return null;
   const c = ctx.candles[index];
   switch (name) {
