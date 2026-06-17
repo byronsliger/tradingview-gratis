@@ -15,6 +15,7 @@ import { useMACDPane } from "@/hooks/chart/useMACDPane";
 import { useSQZPane } from "@/hooks/chart/useSQZPane";
 import { useADXPane } from "@/hooks/chart/useADXPane";
 import { useUserScriptPanes, type ScriptPill } from "@/hooks/chart/useUserScriptPanes";
+import { useScriptHtf } from "@/hooks/chart/useScriptHtf";
 import { useVRVPSeries } from "@/hooks/chart/useVRVPSeries";
 import { usePriceLines } from "@/hooks/chart/usePriceLines";
 import { usePriceLineDrag } from "@/hooks/chart/usePriceLineDrag";
@@ -100,13 +101,17 @@ export function PriceChart({ symbol, timeframe }: Props) {
     (indicators.macd ? 1 : 0) +
     (indicators.sqzmom || indicators.adx ? 1 : 0);
 
-  const { updateUserScripts, scriptLastValues, scriptErrors, scriptMeta } = useUserScriptPanes(
+  const { updateUserScripts, scriptLastValues, scriptErrors, scriptMeta, runCtxRef } = useUserScriptPanes(
     chartRef,
     candlesRef,
     scripts,
     scriptBasePaneIdx,
     recomputePaneOffsets,
   );
+
+  // Fase D (MTF): fetch de velas HTF para request.security; rellena runCtxRef y
+  // re-ejecuta los scripts cuando llegan los datos.
+  useScriptHtf(symbol, timeframe, scripts, runCtxRef, updateUserScripts);
 
   const seriesPaneIndices = {
     ema20: 0,

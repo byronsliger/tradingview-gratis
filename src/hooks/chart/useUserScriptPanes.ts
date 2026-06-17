@@ -18,7 +18,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { compile, runScript, PineRuntimeError, type CompiledScript, type CompileResult } from "@/lib/pine";
-import type { PlotSpec, DrawingPoint } from "@/lib/pine/types";
+import type { PlotSpec, DrawingPoint, RunContext } from "@/lib/pine/types";
 import type { Candle } from "@/lib/binance/types";
 import type { PineScriptRecord } from "@/lib/store/chart-store";
 import { LineSegmentsPrimitive, type LineSegment } from "@/lib/chart/LineSegmentsPrimitive";
@@ -165,6 +165,10 @@ export function useUserScriptPanes(
   const entriesRef = useRef<Map<string, ScriptEntry>>(new Map());
   const compileCacheRef = useRef<Map<string, CompileResult>>(new Map());
   const layoutKeyRef = useRef<string>("");
+  // RunContext (symbol/timeframe del chart + velas HTF) que useScriptHtf rellena
+  // y runAndSetData pasa como 5º arg de runScript (Fase D, MTF). Empieza vacío
+  // → request.security resuelve a na hasta que llegue el fetch HTF.
+  const runCtxRef = useRef<RunContext>({});
   const scriptsRef = useRef(scripts);
   // eslint-disable-next-line react-hooks/refs
   scriptsRef.current = scripts;
@@ -216,7 +220,7 @@ export function useUserScriptPanes(
       const hasDrawingLayer =
         entry.linesPrim !== null || entry.boxesPrim !== null || entry.candleSeries !== null;
       if (entry.series.length === 0 && !hasDrawingLayer) return;
-      const result = runScript(entry.compiled, candlesRef.current, record.inputs);
+      const result = runScript(entry.compiled, candlesRef.current, record.inputs, undefined, runCtxRef.current);
 
       let firstLast: number | null = null;
       result.plots.forEach((plot, i) => {
@@ -708,5 +712,5 @@ export function useUserScriptPanes(
     if (changed) syncPillState();
   }, [candlesRef, runAndSetData, syncPillState]);
 
-  return { updateUserScripts, scriptLastValues, scriptErrors, scriptMeta };
+  return { updateUserScripts, scriptLastValues, scriptErrors, scriptMeta, runCtxRef };
 }
