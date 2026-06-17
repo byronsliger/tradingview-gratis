@@ -234,7 +234,7 @@ describe("Fase D — analyze.requestedTimeframes", () => {
     expect(compiled.requestedTimeframes).not.toContain("");
   });
 
-  it("no falla con timeframe dinámico (solo no lo prefetchea)", () => {
+  it("timeframe dinámico: prefetchea los literales tf candidatos del script", () => {
     const src = [
       'indicator("mtf", overlay=true)',
       "dyn = close > open ? 'D' : 'W'",
@@ -242,7 +242,10 @@ describe("Fase D — analyze.requestedTimeframes", () => {
       "plot(x)",
     ].join("\n");
     const compiled = mustCompile(src);
-    expect(compiled.requestedTimeframes).toEqual([]);
+    // El tf es dinámico (no rastreable hasta el request.security), pero la
+    // heurística de literales capta 'D' y 'W' del ternario y los prefetchea,
+    // así request.security tiene datos sea cual sea el valor en runtime.
+    expect(new Set(compiled.requestedTimeframes)).toEqual(new Set(["D", "W"]));
   });
 });
 

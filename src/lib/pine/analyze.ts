@@ -1,5 +1,6 @@
 import type { CallExpr, Expr, Program, Stmt } from "./ast";
 import type { SourcePos } from "./errors";
+import { parseTimeframe } from "./runtime/timeframe";
 import {
   COLOR_CONSTANTS,
   DEFAULT_PLOT_COLOR,
@@ -348,7 +349,109 @@ function collectRequestedTimeframes(
     }
     // Cualquier otra forma: dinámica/no resoluble → se omite (no se puede prefetch).
   }
+
+  // (c) Heurística: cualquier literal string del programa que sea un timeframe
+  // válido ('D','W','M','60','240'…). Captura el caso de request.security con el
+  // timeframe pasado como PARÁMETRO de función (p.ej. drawLevels('W', …) en el
+  // SMC), que el análisis estático no puede rastrear hasta el request.security.
+  // parseTimeframe rechaza los demás strings ('All','BOS','Colored'…), así que
+  // el riesgo de prefetch espurio es mínimo.
+  forEachStringLiteral(program, (s) => {
+    if (s.trim() !== "" && parseTimeframe(s) !== null) out.add(s);
+  });
+
   return [...out];
+}
+
+/** Visita el valor de cada literal string del programa (statements + expresiones). */
+function forEachStringLiteral(program: Program, cb: (value: string) => void): void {
+  const visitExpr = (e: Expr): void => {
+    switch (e.kind) {
+      case "string":
+        cb(e.value);
+        return;
+      case "call":
+        for (const a of e.args) visitExpr(a.value);
+        return;
+      case "array":
+        for (const el of e.elements) visitExpr(el);
+        return;
+      case "unary":
+        visitExpr(e.operand);
+        return;
+      case "binary":
+        visitExpr(e.left);
+        visitExpr(e.right);
+        return;
+      case "ternary":
+        visitExpr(e.cond);
+        visitExpr(e.whenTrue);
+        visitExpr(e.whenFalse);
+        return;
+      case "hist":
+        visitExpr(e.base);
+        visitExpr(e.offset);
+        return;
+      case "ifExpr":
+        for (const b of e.branches) {
+          if (b.cond) visitExpr(b.cond);
+          visitStmts(b.body);
+        }
+        return;
+      case "switchExpr":
+        if (e.subject) visitExpr(e.subject);
+        for (const c of e.cases) {
+          if (c.match) visitExpr(c.match);
+          visitStmts(c.body);
+        }
+        return;
+      case "fieldAccess":
+        visitExpr(e.target);
+        return;
+      default:
+        return;
+    }
+  };
+  const visitStmts = (stmts: Stmt[]): void => {
+    for (const stmt of stmts) {
+      switch (stmt.kind) {
+        case "varDecl":
+        case "tupleDecl":
+          visitExpr(stmt.init);
+          break;
+        case "assign":
+          visitExpr(stmt.value);
+          break;
+        case "fieldAssign":
+          visitExpr(stmt.value);
+          break;
+        case "exprStmt":
+          visitExpr(stmt.expr);
+          break;
+        case "ifStmt":
+          visitExpr(stmt.cond);
+          visitStmts(stmt.then);
+          if (stmt.elseBranch) visitStmts(stmt.elseBranch);
+          break;
+        case "forStmt":
+          visitExpr(stmt.from);
+          visitExpr(stmt.to);
+          if (stmt.step) visitExpr(stmt.step);
+          visitStmts(stmt.body);
+          break;
+        case "forInStmt":
+          visitExpr(stmt.iterable);
+          visitStmts(stmt.body);
+          break;
+        case "funcDecl":
+          visitStmts(stmt.body);
+          break;
+        default:
+          break;
+      }
+    }
+  };
+  visitStmts(program.statements);
 }
 
 /** 2º argumento (timeframe) de request.security, sea posicional o nombrado. */

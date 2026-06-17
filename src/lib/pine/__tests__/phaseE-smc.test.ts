@@ -31,6 +31,14 @@ describe("LuxAlgo SMC end-to-end", () => {
     expect(res.ok).toBe(true);
   });
 
+  it("detecta D/W/M como timeframes pedidos (request.security vía parámetro)", () => {
+    const res = compile(SRC);
+    if (!res.ok) throw new Error("no compila");
+    // drawLevels('D'/'W'/'M', …) pasa el tf como parámetro; la heurística de
+    // literales lo capta para que useScriptHtf prefetchee esas velas HTF.
+    expect(res.script.requestedTimeframes).toEqual(expect.arrayContaining(["D", "W", "M"]));
+  });
+
   function runWith(inputs: Record<string, number | string | boolean>, htf: Record<string, Candle[]> = {}) {
     const res = compile(SRC);
     if (!res.ok) throw new Error("no compila");
