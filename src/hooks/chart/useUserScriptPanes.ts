@@ -163,6 +163,8 @@ export function useUserScriptPanes(
   scripts: PineScriptRecord[],
   scriptBasePaneIdx: number,
   recomputePaneOffsets: () => void,
+  /** Serie principal de velas (pane 0): ancla con datos para los dibujos overlay. */
+  mainSeriesRef?: RefObject<ISeriesApi<"Candlestick"> | null>,
 ) {
   const entriesRef = useRef<Map<string, ScriptEntry>>(new Map());
   const compileCacheRef = useRef<Map<string, CompileResult>>(new Map());
@@ -613,9 +615,15 @@ export function useUserScriptPanes(
         const needsDrawingLayer = hasDrawings || hasCandles;
 
         if (needsDrawingLayer) {
-          // Ancla para colgar los primitives: la 1ª serie de plots, o una
-          // LineSeries invisible en el mismo pane si el script no tiene plots.
-          let anchor = first ?? null;
+          // Ancla para colgar los primitives. priceToCoordinate() necesita una
+          // serie CON DATOS y en la escala de precios correcta:
+          //  1) la 1ª serie de plots del script, si tiene; si no
+          //  2) overlay → la serie principal de velas (tiene datos + escala right); si no
+          //  3) una LineSeries invisible propia en el pane (se le cargan datos luego).
+          let anchor: AnySeries | null = first ?? null;
+          if (!anchor && overlay && mainSeriesRef?.current) {
+            anchor = mainSeriesRef.current;
+          }
           if (!anchor) {
             anchor = chart.addSeries(
               LineSeries,
@@ -634,9 +642,9 @@ export function useUserScriptPanes(
           entry.drawingAnchor = anchor;
 
           if (hasDrawings) {
-            entry.linesPrim = new LinesPrimitive();
-            entry.boxesPrim = new BoxesPrimitive();
-            entry.labelsPrim = new LabelsPrimitive();
+            entry.linesPrim = new LinesPrimitive(candlesRef);
+            entry.boxesPrim = new BoxesPrimitive(candlesRef);
+            entry.labelsPrim = new LabelsPrimitive(candlesRef);
             anchor.attachPrimitive(entry.boxesPrim);
             anchor.attachPrimitive(entry.linesPrim);
             anchor.attachPrimitive(entry.labelsPrim);
@@ -691,7 +699,7 @@ export function useUserScriptPanes(
         try { runAndSetData(entry, record); } catch {}
       }
     }
-  }, [scripts, scriptBasePaneIdx, chartRef, teardownAll, compileCached, createPlotSeries, runAndSetData, recomputePaneOffsets, syncPillState]);
+  }, [scripts, scriptBasePaneIdx, chartRef, candlesRef, mainSeriesRef, teardownAll, compileCached, createPlotSeries, runAndSetData, recomputePaneOffsets, syncPillState]);
 
   // Cleanup al desmontar el chart completo
   useEffect(() => {

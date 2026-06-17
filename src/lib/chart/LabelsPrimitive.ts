@@ -9,6 +9,9 @@ import type {
   SeriesAttachedParameter,
   Time,
 } from "lightweight-charts";
+import type { RefObject } from "react";
+import type { Candle } from "@/lib/binance/types";
+import { timeToCoordinateExtended } from "@/lib/drawings/time-coordinate";
 
 type CanvasRenderingTarget2D = Parameters<IPrimitivePaneRenderer["draw"]>[0];
 
@@ -61,15 +64,15 @@ class LabelsRenderer implements IPrimitivePaneRenderer {
   constructor(private readonly _primitive: LabelsPrimitive) {}
 
   draw(target: CanvasRenderingTarget2D): void {
-    const { _chart: chart, _series: series, labels } = this._primitive;
+    const { _chart: chart, _series: series, _candlesRef: candlesRef, labels } = this._primitive;
     if (!chart || !series || labels.length === 0) return;
-    const timeScale = chart.timeScale();
+    const candles = candlesRef?.current ?? null;
 
     target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio: pr, verticalPixelRatio: vpr }) => {
       ctx.save();
       for (const label of labels) {
         if (label.t === null || label.price === null) continue;
-        const x = timeScale.timeToCoordinate(label.t as Time);
+        const x = timeToCoordinateExtended(chart, candles, label.t);
         const y = series.priceToCoordinate(label.price);
         if (x === null || y === null) continue;
 
@@ -170,10 +173,12 @@ export class LabelsPrimitive {
   labels: DrawLabel[] = [];
   _chart: IChartApiBase<Time> | null = null;
   _series: ISeriesApi<SeriesType, Time> | null = null;
+  _candlesRef: RefObject<Candle[]> | null;
   private _requestUpdate: (() => void) | null = null;
   private readonly _paneViews: LabelsPaneView[];
 
-  constructor() {
+  constructor(candlesRef?: RefObject<Candle[]>) {
+    this._candlesRef = candlesRef ?? null;
     this._paneViews = [new LabelsPaneView(this)];
   }
 

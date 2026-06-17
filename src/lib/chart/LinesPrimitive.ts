@@ -9,6 +9,9 @@ import type {
   SeriesAttachedParameter,
   Time,
 } from "lightweight-charts";
+import type { RefObject } from "react";
+import type { Candle } from "@/lib/binance/types";
+import { timeToCoordinateExtended } from "@/lib/drawings/time-coordinate";
 
 type CanvasRenderingTarget2D = Parameters<IPrimitivePaneRenderer["draw"]>[0];
 
@@ -59,16 +62,16 @@ class LinesRenderer implements IPrimitivePaneRenderer {
   constructor(private readonly _primitive: LinesPrimitive) {}
 
   draw(target: CanvasRenderingTarget2D): void {
-    const { _chart: chart, _series: series, lines } = this._primitive;
+    const { _chart: chart, _series: series, _candlesRef: candlesRef, lines } = this._primitive;
     if (!chart || !series || lines.length === 0) return;
-    const timeScale = chart.timeScale();
+    const candles = candlesRef?.current ?? null;
 
     target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio: pr, verticalPixelRatio: vpr, mediaSize }) => {
       ctx.save();
       for (const line of lines) {
         if (line.t1 === null || line.t2 === null || line.p1 === null || line.p2 === null) continue;
-        const x1 = timeScale.timeToCoordinate(line.t1 as Time);
-        const x2 = timeScale.timeToCoordinate(line.t2 as Time);
+        const x1 = timeToCoordinateExtended(chart, candles, line.t1);
+        const x2 = timeToCoordinateExtended(chart, candles, line.t2);
         const y1 = series.priceToCoordinate(line.p1);
         const y2 = series.priceToCoordinate(line.p2);
         if (x1 === null || x2 === null || y1 === null || y2 === null) continue;
@@ -105,10 +108,12 @@ export class LinesPrimitive {
   lines: DrawLine[] = [];
   _chart: IChartApiBase<Time> | null = null;
   _series: ISeriesApi<SeriesType, Time> | null = null;
+  _candlesRef: RefObject<Candle[]> | null;
   private _requestUpdate: (() => void) | null = null;
   private readonly _paneViews: LinesPaneView[];
 
-  constructor() {
+  constructor(candlesRef?: RefObject<Candle[]>) {
+    this._candlesRef = candlesRef ?? null;
     this._paneViews = [new LinesPaneView(this)];
   }
 

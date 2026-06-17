@@ -9,6 +9,9 @@ import type {
   SeriesAttachedParameter,
   Time,
 } from "lightweight-charts";
+import type { RefObject } from "react";
+import type { Candle } from "@/lib/binance/types";
+import { timeToCoordinateExtended } from "@/lib/drawings/time-coordinate";
 
 type CanvasRenderingTarget2D = Parameters<IPrimitivePaneRenderer["draw"]>[0];
 
@@ -41,16 +44,16 @@ class BoxesRenderer implements IPrimitivePaneRenderer {
   constructor(private readonly _primitive: BoxesPrimitive) {}
 
   draw(target: CanvasRenderingTarget2D): void {
-    const { _chart: chart, _series: series, boxes } = this._primitive;
+    const { _chart: chart, _series: series, _candlesRef: candlesRef, boxes } = this._primitive;
     if (!chart || !series || boxes.length === 0) return;
-    const timeScale = chart.timeScale();
+    const candles = candlesRef?.current ?? null;
 
     target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio: pr, verticalPixelRatio: vpr, mediaSize }) => {
       ctx.save();
       for (const box of boxes) {
         if (box.tLeft === null || box.tRight === null || box.pTop === null || box.pBottom === null) continue;
-        const xl = timeScale.timeToCoordinate(box.tLeft as Time);
-        const xr = timeScale.timeToCoordinate(box.tRight as Time);
+        const xl = timeToCoordinateExtended(chart, candles, box.tLeft);
+        const xr = timeToCoordinateExtended(chart, candles, box.tRight);
         const yt = series.priceToCoordinate(box.pTop);
         const yb = series.priceToCoordinate(box.pBottom);
         if (xl === null || xr === null || yt === null || yb === null) continue;
@@ -100,10 +103,12 @@ export class BoxesPrimitive {
   boxes: DrawBox[] = [];
   _chart: IChartApiBase<Time> | null = null;
   _series: ISeriesApi<SeriesType, Time> | null = null;
+  _candlesRef: RefObject<Candle[]> | null;
   private _requestUpdate: (() => void) | null = null;
   private readonly _paneViews: BoxesPaneView[];
 
-  constructor() {
+  constructor(candlesRef?: RefObject<Candle[]>) {
+    this._candlesRef = candlesRef ?? null;
     this._paneViews = [new BoxesPaneView(this)];
   }
 

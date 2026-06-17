@@ -107,6 +107,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
     scripts,
     scriptBasePaneIdx,
     recomputePaneOffsets,
+    candleSeriesRef,
   );
 
   // Fase D (MTF): fetch de velas HTF para request.security; rellena runCtxRef y
