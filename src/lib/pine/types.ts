@@ -92,6 +92,19 @@ export interface IndicatorMeta {
   overlay: boolean;
 }
 
+/** Límites de objetos de dibujo de indicator(max_*_count); default 50 como Pine. */
+export interface DrawingLimitsSpec {
+  maxLabels: number;
+  maxLines: number;
+  maxBoxes: number;
+}
+
+/** plotcandle() declarado estáticamente. `id` = callSiteId. */
+export interface CandleSpec {
+  id: number;
+  title: string;
+}
+
 export interface CompiledScript {
   version: number | null;
   meta: IndicatorMeta;
@@ -99,6 +112,8 @@ export interface CompiledScript {
   inputs: InputDef[];
   hlines: HLineSpec[];
   shapes: ShapeSpec[];
+  candleSpecs: CandleSpec[];
+  limits: DrawingLimitsSpec;
   warnings: Diagnostic[];
   program: Program;
 }
@@ -115,9 +130,82 @@ export interface PlotResult {
   points: PlotPoint[];
 }
 
+/** Coordenada cruda de un dibujo: time (xloc.bar_time) e index (xloc.bar_index) + price. */
+export interface DrawingPoint {
+  time: number | null;
+  index: number | null;
+  price: number | null;
+}
+
+/** Etiqueta resuelta a coordenadas crudas + estilos (la capa de render la pinta). */
+export interface LabelDrawing {
+  id: number;
+  x: number | null;
+  y: number | null;
+  text: string;
+  color: string | null;
+  textcolor: string | null;
+  style: string;
+  size: string;
+  /** "bar_time" | "bar_index" */
+  xloc: string;
+}
+
+/** Línea resuelta a coordenadas crudas + estilos. */
+export interface LineDrawing {
+  id: number;
+  p1: DrawingPoint;
+  p2: DrawingPoint;
+  color: string | null;
+  style: string;
+  width: number;
+  xloc: string;
+  /** "none" | "left" | "right" | "both" */
+  extend: string;
+}
+
+/** Caja resuelta a coordenadas crudas + estilos. */
+export interface BoxDrawing {
+  id: number;
+  topLeft: DrawingPoint;
+  bottomRight: DrawingPoint;
+  bgcolor: string | null;
+  borderColor: string | null;
+  borderWidth: number;
+  xloc: string;
+  extend: string;
+}
+
+/** Grafo de objetos de dibujo vivos (no borrados) tras un run. */
+export interface DrawingsResult {
+  labels: LabelDrawing[];
+  lines: LineDrawing[];
+  boxes: BoxDrawing[];
+}
+
+/** Punto de plotcandle() por barra (na en open → omitido del array). */
+export interface CandlePointResult {
+  time: number;
+  open: number;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  color?: string;
+  wickColor?: string;
+  borderColor?: string;
+}
+
+/** Serie de velas de un plotcandle(). */
+export interface CandleResult {
+  title: string;
+  points: CandlePointResult[];
+}
+
 export interface ScriptResult {
   plots: PlotResult[];
   shapes: ShapeResult[];
+  drawings: DrawingsResult;
+  candles: CandleResult[];
 }
 
 /** Valor Pine en runtime: number | bool | string (incluye colores) | na (null). */

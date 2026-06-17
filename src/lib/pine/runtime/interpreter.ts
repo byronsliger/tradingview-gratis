@@ -17,6 +17,7 @@ import {
   HLINE_PARAMS,
   INDICATOR_PARAMS,
   NAMESPACE_CONSTANTS,
+  PLOTCANDLE_PARAMS,
   PLOTCHAR_PARAMS,
   PLOTSHAPE_PARAMS,
   PLOT_PARAMS,
@@ -25,9 +26,17 @@ import {
 } from "./builtins-core";
 import { mathBuiltins } from "./builtins-math";
 import { taBuiltins } from "./builtins-ta";
-import { ExecutionContext } from "./context";
+import { type DrawingLimits, ExecutionContext } from "./context";
 import { PineArray } from "./arrays";
 import { arrayNewFromGeneric, callArrayMethod } from "./array-methods";
+import {
+  boxNew,
+  callDrawMethod,
+  chartPointNew,
+  labelNew,
+  lineNew,
+} from "./draw-methods";
+import { ChartPoint, PineBox, PineLabel, PineLine } from "./drawings";
 import { PineObject, type FieldDef, type TypeDescriptor } from "./objects";
 import { Series } from "./series";
 import { TupleValue, type EvalValue } from "./values";
@@ -49,8 +58,9 @@ export function runProgram(
   inputs: Record<string, number | string | boolean> = {},
   options?: RunOptions,
   inputDefs: InputDef[] = [],
+  limits?: DrawingLimits,
 ): ExecutionContext {
-  const ctx = new ExecutionContext(candles, inputs, options, inputDefs);
+  const ctx = new ExecutionContext(candles, inputs, options, inputDefs, limits);
   // Registrar funciones de usuario y tipos (UDTs) antes de ejecutar barras (hoisting).
   for (const stmt of program.statements) {
     if (stmt.kind === "funcDecl") {
@@ -181,7 +191,10 @@ function execStmt(ctx: ExecutionContext, stmt: Stmt): void {
       // Ya registrada en runProgram (hoisting); no-op por barra.
       return;
     case "exprStmt":
-      evalExpr(ctx, stmt.expr);
+      // evalExprT: una llamada como statement (label.new(...), arr.push(x), …) puede
+      // devolver un handle/objeto/array — su valor se descarta, pero no debe forzar
+      // contexto escalar (que rechazaría dibujos).
+      evalExprT(ctx, stmt.expr);
       return;
   }
 }
@@ -366,6 +379,12 @@ function scalar(v: EvalValue, pos: SourcePos): PineValue {
   if (v instanceof PineArray) {
     throw new PineRuntimeError(
       "Se usó un array donde se esperaba un valor escalar",
+      pos,
+    );
+  }
+  if (v instanceof PineLabel || v instanceof PineLine || v instanceof PineBox || v instanceof ChartPoint) {
+    throw new PineRuntimeError(
+      "Se usó un objeto de dibujo donde se esperaba un valor escalar",
       pos,
     );
   }
@@ -560,14 +579,36 @@ function evalCallT(ctx: ExecutionContext, e: CallExpr): EvalValue {
     return constructObject(ctx, ctx.types.get(callee.target.name)!, e);
   }
 
-  // Método sobre un array: `arr.push(x)`, `arr.get(i)`, … El callee es un fieldAccess
-  // cuyo target evalúa a un PineArray. (Un fieldAccess que no resuelve a array da el
-  // error genérico de "método de objeto no soportado".)
+  // Constructor `chart.point.new(...)`: el callee es un fieldAccess cuyo target es el
+  // MemberExpr `chart.point` y cuyo field es "new".
+  if (
+    callee.kind === "fieldAccess" &&
+    callee.field === "new" &&
+    callee.target.kind === "member" &&
+    callee.target.object === "chart" &&
+    callee.target.property === "point"
+  ) {
+    const argValues = e.args.map((a) => evalExprT(ctx, a.value));
+    return chartPointNew(argValues, e);
+  }
+
+  // Método sobre un array o un handle de dibujo: `arr.push(x)`, `l.set_xy1(...)`,
+  // `b.delete()`. El callee es un fieldAccess cuyo target evalúa al receptor.
   if (callee.kind === "fieldAccess") {
     const target = evalExprT(ctx, callee.target);
     if (target instanceof PineArray) {
       const argValues = e.args.map((a) => evalExprT(ctx, a.value));
       return callArrayMethod(target, callee.field, argValues, e);
+    }
+    if (target instanceof PineLabel || target instanceof PineLine || target instanceof PineBox) {
+      const argValues = e.args.map((a) => evalExprT(ctx, a.value));
+      return callDrawMethod(target, callee.field, argValues, e);
+    }
+    if (target === null) {
+      throw new PineRuntimeError(
+        `No se puede llamar a '.${callee.field}()' sobre un objeto na`,
+        e,
+      );
     }
     throw new PineRuntimeError(
       `'.${callee.field}()' no está soportado (los métodos de objeto llegan en una fase posterior)`,
@@ -612,6 +653,36 @@ function evalCallT(ctx: ExecutionContext, e: CallExpr): EvalValue {
     return callArrayMethod(arr, callee.property, argValues.slice(1), e);
   }
 
+  // Namespace de dibujos: `label.new(...)`, `line.new(...)`, `box.new(...)` y forma
+  // funcional de mutadores `line.set_xy1(l, ...)`, `label.delete(lbl)`, …
+  if (
+    callee.kind === "member" &&
+    (callee.object === "label" || callee.object === "line" || callee.object === "box")
+  ) {
+    const ns = callee.object;
+    const evaluatedArgs = e.args.map((a) => ({ name: a.name, value: evalExprT(ctx, a.value) }));
+    if (callee.property === "new") {
+      if (ns === "label") return labelNew(ctx.drawings, evaluatedArgs, e);
+      if (ns === "line") return lineNew(ctx.drawings, evaluatedArgs, e);
+      return boxNew(ctx.drawings, evaluatedArgs, e);
+    }
+    // Forma funcional: el primer argumento es el handle, el resto los parámetros.
+    if (evaluatedArgs.length === 0) {
+      throw new PineRuntimeError(`'${ns}.${callee.property}()' requiere el handle como primer argumento`, e);
+    }
+    const handle = evaluatedArgs[0].value;
+    if (handle === null) {
+      throw new PineRuntimeError(`'${ns}.${callee.property}()' recibió un handle na`, e);
+    }
+    if (!(handle instanceof PineLabel || handle instanceof PineLine || handle instanceof PineBox)) {
+      throw new PineRuntimeError(
+        `El primer argumento de '${ns}.${callee.property}()' debe ser un ${ns}`,
+        e,
+      );
+    }
+    return callDrawMethod(handle, callee.property, evaluatedArgs.slice(1).map((a) => a.value), e);
+  }
+
   const evaluated = evalArgs(ctx, e.args);
 
   if (callee.kind === "ident") {
@@ -645,6 +716,32 @@ function evalCallT(ctx: ExecutionContext, e: CallExpr): EvalValue {
         const c = mapped[4];
         ctx.recordShape(e.callSiteId, toBool(mapped[0] ?? null), typeof c === "string" ? c : null);
         return null;
+      }
+      case "plotcandle": {
+        const mapped = mapArgs(e, evaluated, PLOTCANDLE_PARAMS, 4);
+        const numOrNull = (v: PineValue | undefined): number | null =>
+          typeof v === "number" && Number.isFinite(v) ? v : null;
+        const strOrU = (v: PineValue | undefined): string | undefined =>
+          typeof v === "string" ? v : undefined;
+        const open = numOrNull(mapped[0]);
+        // na en open (p.ej. plotcandle(na, high, low, close)) → cuerpo omitido (whitespace).
+        if (open === null) return null;
+        ctx.recordCandle(e.callSiteId, {
+          open,
+          high: numOrNull(mapped[1]),
+          low: numOrNull(mapped[2]),
+          close: numOrNull(mapped[3]),
+          color: strOrU(mapped[5]),
+          wickColor: strOrU(mapped[6]),
+          borderColor: strOrU(mapped[9]),
+        });
+        return null;
+      }
+      case "color": {
+        // color(x): con na → null (sin color/transparente); con un color → passthrough.
+        const mapped = mapArgs(e, evaluated, ["x"], 1);
+        const v = mapped[0];
+        return typeof v === "string" ? v : null;
       }
       case "nz": {
         const mapped = mapArgs(e, evaluated, ["source", "replacement"], 1);

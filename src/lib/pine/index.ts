@@ -5,8 +5,13 @@ import { lex } from "./lexer";
 import { parse } from "./parser";
 import { runProgram } from "./runtime/interpreter";
 import type {
+  BoxDrawing,
+  CandleResult,
   CompiledScript,
   CompileResult,
+  DrawingsResult,
+  LabelDrawing,
+  LineDrawing,
   PlotPoint,
   PlotResult,
   RunOptions,
@@ -37,6 +42,8 @@ export function compile(source: string): CompileResult {
         inputs: analysis.inputs,
         hlines: analysis.hlines,
         shapes: analysis.shapes,
+        candleSpecs: analysis.candleSpecs,
+        limits: analysis.limits,
         warnings: analysis.warnings,
         program,
       },
@@ -85,7 +92,11 @@ export function runScript(
   inputs: Record<string, number | string | boolean> = {},
   options?: RunOptions,
 ): ScriptResult {
-  const ctx = runProgram(script.program, candles, inputs, options, script.inputs);
+  const ctx = runProgram(script.program, candles, inputs, options, script.inputs, {
+    maxLabels: script.limits.maxLabels,
+    maxLines: script.limits.maxLines,
+    maxBoxes: script.limits.maxBoxes,
+  });
 
   const plots: PlotResult[] = script.plots.map((spec) => {
     const values = ctx.plotValues.get(spec.id);
@@ -129,18 +140,89 @@ export function runScript(
     return { spec, points };
   });
 
-  return { plots, shapes };
+  // ---- drawings (objetos vivos no borrados) -------------------------------
+  const labels: LabelDrawing[] = ctx.drawings.labels
+    .filter((l) => !l.deleted)
+    .map((l) => ({
+      id: l.id,
+      x: l.x,
+      y: l.y,
+      text: l.text,
+      color: l.color,
+      textcolor: l.textcolor,
+      style: l.style,
+      size: l.size,
+      xloc: l.xloc,
+    }));
+  const lines: LineDrawing[] = ctx.drawings.lines
+    .filter((l) => !l.deleted)
+    .map((l) => ({
+      id: l.id,
+      p1: { time: l.p1.time, index: l.p1.index, price: l.p1.price },
+      p2: { time: l.p2.time, index: l.p2.index, price: l.p2.price },
+      color: l.color,
+      style: l.style,
+      width: l.width,
+      xloc: l.xloc,
+      extend: l.extend,
+    }));
+  const boxes: BoxDrawing[] = ctx.drawings.boxes
+    .filter((b) => !b.deleted)
+    .map((b) => ({
+      id: b.id,
+      topLeft: { time: b.topLeft.time, index: b.topLeft.index, price: b.topLeft.price },
+      bottomRight: {
+        time: b.bottomRight.time,
+        index: b.bottomRight.index,
+        price: b.bottomRight.price,
+      },
+      bgcolor: b.bgcolor,
+      borderColor: b.borderColor,
+      borderWidth: b.borderWidth,
+      xloc: b.xloc,
+      extend: b.extend,
+    }));
+  const drawings: DrawingsResult = { labels, lines, boxes };
+
+  // ---- plotcandle ---------------------------------------------------------
+  const candleResults: CandleResult[] = script.candleSpecs.map((spec) => {
+    const recorded = ctx.candlePoints.get(spec.id) ?? [];
+    const points = recorded
+      .filter((p) => p.open !== null)
+      .map((p) => ({
+        time: candles[p.barIndex].time,
+        open: p.open as number,
+        high: p.high,
+        low: p.low,
+        close: p.close,
+        ...(p.color !== undefined ? { color: p.color } : {}),
+        ...(p.wickColor !== undefined ? { wickColor: p.wickColor } : {}),
+        ...(p.borderColor !== undefined ? { borderColor: p.borderColor } : {}),
+      }));
+    return { title: spec.title, points };
+  });
+
+  return { plots, shapes, drawings, candles: candleResults };
 }
 
 export { PineRuntimeError, PineSyntaxError } from "./errors";
 export type {
+  BoxDrawing,
+  CandlePointResult,
+  CandleResult,
+  CandleSpec,
   CompiledScript,
   CompileResult,
   Diagnostic,
+  DrawingLimitsSpec,
+  DrawingPoint,
+  DrawingsResult,
   HLineSpec,
   IndicatorMeta,
   InputDef,
   InputType,
+  LabelDrawing,
+  LineDrawing,
   PineValue,
   PlotPoint,
   PlotResult,

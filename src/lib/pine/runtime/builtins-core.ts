@@ -106,6 +106,65 @@ export const SIZE_CONSTANTS: Record<string, number> = {
   huge: 2,
 };
 
+/** Constantes label.style_* → nombre simbólico de estilo (la capa de render lo mapea). */
+export const LABEL_STYLE_CONSTANTS: Record<string, string> = {
+  style_none: "none",
+  style_label_up: "label_up",
+  style_label_down: "label_down",
+  style_label_left: "label_left",
+  style_label_right: "label_right",
+  style_label_lower_left: "label_lower_left",
+  style_label_lower_right: "label_lower_right",
+  style_label_upper_left: "label_upper_left",
+  style_label_upper_right: "label_upper_right",
+  style_label_center: "label_center",
+  style_circle: "circle",
+  style_square: "square",
+  style_diamond: "diamond",
+  style_arrowup: "arrowup",
+  style_arrowdown: "arrowdown",
+  style_xcross: "xcross",
+  style_cross: "cross",
+  style_triangleup: "triangleup",
+  style_triangledown: "triangledown",
+  style_flag: "flag",
+  style_text_outline: "text_outline",
+};
+
+/** Constantes line.style_* / box.* → nombre simbólico de estilo de línea. */
+export const LINE_STYLE_CONSTANTS: Record<string, string> = {
+  style_solid: "solid",
+  style_dashed: "dashed",
+  style_dotted: "dotted",
+  style_arrow_left: "arrow_left",
+  style_arrow_right: "arrow_right",
+  style_arrow_both: "arrow_both",
+};
+
+/** Constantes xloc.* → unidad de la coordenada X de un dibujo. */
+export const XLOC_CONSTANTS: Record<string, string> = {
+  bar_time: "bar_time",
+  bar_index: "bar_index",
+};
+
+/** Constantes extend.* → dirección de extensión de línea/caja. */
+export const EXTEND_CONSTANTS: Record<string, string> = {
+  none: "none",
+  left: "left",
+  right: "right",
+  both: "both",
+};
+
+/** Constantes size.* SIMBÓLICAS para labels (size.* numérico vive en SIZE_CONSTANTS para plotshape). */
+export const LABEL_SIZE_NAMES: Record<string, string> = {
+  auto: "auto",
+  tiny: "tiny",
+  small: "small",
+  normal: "normal",
+  large: "large",
+  huge: "huge",
+};
+
 /** Tabla unificada de constantes por namespace (analyze y evalMember la comparten). */
 export const NAMESPACE_CONSTANTS: Record<string, Record<string, string | number>> = {
   color: COLOR_CONSTANTS,
@@ -114,6 +173,11 @@ export const NAMESPACE_CONSTANTS: Record<string, Record<string, string | number>
   location: LOCATION_CONSTANTS,
   shape: SHAPE_CONSTANTS,
   size: SIZE_CONSTANTS,
+  label: LABEL_STYLE_CONSTANTS,
+  line: LINE_STYLE_CONSTANTS,
+  box: LINE_STYLE_CONSTANTS,
+  xloc: XLOC_CONSTANTS,
+  extend: EXTEND_CONSTANTS,
 };
 
 /** Parámetros de hline() (price/title/color/linestyle/linewidth tienen efecto). */
@@ -182,7 +246,7 @@ export const INPUT_PARAMS: Record<string, string[]> = {
   generic: ["defval", "title", "tooltip", "inline", "group", "confirm", "display"],
 };
 
-/** Parámetros aceptados por indicator(); solo title/shorttitle/overlay tienen efecto. */
+/** Parámetros aceptados por indicator(); solo title/shorttitle/overlay/max_*_count tienen efecto. */
 export const INDICATOR_PARAMS = [
   "title",
   "shorttitle",
@@ -192,4 +256,76 @@ export const INDICATOR_PARAMS = [
   "timeframe",
   "timeframe_gaps",
   "max_bars_back",
+  "max_lines_count",
+  "max_labels_count",
+  "max_boxes_count",
+];
+
+/** Parámetros de label.new() en su forma (x, y, text, ...). */
+export const LABEL_PARAMS = [
+  "x",
+  "y",
+  "text",
+  "xloc",
+  "yloc",
+  "color",
+  "style",
+  "textcolor",
+  "size",
+  "textalign",
+  "tooltip",
+  "text_font_family",
+  "force_overlay",
+];
+
+/** Parámetros de line.new() en su forma (x1, y1, x2, y2, ...). */
+export const LINE_PARAMS = [
+  "x1",
+  "y1",
+  "x2",
+  "y2",
+  "xloc",
+  "extend",
+  "color",
+  "style",
+  "width",
+  "force_overlay",
+];
+
+/** Parámetros de box.new() en su forma (left, top, right, bottom, ...). */
+export const BOX_PARAMS = [
+  "left",
+  "top",
+  "right",
+  "bottom",
+  "border_color",
+  "border_width",
+  "border_style",
+  "extend",
+  "xloc",
+  "bgcolor",
+  "text",
+  "text_size",
+  "text_color",
+  "text_halign",
+  "text_valign",
+  "text_wrap",
+  "text_font_family",
+  "force_overlay",
+];
+
+/** Parámetros de plotcandle() (orden Pine v5). */
+export const PLOTCANDLE_PARAMS = [
+  "open",
+  "high",
+  "low",
+  "close",
+  "title",
+  "color",
+  "wickcolor",
+  "editable",
+  "show_last",
+  "bordercolor",
+  "display",
+  "force_overlay",
 ];

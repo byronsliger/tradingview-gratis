@@ -7,6 +7,7 @@ import {
   INDICATOR_PARAMS,
   INPUT_PARAMS,
   NAMESPACE_CONSTANTS,
+  PLOTCANDLE_PARAMS,
   PLOTCHAR_PARAMS,
   PLOTSHAPE_PARAMS,
   PLOT_PARAMS,
@@ -15,7 +16,9 @@ import {
   SOURCE_NAMES,
 } from "./runtime/builtins-core";
 import type {
+  CandleSpec,
   Diagnostic,
+  DrawingLimitsSpec,
   HLineSpec,
   IndicatorMeta,
   InputDef,
@@ -32,6 +35,8 @@ export interface Analysis {
   inputs: InputDef[];
   hlines: HLineSpec[];
   shapes: ShapeSpec[];
+  candleSpecs: CandleSpec[];
+  limits: DrawingLimitsSpec;
   warnings: Diagnostic[];
   errors: Diagnostic[];
 }
@@ -60,6 +65,7 @@ export function analyze(program: Program): Analysis {
   const plotCalls = calls.filter((c) => isBareCall(c, "plot"));
   const hlineCalls = calls.filter((c) => isBareCall(c, "hline"));
   const shapeCalls = calls.filter((c) => isBareCall(c, "plotshape") || isBareCall(c, "plotchar"));
+  const candleCalls = calls.filter((c) => isBareCall(c, "plotcandle"));
   const inputCalls = calls.filter(
     (c) =>
       isBareCall(c, "input") ||
@@ -67,6 +73,7 @@ export function analyze(program: Program): Analysis {
   );
 
   const meta: IndicatorMeta = { title: "Indicator", overlay: false };
+  const limits: DrawingLimitsSpec = { maxLabels: 50, maxLines: 50, maxBoxes: 50 };
   if (indicatorCalls.length === 0) {
     warn(TOP_OF_FILE, "El script no declara indicator(); se usa título y overlay por defecto");
   } else {
@@ -91,6 +98,17 @@ export function analyze(program: Program): Analysis {
       if (typeof overlay === "boolean") meta.overlay = overlay;
       else warn(overlayExpr, "overlay debe ser true o false literal");
     }
+    const limitArg = (name: string): number | undefined => {
+      const expr = argExpr(ind, INDICATOR_PARAMS, name);
+      if (!expr) return undefined;
+      const lit = literalOf(expr);
+      if (typeof lit === "number" && Number.isFinite(lit) && lit >= 0) return Math.round(lit);
+      warn(expr, `'${name}' de indicator() debe ser un número literal; se usa 50`);
+      return undefined;
+    };
+    limits.maxLabels = limitArg("max_labels_count") ?? 50;
+    limits.maxLines = limitArg("max_lines_count") ?? 50;
+    limits.maxBoxes = limitArg("max_boxes_count") ?? 50;
   }
 
   // ---- inputs ------------------------------------------------------------
@@ -224,11 +242,35 @@ export function analyze(program: Program): Analysis {
     };
   });
 
-  if (plots.length === 0 && shapes.length === 0 && hlines.length === 0) {
+  // ---- plotcandle ---------------------------------------------------------
+  const candleSpecs: CandleSpec[] = candleCalls.map((call, i) => {
+    const titleExpr = argExpr(call, PLOTCANDLE_PARAMS, "title");
+    const titleLit = titleExpr ? literalOf(titleExpr) : undefined;
+    return {
+      id: call.callSiteId,
+      title: typeof titleLit === "string" ? titleLit : `Candle ${i + 1}`,
+    };
+  });
+
+  // Las llamadas de dibujo (label/line/box.new) no se conocen estáticamente; basta
+  // con que exista alguna para no avisar "no dibuja nada".
+  const hasDrawingCall = calls.some(
+    (c) =>
+      c.callee.kind === "member" &&
+      (c.callee.object === "label" || c.callee.object === "line" || c.callee.object === "box") &&
+      c.callee.property === "new",
+  );
+  if (
+    plots.length === 0 &&
+    shapes.length === 0 &&
+    hlines.length === 0 &&
+    candleSpecs.length === 0 &&
+    !hasDrawingCall
+  ) {
     warn(TOP_OF_FILE, "El script no tiene ningún plot(): no dibujará nada");
   }
 
-  return { meta, plots, inputs, hlines, shapes, warnings, errors };
+  return { meta, plots, inputs, hlines, shapes, candleSpecs, limits, warnings, errors };
 }
 
 interface Reporter {

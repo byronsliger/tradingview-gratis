@@ -50,7 +50,7 @@ function posOf(t: SourcePos): SourcePos {
 const NAMESPACES = new Set([
   "ta", "math", "color", "input", "plot", "location", "shape", "size", "hline",
   "line", "label", "box", "chart", "barstate", "timeframe", "syminfo", "str",
-  "array", "request",
+  "array", "request", "xloc", "extend",
 ]);
 
 function isBlockStmt(stmt: Stmt): boolean {

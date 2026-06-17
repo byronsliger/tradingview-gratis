@@ -3,7 +3,20 @@ import type { FuncDeclStmt } from "../ast";
 import { PineRuntimeError, type SourcePos } from "../errors";
 import type { InputDef, RunOptions } from "../types";
 import type { TypeDescriptor } from "./objects";
+import { DrawingStore } from "./drawings";
 import { Series } from "./series";
+
+/** Punto OHLC de un plotcandle() por barra (na en open → cuerpo omitido). */
+export interface CandlePoint {
+  barIndex: number;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  color?: string;
+  wickColor?: string;
+  borderColor?: string;
+}
 
 export const DEFAULT_FUEL_PER_BAR = 50_000;
 export const DEFAULT_FUEL_TOTAL = 5_000_000;
@@ -17,6 +30,13 @@ export interface VarSlot {
 export interface FuncDef {
   params: string[];
   decl: FuncDeclStmt;
+}
+
+/** Límites de objetos de dibujo (de indicator(max_*_count); default 50 como Pine). */
+export interface DrawingLimits {
+  maxLabels?: number;
+  maxLines?: number;
+  maxBoxes?: number;
 }
 
 /** Estado de una ejecución completa del script (se crea uno nuevo por run). */
@@ -38,6 +58,12 @@ export class ExecutionContext {
 
   /** Descriptores de tipos definidos por el usuario (UDTs), por nombre. */
   readonly types = new Map<string, TypeDescriptor>();
+
+  /** Grafo de objetos de dibujo (label/line/box) creados durante el run. */
+  readonly drawings: DrawingStore;
+
+  /** Puntos OHLC de cada plotcandle() por callSiteId, en orden de barra. */
+  readonly candlePoints = new Map<number, CandlePoint[]>();
 
   /**
    * Prefijo del estado por call-site, derivado de la pila de llamadas a funciones
@@ -69,12 +95,28 @@ export class ExecutionContext {
     inputs: Record<string, number | string | boolean>,
     options?: RunOptions,
     inputDefs: InputDef[] = [],
+    limits?: DrawingLimits,
   ) {
     this.candles = candles;
     this.inputs = inputs;
     this.maxFuelPerBar = options?.maxFuelPerBar ?? DEFAULT_FUEL_PER_BAR;
     this.maxFuelTotal = options?.maxFuelTotal ?? DEFAULT_FUEL_TOTAL;
+    this.drawings = new DrawingStore(
+      limits?.maxLabels ?? 50,
+      limits?.maxLines ?? 50,
+      limits?.maxBoxes ?? 50,
+    );
     for (const def of inputDefs) this.inputDefsByCallSite.set(def.callSiteId, def);
+  }
+
+  /** Registra el OHLC + colores de un plotcandle() en la barra actual. */
+  recordCandle(callSiteId: number, point: Omit<CandlePoint, "barIndex">): void {
+    let arr = this.candlePoints.get(callSiteId);
+    if (!arr) {
+      arr = [];
+      this.candlePoints.set(callSiteId, arr);
+    }
+    arr.push({ barIndex: this.barIndex, ...point });
   }
 
   /** InputDef del input.*() en ese call-site (extraído por analyze). */
