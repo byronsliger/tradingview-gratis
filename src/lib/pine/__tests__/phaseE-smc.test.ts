@@ -67,4 +67,25 @@ describe("LuxAlgo SMC end-to-end", () => {
   it("corre en modo monocromo", () => {
     expect(() => runWith({ Style: "Monochrome" })).not.toThrow();
   });
+
+  it("no lanza al mitigar order blocks (for-in que muta el array durante 1500 velas)", () => {
+    // Serie larga con ondas → crea y mitiga order blocks, ejercitando
+    // deleteOrderBlocks (remove(index) dentro de un for-in). Regresión del
+    // bug 'No se puede leer barHigh de un objeto na'.
+    let s = 7;
+    const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+    let p = 100;
+    const candles: Candle[] = [];
+    for (let i = 0; i < 1500; i++) {
+      const o = p;
+      p = p + (Math.sin(i / 40) * 3 + Math.sin(i / 13) * 1.5) * 0.5 + (rnd() - 0.5) * 4;
+      if (p < 5) p = 5;
+      candles.push({ time: 1_700_000_000 + i * 3600, open: o, high: Math.max(o, p) + rnd() * 2, low: Math.min(o, p) - rnd() * 2, close: p, volume: 100 + i });
+    }
+    const res = compile(SRC);
+    if (!res.ok) throw new Error("no compila");
+    expect(() =>
+      runScript(res.script, candles, { "Swing Order Blocks": true, "Internal Order Blocks": true, "Fair Value Gaps": true }, undefined, { symbol: "BTCUSDT", timeframe: "60", htf: {} }),
+    ).not.toThrow();
+  });
 });

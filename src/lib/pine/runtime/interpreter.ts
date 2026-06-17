@@ -310,10 +310,14 @@ function execForIn(ctx: ExecutionContext, stmt: Extract<Stmt, { kind: "forInStmt
     scope.set(stmt.indexVar, indexSlot);
   }
 
-  const count = iterable.items.length; // snapshot del tamaño inicial
-  for (let i = 0; i < count; i++) {
+  // Snapshot de los ELEMENTOS (copia), no solo del tamaño: si el cuerpo muta el
+  // array (p. ej. deleteOrderBlocks hace remove(index) durante la iteración), el
+  // valor de cada vuelta sigue siendo el elemento original y nunca se lee na de
+  // una posición ya removida.
+  const snapshot = iterable.items.slice();
+  for (let i = 0; i < snapshot.length; i++) {
     ctx.consumeFuel(stmt); // cada iteración consume fuel
-    valueSlot.series.set(ctx.barIndex, iterable.items[i] ?? null);
+    valueSlot.series.set(ctx.barIndex, snapshot[i] ?? null);
     if (indexSlot) indexSlot.series.set(ctx.barIndex, i);
     try {
       execBlock(ctx, stmt.body);

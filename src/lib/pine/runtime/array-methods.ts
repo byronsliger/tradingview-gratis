@@ -89,8 +89,12 @@ export function callArrayMethod(
       return items[items.length - 1] ?? null;
     }
     case "remove": {
-      const i = indexArg(args, 0, items.length, pos, method);
-      return items.splice(i, 1)[0] ?? null;
+      // Tolerante a índice fuera de rango: durante un for-in que muta el array
+      // (deleteOrderBlocks/deleteFairValueGaps), los índices pueden desalinearse
+      // al encoger. Devolver na en vez de lanzar evita tumbar el indicador.
+      const ri = Math.floor(numericArg(args[0], pos, "index"));
+      if (ri < 0 || ri >= items.length) return null;
+      return items.splice(ri, 1)[0] ?? null;
     }
     case "insert": {
       const i = Math.floor(numericArg(args[0], pos, "index"));
