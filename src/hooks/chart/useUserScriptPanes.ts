@@ -5,6 +5,7 @@ import {
   LineSeries,
   HistogramSeries,
   AreaSeries,
+  CandlestickSeries,
   LineType,
   createSeriesMarkers,
   type IChartApi,
@@ -17,10 +18,13 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { compile, runScript, PineRuntimeError, type CompiledScript, type CompileResult } from "@/lib/pine";
-import type { PlotSpec } from "@/lib/pine/types";
+import type { PlotSpec, DrawingPoint } from "@/lib/pine/types";
 import type { Candle } from "@/lib/binance/types";
 import type { PineScriptRecord } from "@/lib/store/chart-store";
 import { LineSegmentsPrimitive, type LineSegment } from "@/lib/chart/LineSegmentsPrimitive";
+import { LinesPrimitive, type DrawLine } from "@/lib/chart/LinesPrimitive";
+import { BoxesPrimitive, type DrawBox } from "@/lib/chart/BoxesPrimitive";
+import { LabelsPrimitive, type DrawLabel } from "@/lib/chart/LabelsPrimitive";
 
 const DEFAULT_PLOT_COLOR = "#2962ff";
 
@@ -41,6 +45,20 @@ interface ScriptEntry {
   priceLines: IPriceLine[];
   /** Plugin de markers sobre la primera serie (plotshape/plotchar) */
   markers: ISeriesMarkersPluginApi<Time> | null;
+  /**
+   * Serie sobre la que cuelgan los primitives de dibujos (lines/boxes/labels).
+   * Es `series[0]` si el script tiene plots; si no, una LineSeries invisible
+   * creada solo para anclar (priceToCoordinate para Y).
+   */
+  drawingAnchor: AnySeries | null;
+  /** True si `drawingAnchor` es una serie invisible propia (hay que removerla en teardown). */
+  ownAnchor: boolean;
+  /** Primitives multi-objeto de dibujos (una instancia por tipo, .update(list)). */
+  linesPrim: LinesPrimitive | null;
+  boxesPrim: BoxesPrimitive | null;
+  labelsPrim: LabelsPrimitive | null;
+  /** CandlestickSeries del plotcandle() (null si el script no usa plotcandle). */
+  candleSeries: ISeriesApi<"Candlestick"> | null;
   /** Último valor finito del primer plot (para la pill); null = na/sin datos */
   lastValue: number | null;
   /** overlay=true → pane 0; si no, sub-pane propio */
@@ -87,6 +105,40 @@ export interface ScriptPill {
 
 function clampWidth(n: number): 1 | 2 | 3 | 4 {
   return Math.max(1, Math.min(4, Math.round(n))) as 1 | 2 | 3 | 4;
+}
+
+/** Estilo Pine de línea/borde → patrón de dash de los primitives. */
+function lineStyleToDash(style: string): string {
+  if (style === "dashed") return "dashed";
+  if (style === "dotted") return "dotted";
+  return "solid";
+}
+
+/**
+ * Resuelve la X de un DrawingPoint a un tiempo en SEGUNDOS UNIX (formato
+ * Candle.time del proyecto). El motor entrega `time` en MILISEGUNDOS (semántica
+ * Pine) e `index` como bar_index. Devuelve null si el punto no se puede ubicar.
+ *  - xloc 'bar_time': usar time si !=null (÷1000), si no caer al index.
+ *  - xloc 'bar_index': usar index→candles[index].time, si no caer al time.
+ */
+function resolvePointTime(p: DrawingPoint, xloc: string, candles: Candle[]): number | null {
+  const preferIndex = xloc === "bar_index";
+  const fromIndex = (): number | null => {
+    if (p.index === null) return null;
+    // bar_index puede apuntar a una barra futura (no cargada): extrapolar por intervalo.
+    const n = candles.length;
+    if (n === 0) return null;
+    if (p.index >= 0 && p.index < n) return candles[p.index].time;
+    if (p.index < 0) {
+      const interval = n >= 2 ? candles[1].time - candles[0].time : 60;
+      return candles[0].time + p.index * interval;
+    }
+    const interval = n >= 2 ? candles[n - 1].time - candles[n - 2].time : 60;
+    return candles[n - 1].time + (p.index - (n - 1)) * interval;
+  };
+  const fromTime = (): number | null => (p.time === null ? null : Math.floor(p.time / 1000));
+  if (preferIndex) return fromIndex() ?? fromTime();
+  return fromTime() ?? fromIndex();
 }
 
 /**
@@ -158,7 +210,12 @@ export function useUserScriptPanes(
   /** Ejecuta el script y vuelca cada plot/shape en sus series. Lanza PineRuntimeError. */
   const runAndSetData = useCallback(
     (entry: ScriptEntry, record: PineScriptRecord) => {
-      if (!entry.compiled || entry.series.length === 0) return;
+      // Un script puede no tener plots (solo dibujos/plotcandle, p. ej. SMC); en
+      // ese caso aún hay que ejecutarlo si tiene capa de dibujo.
+      if (!entry.compiled) return;
+      const hasDrawingLayer =
+        entry.linesPrim !== null || entry.boxesPrim !== null || entry.candleSeries !== null;
+      if (entry.series.length === 0 && !hasDrawingLayer) return;
       const result = runScript(entry.compiled, candlesRef.current, record.inputs);
 
       let firstLast: number | null = null;
@@ -248,6 +305,93 @@ export function useUserScriptPanes(
         // Los markers deben ir ordenados por tiempo ascendente.
         markers.sort((a, b) => (a.time as unknown as number) - (b.time as unknown as number));
         entry.markers.setMarkers(markers);
+      }
+
+      // ---- drawings (lines / boxes / labels) --------------------------------
+      const candles = candlesRef.current;
+      const hidden = record.hidden;
+
+      if (entry.linesPrim) {
+        const lines: DrawLine[] = hidden
+          ? []
+          : result.drawings.lines.map((l) => ({
+              t1: resolvePointTime(l.p1, l.xloc, candles),
+              p1: l.p1.price,
+              t2: resolvePointTime(l.p2, l.xloc, candles),
+              p2: l.p2.price,
+              color: l.color ?? "rgba(0,0,0,0)",
+              width: l.width,
+              dash: lineStyleToDash(l.style),
+              extend: l.extend,
+            }));
+        entry.linesPrim.update(lines);
+      }
+
+      if (entry.boxesPrim) {
+        const boxes: DrawBox[] = hidden
+          ? []
+          : result.drawings.boxes.map((b) => ({
+              tLeft: resolvePointTime(b.topLeft, b.xloc, candles),
+              pTop: b.topLeft.price,
+              tRight: resolvePointTime(b.bottomRight, b.xloc, candles),
+              pBottom: b.bottomRight.price,
+              bgcolor: b.bgcolor,
+              borderColor: b.borderColor,
+              borderWidth: b.borderWidth,
+              // BoxDrawing no expone estilo de borde (el motor lo trata como no-op);
+              // se pinta sólido. Limitación documentada.
+              dash: "solid",
+              extend: b.extend,
+            }));
+        entry.boxesPrim.update(boxes);
+      }
+
+      if (entry.labelsPrim) {
+        const labels: DrawLabel[] = hidden
+          ? []
+          : result.drawings.labels.map((l) => {
+              // label.x es time(ms) o bar_index según xloc; reutilizamos resolvePointTime
+              // tratando x como time/index según corresponda.
+              const pt: DrawingPoint =
+                l.xloc === "bar_index"
+                  ? { time: null, index: l.x, price: l.y }
+                  : { time: l.x, index: null, price: l.y };
+              return {
+                t: resolvePointTime(pt, l.xloc, candles),
+                price: l.y,
+                text: l.text,
+                color: l.color,
+                textcolor: l.textcolor,
+                style: l.style,
+                size: l.size,
+              };
+            });
+        entry.labelsPrim.update(labels);
+      }
+
+      // ---- plotcandle -------------------------------------------------------
+      if (entry.candleSeries) {
+        if (hidden) {
+          entry.candleSeries.setData([]);
+        } else {
+          // Una sola serie agrega todos los plotcandle() del script (raro tener >1).
+          const data = result.candles.flatMap((c) =>
+            c.points
+              .filter((p) => p.high !== null && p.low !== null && p.close !== null)
+              .map((p) => ({
+                time: p.time as UTCTimestamp,
+                open: p.open,
+                high: p.high as number,
+                low: p.low as number,
+                close: p.close as number,
+                ...(p.color ? { color: p.color } : {}),
+                ...(p.wickColor ? { wickColor: p.wickColor } : {}),
+                ...(p.borderColor ? { borderColor: p.borderColor } : {}),
+              })),
+          );
+          data.sort((a, b) => (a.time as number) - (b.time as number));
+          entry.candleSeries.setData(data);
+        }
       }
     },
     [candlesRef],
@@ -339,6 +483,18 @@ export function useUserScriptPanes(
           try { entry.series[idx]?.detachPrimitive(prim); } catch {}
         }
       });
+      // Primitives de dibujos (lines/boxes/labels) colgados del ancla.
+      const anchor = entry.drawingAnchor;
+      if (anchor) {
+        if (entry.linesPrim) { try { anchor.detachPrimitive(entry.linesPrim); } catch {} }
+        if (entry.boxesPrim) { try { anchor.detachPrimitive(entry.boxesPrim); } catch {} }
+        if (entry.labelsPrim) { try { anchor.detachPrimitive(entry.labelsPrim); } catch {} }
+        // Solo removemos el ancla si la creamos nosotros (no es series[0]).
+        if (entry.ownAnchor) { try { chart?.removeSeries(anchor); } catch {} }
+      }
+      if (entry.candleSeries) {
+        try { chart?.removeSeries(entry.candleSeries); } catch {}
+      }
       for (const s of entry.series) {
         try { chart?.removeSeries(s); } catch {}
       }
@@ -367,6 +523,12 @@ export function useUserScriptPanes(
           segments: [],
           priceLines: [],
           markers: null,
+          drawingAnchor: null,
+          ownAnchor: false,
+          linesPrim: null,
+          boxesPrim: null,
+          labelsPrim: null,
+          candleSeries: null,
           lastValue: null,
           overlay: true,
           paneIndex: 0,
@@ -422,8 +584,58 @@ export function useUserScriptPanes(
           }
         }
 
-        if (!overlay && first) {
-          first.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 } });
+        // ---- dibujos (line/box/label) + plotcandle --------------------------
+        const hasDrawings =
+          result.script.limits.maxLines > 0 ||
+          result.script.limits.maxBoxes > 0 ||
+          result.script.limits.maxLabels > 0;
+        // Solo montamos primitives si el script realmente dibuja algo. Detectamos
+        // por programa: si no hay plots pero sí dibujos/plotcandle, necesitamos ancla.
+        const hasCandles = result.script.candleSpecs.length > 0;
+        const needsDrawingLayer = hasDrawings || hasCandles;
+
+        if (needsDrawingLayer) {
+          // Ancla para colgar los primitives: la 1ª serie de plots, o una
+          // LineSeries invisible en el mismo pane si el script no tiene plots.
+          let anchor = first ?? null;
+          if (!anchor) {
+            anchor = chart.addSeries(
+              LineSeries,
+              {
+                lineVisible: false,
+                lastValueVisible: false,
+                priceLineVisible: false,
+                pointMarkersVisible: false,
+                crosshairMarkerVisible: false,
+                autoscaleInfoProvider: () => null,
+              },
+              paneIndex,
+            );
+            entry.ownAnchor = true;
+          }
+          entry.drawingAnchor = anchor;
+
+          if (hasDrawings) {
+            entry.linesPrim = new LinesPrimitive();
+            entry.boxesPrim = new BoxesPrimitive();
+            entry.labelsPrim = new LabelsPrimitive();
+            anchor.attachPrimitive(entry.boxesPrim);
+            anchor.attachPrimitive(entry.linesPrim);
+            anchor.attachPrimitive(entry.labelsPrim);
+          }
+
+          if (hasCandles) {
+            entry.candleSeries = chart.addSeries(
+              CandlestickSeries,
+              { priceLineVisible: false, lastValueVisible: false },
+              paneIndex,
+            );
+          }
+        }
+
+        const paneAnchor = first ?? entry.candleSeries ?? entry.drawingAnchor;
+        if (!overlay && paneAnchor) {
+          paneAnchor.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 } });
           try {
             chart.panes()[0]?.setStretchFactor(3);
             chart.panes()[paneIndex]?.setStretchFactor(1);
@@ -450,6 +662,16 @@ export function useUserScriptPanes(
       if (!entry) continue;
       const visible = record.onChart && !record.hidden;
       for (const s of entry.series) s.applyOptions({ visible });
+      entry.candleSeries?.applyOptions({ visible });
+      // Los dibujos no tienen flag de visibilidad: se ocultan vaciando la lista.
+      if (record.hidden) {
+        entry.linesPrim?.update([]);
+        entry.boxesPrim?.update([]);
+        entry.labelsPrim?.update([]);
+      } else if (entry.compiled) {
+        // Re-pintar al volver de hidden→visible (sin esperar al próximo tick).
+        try { runAndSetData(entry, record); } catch {}
+      }
     }
   }, [scripts, scriptBasePaneIdx, chartRef, teardownAll, compileCached, createPlotSeries, runAndSetData, recomputePaneOffsets, syncPillState]);
 
@@ -467,7 +689,10 @@ export function useUserScriptPanes(
     let changed = false;
     for (const record of scriptsRef.current) {
       const entry = entriesRef.current.get(record.id);
-      if (!entry || !entry.compiled || entry.series.length === 0) continue;
+      if (!entry || !entry.compiled) continue;
+      const hasDrawingLayer =
+        entry.linesPrim !== null || entry.boxesPrim !== null || entry.candleSeries !== null;
+      if (entry.series.length === 0 && !hasDrawingLayer) continue;
       try {
         runAndSetData(entry, record);
         if (entry.error !== undefined) { entry.error = undefined; changed = true; }
