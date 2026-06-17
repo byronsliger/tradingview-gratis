@@ -53,6 +53,8 @@ interface ScriptEntry {
   drawingAnchor: AnySeries | null;
   /** True si `drawingAnchor` es una serie invisible propia (hay que removerla en teardown). */
   ownAnchor: boolean;
+  /** Nº de velas con que se pobló el ancla (para no re-setear datos cada tick). */
+  anchorLen: number;
   /** Primitives multi-objeto de dibujos (una instancia por tipo, .update(list)). */
   linesPrim: LinesPrimitive | null;
   boxesPrim: BoxesPrimitive | null;
@@ -315,6 +317,17 @@ export function useUserScriptPanes(
       const candles = candlesRef.current;
       const hidden = record.hidden;
 
+      // La serie ancla invisible necesita DATOS para que priceToCoordinate()
+      // funcione (lightweight-charts devuelve null si la serie está vacía). Le
+      // damos los closes de las velas (no afecta el autoescala por el
+      // autoscaleInfoProvider:()=>null). Sin esto, ningún dibujo se pinta.
+      if (entry.ownAnchor && entry.drawingAnchor && entry.anchorLen !== candles.length) {
+        entry.anchorLen = candles.length;
+        (entry.drawingAnchor as ISeriesApi<"Line">).setData(
+          candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.close })),
+        );
+      }
+
       if (entry.linesPrim) {
         const lines: DrawLine[] = hidden
           ? []
@@ -529,6 +542,7 @@ export function useUserScriptPanes(
           markers: null,
           drawingAnchor: null,
           ownAnchor: false,
+          anchorLen: -1,
           linesPrim: null,
           boxesPrim: null,
           labelsPrim: null,
