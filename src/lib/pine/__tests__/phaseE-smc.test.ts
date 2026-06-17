@@ -64,6 +64,28 @@ describe("LuxAlgo SMC end-to-end", () => {
     expect(out.drawings!.boxes.length).toBeGreaterThan(0);
   });
 
+  it("crea Fair Value Gaps (timeframe.change('') es true en cada barra)", () => {
+    // Datos con huecos alcistas explícitos cada ~6 barras.
+    const candles: Candle[] = [];
+    let p = 100;
+    for (let i = 0; i < 120; i++) {
+      let o = p, c: number, hi: number, lo: number;
+      if (i % 6 === 3) { o = p; c = p + 30; hi = c + 2; lo = o - 1; }
+      else if (i % 6 === 4) { o = p; c = p + 4; hi = c + 3; lo = o + 1; }
+      else { o = p; c = p + (i % 2 === 0 ? 1 : -1); hi = Math.max(o, c) + 2; lo = Math.min(o, c) - 2; }
+      p = c;
+      candles.push({ time: 1_700_000_000 + i * 86400, open: o, high: hi, low: lo, close: c, volume: 100 });
+    }
+    const res = compile(SRC);
+    if (!res.ok) throw new Error("no compila");
+    const out = runScript(res.script, candles, {
+      "Fair Value Gaps": true, "Auto Threshold": false,
+      "Show Internal Structure": false, "Show Swing Structure": false,
+      "Internal Order Blocks": false, "Show Strong/Weak High/Low": false,
+    }, undefined, { symbol: "BTCUSDT", timeframe: "1d", htf: {} });
+    expect(out.drawings!.boxes.length).toBeGreaterThan(0);
+  });
+
   it("corre con niveles MTF (str.format + request.security D/W/M)", () => {
     const out = runWith(
       { Daily: true, Weekly: true, Monthly: true },

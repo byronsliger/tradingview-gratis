@@ -632,7 +632,14 @@ function evalTimeframeCall(ctx: ExecutionContext, e: CallExpr, prop: string): Pi
       throw new PineRuntimeError("timeframe.change() requiere un timeframe", e);
     }
     const tf = evalExpr(ctx, argExprs[0]);
-    const tfStr = typeof tf === "string" ? tf : "";
+    let tfStr = typeof tf === "string" ? tf : "";
+    // '' = timeframe del chart. Cada barra ES un periodo del tf del chart, así
+    // que el cambio es true en cada barra (clave para los FVG, que exigen
+    // timeframe.change('')). Resolvemos a ctx.timeframe; si no hay, true siempre.
+    if (tfStr.trim() === "") {
+      tfStr = ctx.timeframe ?? "";
+      if (tfStr.trim() === "") return true;
+    }
     const info = parseTimeframe(tfStr);
     if (!info) return false;
     const cur = ctx.candles[ctx.barIndex];
