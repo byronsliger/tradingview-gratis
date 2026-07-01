@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useEffect } from "react";
-import { useChartStore } from "@/lib/store/chart-store";
+import { useRef, useEffect, useMemo } from "react";
+import { useChartStore, type IndicatorKey } from "@/lib/store/chart-store";
 import type { Candle } from "@/lib/binance/types";
 import type { Timeframe } from "@/lib/binance/types";
 import { fetchExchangeSymbols } from "@/lib/binance/rest";
@@ -46,6 +46,20 @@ interface Props {
   timeframe: Timeframe;
 }
 
+// Identidad estable a nivel de módulo: se pasa como `hidden` a todos los hooks
+// cuando el toggle global "ocultar indicadores" está activo.
+const ALL_HIDDEN: Record<IndicatorKey, boolean> = {
+  ema20: true,
+  ema50: true,
+  ema200: true,
+  rsi: true,
+  macd: true,
+  volume: true,
+  sqzmom: true,
+  adx: true,
+  vrvp: true,
+};
+
 export function PriceChart({ symbol, timeframe }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const candlesRef = useRef<Candle[]>([]);
@@ -56,6 +70,15 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const tool = useChartStore((s) => s.tool);
   const theme = useChartStore((s) => s.theme);
   const scripts = useChartStore((s) => s.scripts);
+  const indicatorsHidden = useChartStore((s) => s.indicatorsHidden);
+
+  // Toggle global "ocultar indicadores": fuerza hidden en todo sin tocar los
+  // flags per-indicador (se restauran al reactivar).
+  const effectiveHidden = indicatorsHidden ? ALL_HIDDEN : hidden;
+  const effectiveScripts = useMemo(
+    () => (indicatorsHidden ? scripts.map((sc) => (sc.hidden ? sc : { ...sc, hidden: true })) : scripts),
+    [scripts, indicatorsHidden],
+  );
 
   useEffect(() => {
     // Prefetch symbol dictionary in the background on load
@@ -67,13 +90,13 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const { paneOffsets, recomputePaneOffsets } = usePaneLayout(chartRef, containerRef);
 
   const { candleSeriesRef, ema20Ref, ema50Ref, ema200Ref, updateEMAs, lastEMA20, lastEMA50, lastEMA200, lastVolume } =
-    useCandleSeries(chartRef, candlesRef, indicators, hidden, config, theme);
-  const { volumeSeriesRef } = useVolumeSeries(chartRef, candlesRef, indicators, hidden, recomputePaneOffsets);
-  const { updateRSI, rsiRef, lastRSI } = useRSIPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
-  const { updateMACD, macdRef, macdSignalRef, macdHistRef, lastMACD, lastMACDSignal, lastMACDHist } = useMACDPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
-  const { updateSQZ, sqzmomHistRef, sqzmomDotRef, lastSQZ } = useSQZPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
-  const { updateADX, adxRef, lastADX, lastPlusDI, lastMinusDI } = useADXPane(chartRef, candlesRef, indicators, hidden, config, recomputePaneOffsets);
-  const { updateVRVP, vrvpSeriesRef } = useVRVPSeries(chartRef, candlesRef, indicators, hidden, config);
+    useCandleSeries(chartRef, candlesRef, indicators, effectiveHidden, config, theme);
+  const { volumeSeriesRef } = useVolumeSeries(chartRef, candlesRef, indicators, effectiveHidden, recomputePaneOffsets);
+  const { updateRSI, rsiRef, lastRSI } = useRSIPane(chartRef, candlesRef, indicators, effectiveHidden, config, recomputePaneOffsets);
+  const { updateMACD, macdRef, macdSignalRef, macdHistRef, lastMACD, lastMACDSignal, lastMACDHist } = useMACDPane(chartRef, candlesRef, indicators, effectiveHidden, config, recomputePaneOffsets);
+  const { updateSQZ, sqzmomHistRef, sqzmomDotRef, lastSQZ } = useSQZPane(chartRef, candlesRef, indicators, effectiveHidden, config, recomputePaneOffsets);
+  const { updateADX, adxRef, lastADX, lastPlusDI, lastMinusDI } = useADXPane(chartRef, candlesRef, indicators, effectiveHidden, config, recomputePaneOffsets);
+  const { updateVRVP, vrvpSeriesRef } = useVRVPSeries(chartRef, candlesRef, indicators, effectiveHidden, config);
 
   usePriceLines(candleSeriesRef, symbol);
   // Trend line hooks must add their capture listeners BEFORE usePriceLineDrag so that
@@ -104,7 +127,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const { updateUserScripts, scriptLastValues, scriptErrors, scriptMeta, runCtxRef } = useUserScriptPanes(
     chartRef,
     candlesRef,
-    scripts,
+    effectiveScripts,
     scriptBasePaneIdx,
     recomputePaneOffsets,
     candleSeriesRef,
@@ -167,7 +190,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
   const mainPaneTop = paneOffsets[0]?.top ?? 0;
 
   // Pills de scripts Pine: overlay → ChartLegend, sub-pane → SubPaneLegend.
-  const scriptPills: ScriptPill[] = scripts
+  const scriptPills: ScriptPill[] = effectiveScripts
     .filter((s) => s.onChart)
     .map((s) => {
       const meta = scriptMeta[s.id];
@@ -239,7 +262,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
 
       <ChartLegend
         indicators={indicators}
-        hidden={hidden}
+        hidden={effectiveHidden}
         config={config}
         lastValues={lastValues}
         selectedIndicatorKey={selectedIndicatorKey}
@@ -250,7 +273,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
 
       <SubPaneLegend
         indicators={indicators}
-        hidden={hidden}
+        hidden={effectiveHidden}
         config={config}
         lastValues={lastValues}
         selectedIndicatorKey={selectedIndicatorKey}

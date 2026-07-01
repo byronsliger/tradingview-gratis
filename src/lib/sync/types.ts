@@ -20,6 +20,9 @@ export interface SyncedState {
   logScale: boolean;
   indicators: Record<IndicatorKey, boolean>;
   hidden: Record<IndicatorKey, boolean>;
+  /** Flags de visibilidad global (añadidos post-v2; opcionales para docs antiguos) */
+  drawingsHidden?: boolean;
+  indicatorsHidden?: boolean;
   config: IndicatorConfig;
   watchlist: string[];
   priceLines: PriceLine[];

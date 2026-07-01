@@ -251,6 +251,10 @@ interface ChartState {
   indicators: Record<IndicatorKey, boolean>;
   /** Indicator is hidden (eye icon off) — kept in pill list, just not rendered */
   hidden: Record<IndicatorKey, boolean>;
+  /** Oculta todos los dibujos (price lines + trendlines + rectángulos). No afecta indicadores. */
+  drawingsHidden: boolean;
+  /** Oculta todos los indicadores (builtin + scripts Pine). No afecta dibujos. */
+  indicatorsHidden: boolean;
   /** Periods and parameters for each indicator */
   config: IndicatorConfig;
   watchlist: string[];
@@ -287,6 +291,8 @@ interface ChartState {
   toggleIndicator: (key: IndicatorKey) => void;
   removeIndicator: (key: IndicatorKey) => void;
   toggleHidden: (key: IndicatorKey) => void;
+  toggleDrawingsHidden: () => void;
+  toggleIndicatorsHidden: () => void;
   setConfig: (patch: Partial<IndicatorConfig>) => void;
   addToWatchlist: (s: string) => void;
   removeFromWatchlist: (s: string) => void;
@@ -351,6 +357,8 @@ export const useChartStore = create<ChartState>()(
         adx: false,
         vrvp: false,
       },
+      drawingsHidden: false,
+      indicatorsHidden: false,
       config: { ...DEFAULT_CONFIG },
       watchlist: DEFAULT_WATCHLIST,
       scripts: [],
@@ -383,6 +391,8 @@ export const useChartStore = create<ChartState>()(
           hidden: !s.indicators[key]
             ? { ...s.hidden, [key]: false }
             : s.hidden,
+          // Al añadir un indicador, desactivar el ocultamiento global
+          indicatorsHidden: !s.indicators[key] ? false : s.indicatorsHidden,
         })),
       removeIndicator: (key) =>
         set((s) => ({
@@ -391,6 +401,21 @@ export const useChartStore = create<ChartState>()(
         })),
       toggleHidden: (key) =>
         set((s) => ({ hidden: { ...s.hidden, [key]: !s.hidden[key] } })),
+      toggleDrawingsHidden: () =>
+        set((s) =>
+          s.drawingsHidden
+            ? { drawingsHidden: false }
+            : {
+                drawingsHidden: true,
+                // Al ocultar: limpiar selección y cerrar dialogs de edición de dibujos
+                selectedPriceLineId: null,
+                selectedDrawingId: null,
+                priceLineEditTarget: null,
+                drawingEditTarget: null,
+              },
+        ),
+      toggleIndicatorsHidden: () =>
+        set((s) => ({ indicatorsHidden: !s.indicatorsHidden })),
       setConfig: (patch) =>
         set((s) => ({ config: { ...s.config, ...patch } })),
       addToWatchlist: (s) =>
@@ -421,6 +446,8 @@ export const useChartStore = create<ChartState>()(
               axisLabelVisible: state.drawingDefaults.hline.axisLabelVisible,
             },
           ],
+          // Al crear un dibujo, mostrar todos (evita "dibujé y no veo nada")
+          drawingsHidden: false,
         })),
       removePriceLine: (id) =>
         set((state) => ({
@@ -451,7 +478,7 @@ export const useChartStore = create<ChartState>()(
             [type]: { ...s.drawingDefaults[type], ...(patch as object) },
           },
         })),
-      addDrawing: (d) => set((s) => ({ drawings: [...s.drawings, d] })),
+      addDrawing: (d) => set((s) => ({ drawings: [...s.drawings, d], drawingsHidden: false })),
       removeDrawing: (id) => set((s) => ({ drawings: s.drawings.filter((d) => d.id !== id) })),
       updateDrawing: (id, patch) =>
         set((s) => ({
@@ -487,6 +514,8 @@ export const useChartStore = create<ChartState>()(
               updatedAt: Date.now(),
             },
           ],
+          // Al añadir un script al chart, desactivar el ocultamiento global
+          indicatorsHidden: opts?.onChart === false ? state.indicatorsHidden : false,
         }));
         return id;
       },
@@ -512,6 +541,10 @@ export const useChartStore = create<ChartState>()(
                 }
               : sc,
           ),
+          // Al añadir un script al chart, desactivar el ocultamiento global
+          indicatorsHidden: state.scripts.some((sc) => sc.id === id && !sc.onChart)
+            ? false
+            : state.indicatorsHidden,
         })),
       toggleScriptHidden: (id) =>
         set((state) => ({
@@ -532,6 +565,8 @@ export const useChartStore = create<ChartState>()(
         logScale: s.logScale,
         indicators: s.indicators,
         hidden: s.hidden,
+        drawingsHidden: s.drawingsHidden,
+        indicatorsHidden: s.indicatorsHidden,
         config: s.config,
         watchlist: s.watchlist,
         scripts: s.scripts,

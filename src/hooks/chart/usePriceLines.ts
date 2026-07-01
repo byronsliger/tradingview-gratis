@@ -10,13 +10,17 @@ export function usePriceLines(
   symbol: string,
 ) {
   const priceLines = useChartStore((s) => s.priceLines);
+  const drawingsHidden = useChartStore((s) => s.drawingsHidden);
   const priceLinesMapRef = useRef<Map<string, IPriceLine>>(new Map());
 
   useEffect(() => {
     const series = candleSeriesRef.current;
     if (!series) return;
     const map = priceLinesMapRef.current;
-    const linesForSymbol = priceLines.filter((p) => p.symbol === symbol);
+    // Con dibujos ocultos la lista efectiva es vacía → se remueven todas
+    const linesForSymbol = drawingsHidden
+      ? []
+      : priceLines.filter((p) => p.symbol === symbol);
     const activeIds = new Set(linesForSymbol.map((p) => p.id));
 
     // Remove deleted lines
@@ -44,5 +48,5 @@ export function usePriceLines(
         map.get(pl.id)!.applyOptions(opts);
       }
     }
-  }, [priceLines, symbol, candleSeriesRef]);
+  }, [priceLines, symbol, candleSeriesRef, drawingsHidden]);
 }

@@ -1,6 +1,8 @@
 "use client";
 
-import { Code2, Moon, Sun, Zap } from "lucide-react";
+import { ChartCandlestick, Code2, Moon, Sun, Zap } from "lucide-react";
+import { ChartCandlestickOff } from "@/components/icons/ChartCandlestickOff";
+import { cn } from "@/lib/utils";
 import { SymbolSelector } from "@/components/chart/SymbolSelector";
 import { TimeframeSelector } from "@/components/chart/TimeframeSelector";
 import { IndicatorMenu } from "@/components/chart/IndicatorMenu";
@@ -11,6 +13,8 @@ import { useChartStore } from "@/lib/store/chart-store";
 export function Header() {
   const theme = useChartStore((s) => s.theme);
   const setTheme = useChartStore((s) => s.setTheme);
+  const indicatorsHidden = useChartStore((s) => s.indicatorsHidden);
+  const toggleIndicatorsHidden = useChartStore((s) => s.toggleIndicatorsHidden);
 
   return (
     <header className="hidden h-12 items-center justify-between border-b border-tv-border bg-tv-panel px-3 md:flex">
@@ -31,6 +35,23 @@ export function Header() {
         </div>
         <Separator orientation="vertical" className="mx-1 h-6 bg-tv-border" />
         <IndicatorMenu />
+        <button
+          onClick={toggleIndicatorsHidden}
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded",
+            indicatorsHidden
+              ? "bg-tv-blue/15 text-tv-blue"
+              : "text-tv-text-muted hover:bg-tv-panel-hover hover:text-tv-text",
+          )}
+          title={indicatorsHidden ? "Mostrar indicadores" : "Ocultar todos los indicadores"}
+          aria-label={indicatorsHidden ? "Mostrar indicadores" : "Ocultar todos los indicadores"}
+        >
+          {indicatorsHidden ? (
+            <ChartCandlestickOff className="h-4 w-4" />
+          ) : (
+            <ChartCandlestick className="h-4 w-4" />
+          )}
+        </button>
       </div>
 
       <div className="flex items-center gap-2">

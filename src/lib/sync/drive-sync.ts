@@ -70,6 +70,8 @@ function buildSnapshot(): SyncedState {
     logScale: s.logScale,
     indicators: s.indicators,
     hidden: s.hidden,
+    drawingsHidden: s.drawingsHidden,
+    indicatorsHidden: s.indicatorsHidden,
     config: s.config,
     watchlist: s.watchlist,
     priceLines: s.priceLines,
@@ -111,6 +113,9 @@ function applyRemote(doc: DriveSyncDocument, full: boolean): void {
     priceLines: remote.priceLines ?? [],
     indicators: { ...current.indicators, ...remote.indicators },
     hidden: { ...current.hidden, ...remote.hidden },
+    // Docs antiguos sin estos campos: preservar el valor local
+    drawingsHidden: remote.drawingsHidden ?? current.drawingsHidden,
+    indicatorsHidden: remote.indicatorsHidden ?? current.indicatorsHidden,
     config: { ...DEFAULT_CONFIG, ...remote.config },
     // Scripts Pine: last-write-wins del array completo (igual que drawings).
     scripts: remote.scripts ?? [],
@@ -276,6 +281,8 @@ function handleStoreChange(state: ChartSnapshot, prev: ChartSnapshot): void {
     state.priceLines !== prev.priceLines ||
     state.indicators !== prev.indicators ||
     state.hidden !== prev.hidden ||
+    state.drawingsHidden !== prev.drawingsHidden ||
+    state.indicatorsHidden !== prev.indicatorsHidden ||
     state.config !== prev.config ||
     state.drawingDefaults !== prev.drawingDefaults ||
     state.scripts !== prev.scripts;

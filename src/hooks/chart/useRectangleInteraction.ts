@@ -30,10 +30,14 @@ export function useRectangleInteraction(
   const setSelectedDrawingId = useChartStore((s) => s.setSelectedDrawingId);
   const setDrawingEditTarget = useChartStore((s) => s.setDrawingEditTarget);
   const drawings = useChartStore((s) => s.drawings);
+  const drawingsHidden = useChartStore((s) => s.drawingsHidden);
 
   const toolRef = useRef(tool);
   // eslint-disable-next-line react-hooks/refs
   toolRef.current = tool;
+  const drawingsHiddenRef = useRef(drawingsHidden);
+  // eslint-disable-next-line react-hooks/refs
+  drawingsHiddenRef.current = drawingsHidden;
   const updateDrawingRef = useRef(updateDrawing);
   // eslint-disable-next-line react-hooks/refs
   updateDrawingRef.current = updateDrawing;
@@ -267,6 +271,8 @@ export function useRectangleInteraction(
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLElement && ["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
       if (toolRef.current !== "cursor") return;
+      // Con dibujos ocultos, hoveredIdRef puede quedar stale — no borrar invisibles
+      if (drawingsHiddenRef.current) return;
       const selId = selectedIdRef.current;
       if (e.key === "Escape") { setSelectedRef.current(null); return; }
       if (e.key !== "Delete" && e.key !== "Backspace") return;

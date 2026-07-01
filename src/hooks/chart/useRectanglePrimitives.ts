@@ -14,6 +14,7 @@ export function useRectanglePrimitives(
 ): { primitivesRef: RefObject<Map<string, RectanglePrimitive>> } {
   const drawings = useChartStore((s) => s.drawings);
   const selectedDrawingId = useChartStore((s) => s.selectedDrawingId);
+  const drawingsHidden = useChartStore((s) => s.drawingsHidden);
 
   const primitivesRef = useRef(new Map<string, RectanglePrimitive>());
 
@@ -21,9 +22,12 @@ export function useRectanglePrimitives(
     const series = candleSeriesRef.current;
     if (!series) return;
 
-    const relevant = drawings.filter(
-      (d): d is RectangleDrawing => d.symbol === symbol && d.type === "rectangle",
-    );
+    // Con dibujos ocultos se detachan todos (el Map vacío también inhabilita el hit-test)
+    const relevant = drawingsHidden
+      ? []
+      : drawings.filter(
+          (d): d is RectangleDrawing => d.symbol === symbol && d.type === "rectangle",
+        );
     const existing = primitivesRef.current;
     const ids = new Set(relevant.map((d) => d.id));
 
@@ -46,7 +50,7 @@ export function useRectanglePrimitives(
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawings, selectedDrawingId, symbol]);
+  }, [drawings, selectedDrawingId, symbol, drawingsHidden]);
 
   useEffect(() => {
     const series = candleSeriesRef.current;

@@ -21,6 +21,7 @@ export function usePriceLineDrag(
   const setSelectedPriceLineId = useChartStore((s) => s.setSelectedPriceLineId);
   const selectedPriceLineId = useChartStore((s) => s.selectedPriceLineId);
   const setSelectedDrawingId = useChartStore((s) => s.setSelectedDrawingId);
+  const drawingsHidden = useChartStore((s) => s.drawingsHidden);
 
   const priceLinesRef = useRef(priceLines);
   // eslint-disable-next-line react-hooks/refs
@@ -49,6 +50,9 @@ export function usePriceLineDrag(
   const toolRef = useRef(tool);
   // eslint-disable-next-line react-hooks/refs
   toolRef.current = tool;
+  const drawingsHiddenRef = useRef(drawingsHidden);
+  // eslint-disable-next-line react-hooks/refs
+  drawingsHiddenRef.current = drawingsHidden;
 
   // Drag state
   const draggingIdRef = useRef<string | null>(null);
@@ -92,6 +96,7 @@ export function usePriceLineDrag(
 
     const onPointerMove = (e: PointerEvent) => {
       if (toolRef.current !== "cursor") return;
+      if (drawingsHiddenRef.current) return;
       const series = candleSeriesRef.current;
       if (!series) return;
       const y = getY(e);
@@ -132,6 +137,7 @@ export function usePriceLineDrag(
 
     const onPointerDown = (e: PointerEvent) => {
       if (toolRef.current !== "cursor") return;
+      if (drawingsHiddenRef.current) return;
       const id = findNearbyLine(getY(e));
 
       if (!id) {
@@ -185,6 +191,7 @@ export function usePriceLineDrag(
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLElement && ["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
       if (toolRef.current !== "cursor") return;
+      if (drawingsHiddenRef.current) return;
       if (e.key === "Escape") {
         setSelectedPriceLineIdRef.current(null);
         return;

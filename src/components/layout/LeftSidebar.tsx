@@ -1,6 +1,6 @@
 "use client";
 
-import { MousePointer2, Minus, Trash2, Lock, RectangleHorizontal, Slash } from "lucide-react";
+import { MousePointer2, Minus, Trash2, Lock, RectangleHorizontal, Slash, Ruler, Eye, EyeOff } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ const TOOLS: ToolDef[] = [
   { key: "hline",     icon: Minus,                label: "Línea horizontal",    hint: "Click en el chart para marcar un precio" },
   { key: "trendline", icon: Slash,                label: "Línea de tendencia",  hint: "Click en dos puntos para trazar una línea diagonal" },
   { key: "rectangle", icon: RectangleHorizontal,  label: "Rectángulo",          hint: "Click en dos puntos para dibujar un rectángulo" },
+  { key: "measure",   icon: Ruler,                label: "Regla",               hint: "Click en dos puntos para medir precio, % y barras" },
 ];
 
 const LOCKED = [
@@ -30,6 +31,8 @@ export function LeftSidebar() {
   const clearPriceLines = useChartStore((s) => s.clearPriceLines);
   const clearDrawings = useChartStore((s) => s.clearDrawings);
   const symbol = useChartStore((s) => s.symbol);
+  const drawingsHidden = useChartStore((s) => s.drawingsHidden);
+  const toggleDrawingsHidden = useChartStore((s) => s.toggleDrawingsHidden);
 
   function handleClearAll() {
     clearPriceLines(symbol);
@@ -64,6 +67,27 @@ export function LeftSidebar() {
           </Tooltip>
         );
       })}
+
+      <Tooltip>
+        <TooltipTrigger
+          onClick={toggleDrawingsHidden}
+          aria-label={drawingsHidden ? "Mostrar dibujos" : "Ocultar dibujos"}
+          className={cn(
+            "flex h-8 w-8 items-center justify-center rounded transition-colors hover:bg-tv-panel-hover",
+            drawingsHidden
+              ? "bg-tv-blue/15 text-tv-blue"
+              : "text-tv-text-muted hover:text-tv-text",
+          )}
+        >
+          {drawingsHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </TooltipTrigger>
+        <TooltipContent side="right" className="text-xs">
+          <div className="font-medium">{drawingsHidden ? "Mostrar dibujos" : "Ocultar dibujos"}</div>
+          <div className="mt-0.5 text-[10px] text-tv-text-muted">
+            Oculta líneas, tendencias y rectángulos. No afecta a los indicadores
+          </div>
+        </TooltipContent>
+      </Tooltip>
 
       <Tooltip>
         <TooltipTrigger

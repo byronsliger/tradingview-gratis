@@ -11,6 +11,9 @@ import {
   MoreHorizontal,
   Search,
   Trash2,
+  Ruler,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useChartStore, type DrawingTool } from "@/lib/store/chart-store";
 import type { Timeframe, SymbolInfo } from "@/lib/binance/types";
@@ -30,6 +33,7 @@ const DRAWING_TOOLS: { key: DrawingTool; icon: ElementType; label: string }[] = 
   { key: "hline", icon: Minus, label: "Horizontal" },
   { key: "trendline", icon: Slash, label: "Tendencia" },
   { key: "rectangle", icon: RectangleHorizontal, label: "Rectángulo" },
+  { key: "measure", icon: Ruler, label: "Regla" },
 ];
 
 type SheetType = "timeframe" | "drawings" | "more" | "watchlist" | "indicators" | "search" | null;
@@ -57,6 +61,10 @@ export function MobileChartTools() {
   const toggleIndicator = useChartStore((s) => s.toggleIndicator);
   const clearDrawings = useChartStore((s) => s.clearDrawings);
   const clearPriceLines = useChartStore((s) => s.clearPriceLines);
+  const drawingsHidden = useChartStore((s) => s.drawingsHidden);
+  const toggleDrawingsHidden = useChartStore((s) => s.toggleDrawingsHidden);
+  const indicatorsHidden = useChartStore((s) => s.indicatorsHidden);
+  const toggleIndicatorsHidden = useChartStore((s) => s.toggleIndicatorsHidden);
 
   useEffect(() => {
     if (activeSheet === "search" && allSymbols.length === 0) {
@@ -172,6 +180,21 @@ export function MobileChartTools() {
               </div>
               <button
                 onClick={() => {
+                  toggleDrawingsHidden();
+                  closeSheet();
+                }}
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-colors",
+                  drawingsHidden
+                    ? "bg-tv-blue/10 text-tv-blue hover:bg-tv-blue/20"
+                    : "bg-tv-bg text-tv-text-muted hover:text-tv-text"
+                )}
+              >
+                {drawingsHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                {drawingsHidden ? "Mostrar dibujos" : "Ocultar todos los dibujos"}
+              </button>
+              <button
+                onClick={() => {
                   clearPriceLines(symbol);
                   clearDrawings(symbol);
                   closeSheet();
@@ -261,6 +284,23 @@ export function MobileChartTools() {
 
           {renderedSheet === "indicators" && (
             <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between rounded-xl bg-tv-bg px-3 py-2">
+                <span className="text-sm font-medium text-tv-text">Ocultar todos los indicadores</span>
+                <button
+                  onClick={toggleIndicatorsHidden}
+                  className={cn(
+                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                    indicatorsHidden ? "bg-tv-blue" : "bg-tv-border"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                      indicatorsHidden ? "translate-x-6" : "translate-x-1"
+                    )}
+                  />
+                </button>
+              </div>
               {Object.entries(
                 ENTRIES.reduce<Record<string, typeof ENTRIES[0][]>>((acc, i) => {
                   (acc[i.group] ||= []).push(i);

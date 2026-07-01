@@ -14,6 +14,7 @@ export function useTrendLinePrimitives(
 ): { primitivesRef: RefObject<Map<string, TrendLinePrimitive>> } {
   const drawings = useChartStore((s) => s.drawings);
   const selectedDrawingId = useChartStore((s) => s.selectedDrawingId);
+  const drawingsHidden = useChartStore((s) => s.drawingsHidden);
 
   const primitivesRef = useRef(new Map<string, TrendLinePrimitive>());
 
@@ -21,9 +22,12 @@ export function useTrendLinePrimitives(
     const series = candleSeriesRef.current;
     if (!series) return;
 
-    const symbolDrawings = drawings.filter(
-      (d): d is TrendLineDrawing => d.symbol === symbol && d.type === "trendline",
-    );
+    // Con dibujos ocultos se detachan todos (el Map vacío también inhabilita el hit-test)
+    const symbolDrawings = drawingsHidden
+      ? []
+      : drawings.filter(
+          (d): d is TrendLineDrawing => d.symbol === symbol && d.type === "trendline",
+        );
     const existing = primitivesRef.current;
     const drawingIds = new Set(symbolDrawings.map((d) => d.id));
 
@@ -48,7 +52,7 @@ export function useTrendLinePrimitives(
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawings, selectedDrawingId, symbol]);
+  }, [drawings, selectedDrawingId, symbol, drawingsHidden]);
 
   // Full cleanup on unmount
   useEffect(() => {
