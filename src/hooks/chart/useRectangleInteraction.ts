@@ -73,6 +73,7 @@ export function useRectangleInteraction(
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+    const isLocked = (id: string) => useChartStore.getState().drawings.find((d) => d.id === id)?.locked === true;
 
     const getCursorPos = (e: PointerEvent) => {
       const rect = container.getBoundingClientRect();
@@ -161,6 +162,12 @@ export function useRectangleInteraction(
       if (toolRef.current !== "cursor") return;
       const { px, py } = getCursorPos(e);
       const drag = dragRef.current;
+      if (drag.type !== "none" && isLocked(drag.id)) {
+        dragRef.current = { type: "none" };
+        container.style.cursor = "";
+        toggleChartScroll(chartRef.current, true);
+        return;
+      }
 
       if (drag.type === "body") {
         e.stopImmediatePropagation();
@@ -187,6 +194,7 @@ export function useRectangleInteraction(
 
       if (pendingRef.current) {
         const p = pendingRef.current;
+        if (isLocked(p.id)) { pendingRef.current = null; toggleChartScroll(chartRef.current, true); return; }
         const dx = Math.abs(e.clientX - p.startClientX);
         const dy = Math.abs(e.clientY - p.startClientY);
         if (dx > DRAG_THRESHOLD_PX || dy > DRAG_THRESHOLD_PX) {
@@ -206,8 +214,9 @@ export function useRectangleInteraction(
       const hit = findHit(px, py);
       if (hit) {
         hoveredIdRef.current = hit.id;
-        container.style.cursor = hit.type === "corner" ? "crosshair" : "move";
-        toggleChartScroll(chartRef.current, false);
+        const locked = isLocked(hit.id);
+        container.style.cursor = locked ? "" : hit.type === "corner" ? "crosshair" : "move";
+        toggleChartScroll(chartRef.current, locked);
       } else {
         hoveredIdRef.current = null;
         container.style.cursor = "";
@@ -238,6 +247,11 @@ export function useRectangleInteraction(
       }
       lastDownRef.current = { id: hit.id, time: now };
       setSelectedRef.current(hit.id);
+      if (isLocked(hit.id)) {
+        container.style.cursor = "";
+        toggleChartScroll(chartRef.current, true);
+        return;
+      }
       try { container.setPointerCapture(e.pointerId); } catch {}
 
       toggleChartScroll(chartRef.current, false);

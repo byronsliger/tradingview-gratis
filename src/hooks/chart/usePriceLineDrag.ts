@@ -72,6 +72,7 @@ export function usePriceLineDrag(
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+    const isLocked = (id: string) => useChartStore.getState().priceLines.find((p) => p.id === id)?.locked === true;
 
     const getY = (e: PointerEvent) =>
       e.clientY - container.getBoundingClientRect().top;
@@ -103,6 +104,11 @@ export function usePriceLineDrag(
 
       // If we have an active drag, update price
       if (draggingIdRef.current) {
+        if (isLocked(draggingIdRef.current)) {
+          draggingIdRef.current = null;
+          container.style.cursor = "";
+          return;
+        }
         e.stopImmediatePropagation();
         const price = series.coordinateToPrice(y);
         if (price !== null && isFinite(price)) {
@@ -113,6 +119,7 @@ export function usePriceLineDrag(
 
       // If we have a pending drag, check if moved enough to commit
       if (pendingRef.current) {
+        if (isLocked(pendingRef.current.id)) { pendingRef.current = null; return; }
         const dx = Math.abs(e.clientX - pendingRef.current.startX);
         const dy = Math.abs(e.clientY - pendingRef.current.startY);
         if (dx > DRAG_THRESHOLD_PX || dy > DRAG_THRESHOLD_PX) {
@@ -128,7 +135,11 @@ export function usePriceLineDrag(
       const nearby = findNearbyLine(y);
       hoveredLineIdRef.current = nearby;
       if (nearby) {
-        container.style.cursor = "ns-resize";
+        if (isLocked(nearby)) {
+          if (container.style.cursor === "ns-resize") container.style.cursor = "";
+        } else {
+          container.style.cursor = "ns-resize";
+        }
       } else if (container.style.cursor === "ns-resize") {
         // Only clear cursor if we set it — don't override "move"/"crosshair" from other hooks
         container.style.cursor = "";
@@ -168,6 +179,10 @@ export function usePriceLineDrag(
 
       // Single click: select the line + start pending drag
       setSelectedPriceLineIdRef.current(id);
+      if (isLocked(id)) {
+        container.style.cursor = "";
+        return;
+      }
       pendingRef.current = { id, startX: e.clientX, startY: e.clientY };
       try { container.setPointerCapture(e.pointerId); } catch {}
       container.style.cursor = "ns-resize";

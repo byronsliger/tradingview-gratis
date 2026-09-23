@@ -50,6 +50,7 @@ function TrendLineSettings({ drawing, onSave, onDelete, onClose }: {
     lineStyle: drawing.lineStyle,
     extendLeft: drawing.extendLeft,
     extendRight: drawing.extendRight,
+    locked: drawing.locked ?? false,
     priceA: drawing.a.price,
     priceB: drawing.b.price,
   });
@@ -63,6 +64,7 @@ function TrendLineSettings({ drawing, onSave, onDelete, onClose }: {
         lineStyle: drawing.lineStyle,
         extendLeft: drawing.extendLeft,
         extendRight: drawing.extendRight,
+        locked: drawing.locked ?? false,
         priceA: roundPrice(drawing.a.price),
         priceB: roundPrice(drawing.b.price),
       });
@@ -143,20 +145,26 @@ function TrendLineSettings({ drawing, onSave, onDelete, onClose }: {
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted">Punto A</span>
             <span className="text-[10px] text-tv-text-dim">{formatTime(drawing.a.time)}</span>
-            <Input type="number" step="any" value={draft.priceA}
+            <Input type="number" step="any" value={draft.priceA} disabled={draft.locked}
               onChange={(e) => { const n = parseFloat(e.target.value); if (!isNaN(n)) setDraft((d) => ({ ...d, priceA: n })); }}
               className="bg-tv-bg tabular-nums text-xs" />
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted">Punto B</span>
             <span className="text-[10px] text-tv-text-dim">{formatTime(drawing.b.time)}</span>
-            <Input type="number" step="any" value={draft.priceB}
+            <Input type="number" step="any" value={draft.priceB} disabled={draft.locked}
               onChange={(e) => { const n = parseFloat(e.target.value); if (!isNaN(n)) setDraft((d) => ({ ...d, priceB: n })); }}
               className="bg-tv-bg tabular-nums text-xs" />
           </div>
         </div>
       )}
 
+      <label className="flex cursor-pointer items-center gap-2">
+        <input type="checkbox" checked={draft.locked}
+          onChange={(e) => setDraft((d) => ({ ...d, locked: e.target.checked }))}
+          className="h-3.5 w-3.5 accent-tv-blue" />
+        <span className="text-xs text-tv-text">Bloquear posición</span>
+      </label>
       <div className="mt-1 flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={onDelete}
           className="text-tv-red hover:bg-tv-red/10 hover:text-tv-red p-2" title="Eliminar">
@@ -172,8 +180,11 @@ function TrendLineSettings({ drawing, onSave, onDelete, onClose }: {
               lineStyle: draft.lineStyle,
               extendLeft: draft.extendLeft,
               extendRight: draft.extendRight,
-              a: { ...drawing.a, price: draft.priceA },
-              b: { ...drawing.b, price: draft.priceB },
+              ...(Boolean(drawing.locked) !== draft.locked ? { locked: draft.locked } : {}),
+              ...(!drawing.locked && !draft.locked ? {
+                a: { ...drawing.a, price: draft.priceA },
+                b: { ...drawing.b, price: draft.priceB },
+              } : {}),
             });
           }} className="bg-tv-blue hover:bg-tv-blue/90">Aceptar</Button>
         </div>
@@ -201,6 +212,7 @@ function RectangleSettings({ drawing, onSave, onDelete, onClose }: {
     lineWidth: drawing.lineWidth,
     lineStyle: drawing.lineStyle,
     fillVisible: drawing.fillVisible,
+    locked: drawing.locked ?? false,
     fillColor: drawing.fillColor.slice(0, 7),
     fillAlpha: Math.round(parseInt(drawing.fillColor.slice(7, 9) || "22", 16) / 255 * 100),
     priceTop: topPrice,
@@ -220,6 +232,7 @@ function RectangleSettings({ drawing, onSave, onDelete, onClose }: {
         lineWidth: drawing.lineWidth,
         lineStyle: drawing.lineStyle,
         fillVisible: drawing.fillVisible,
+        locked: drawing.locked ?? false,
         fillColor: fc.slice(0, 7),
         fillAlpha: Math.round(parseInt(fc.slice(7, 9) || "22", 16) / 255 * 100),
         priceTop: roundPrice(top),
@@ -317,13 +330,13 @@ function RectangleSettings({ drawing, onSave, onDelete, onClose }: {
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted">Precio superior</span>
-              <Input type="number" step="any" value={draft.priceTop}
+              <Input type="number" step="any" value={draft.priceTop} disabled={draft.locked}
                 onChange={(e) => { const n = parseFloat(e.target.value); if (!isNaN(n)) setDraft((d) => ({ ...d, priceTop: n })); }}
                 className="bg-tv-bg tabular-nums text-xs" />
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-tv-text-muted">Precio inferior</span>
-              <Input type="number" step="any" value={draft.priceBottom}
+              <Input type="number" step="any" value={draft.priceBottom} disabled={draft.locked}
                 onChange={(e) => { const n = parseFloat(e.target.value); if (!isNaN(n)) setDraft((d) => ({ ...d, priceBottom: n })); }}
                 className="bg-tv-bg tabular-nums text-xs" />
             </div>
@@ -339,6 +352,12 @@ function RectangleSettings({ drawing, onSave, onDelete, onClose }: {
         </div>
       )}
 
+      <label className="flex cursor-pointer items-center gap-2">
+        <input type="checkbox" checked={draft.locked}
+          onChange={(e) => setDraft((d) => ({ ...d, locked: e.target.checked }))}
+          className="h-3.5 w-3.5 accent-tv-blue" />
+        <span className="text-xs text-tv-text">Bloquear posición</span>
+      </label>
       <div className="mt-1 flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={onDelete}
           className="text-tv-red hover:bg-tv-red/10 hover:text-tv-red p-2" title="Eliminar">
@@ -364,8 +383,8 @@ function RectangleSettings({ drawing, onSave, onDelete, onClose }: {
               lineStyle: draft.lineStyle,
               fillVisible: draft.fillVisible,
               fillColor: buildFillColor(draft.fillColor, draft.fillAlpha),
-              a: newA,
-              b: newB,
+              ...(Boolean(drawing.locked) !== draft.locked ? { locked: draft.locked } : {}),
+              ...(!drawing.locked && !draft.locked ? { a: newA, b: newB } : {}),
             });
           }} className="bg-tv-blue hover:bg-tv-blue/90">Aceptar</Button>
         </div>

@@ -22,6 +22,7 @@ import {
   revokeAccess,
 } from "./google-auth";
 import type { DriveSyncDocument, SyncedState } from "./types";
+import { flattenWatchlist, normalizeWatchlistSections } from "@/lib/store/watchlist-sections";
 
 /**
  * Motor de sincronización con Google Drive (singleton a nivel de módulo).
@@ -62,7 +63,7 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function buildSnapshot(): SyncedState {
+export function buildSnapshot(): SyncedState {
   const s = useChartStore.getState();
   return {
     theme: s.theme,
@@ -74,6 +75,7 @@ function buildSnapshot(): SyncedState {
     indicatorsHidden: s.indicatorsHidden,
     config: s.config,
     watchlist: s.watchlist,
+    watchlistSections: s.watchlistSections,
     priceLines: s.priceLines,
     drawings: s.drawings,
     drawingDefaults: s.drawingDefaults,
@@ -90,13 +92,17 @@ function makeDocument(): DriveSyncDocument {
  * `scripts`) se migran en lectura añadiendo `scripts: []` — last-write-wins
  * por documento completo, así que no se pierde nada del resto del estado.
  */
-function migrateDocument(doc: DriveSyncDocument): DriveSyncDocument {
-  // `scripts` ausente (o no array) ⇒ documento v1 ⇒ migrar a v2.
-  if (Array.isArray(doc.state?.scripts)) return doc;
+export function migrateDocument(doc: DriveSyncDocument): DriveSyncDocument {
+  const watchlistSections = normalizeWatchlistSections(doc.state?.watchlistSections, doc.state?.watchlist);
   return {
     ...doc,
     version: 2,
-    state: { ...doc.state, scripts: [] },
+    state: {
+      ...doc.state,
+      scripts: Array.isArray(doc.state?.scripts) ? doc.state.scripts : [],
+      watchlistSections,
+      watchlist: flattenWatchlist(watchlistSections),
+    },
   };
 }
 
@@ -105,9 +111,10 @@ function migrateDocument(doc: DriveSyncDocument): DriveSyncDocument {
  * dispositivo) se aplica toda la configuración; si no, solo los campos
  * de sincronización continua.
  */
-function applyRemote(doc: DriveSyncDocument, full: boolean): void {
+export function applyRemote(doc: DriveSyncDocument, full: boolean): void {
   const remote = doc.state;
   const current = useChartStore.getState();
+  const watchlistSections = normalizeWatchlistSections(remote.watchlistSections, remote.watchlist);
   const patch: Partial<ChartSnapshot> = {
     drawings: remote.drawings ?? [],
     priceLines: remote.priceLines ?? [],
@@ -120,11 +127,15 @@ function applyRemote(doc: DriveSyncDocument, full: boolean): void {
     // Scripts Pine: last-write-wins del array completo (igual que drawings).
     scripts: remote.scripts ?? [],
   };
+  // A newer remote document must not erase local offline edits awaiting upload.
+  if (full || !useSyncStore.getState().watchlistDirty) {
+    patch.watchlistSections = watchlistSections;
+    patch.watchlist = flattenWatchlist(watchlistSections);
+  }
   if (full) {
     patch.theme = remote.theme ?? current.theme;
     patch.initialZoom = remote.initialZoom ?? current.initialZoom;
     patch.logScale = remote.logScale ?? current.logScale;
-    patch.watchlist = remote.watchlist ?? current.watchlist;
     patch.drawingDefaults = {
       trendline: { ...DEFAULT_DRAWING_DEFAULTS.trendline, ...remote.drawingDefaults?.trendline },
       rectangle: { ...DEFAULT_DRAWING_DEFAULTS.rectangle, ...remote.drawingDefaults?.rectangle },
@@ -226,6 +237,7 @@ async function pullOnce(mode: SyncMode = "background"): Promise<void> {
       const s = useSyncStore.getState();
       s.setFileId(fileId);
       s.setLastSyncedAt(fresh.updatedAt);
+      if (useChartStore.getState().watchlistSections === fresh.state.watchlistSections) s.setWatchlistDirty(false);
       s.markBootstrapped();
       s.setStatus("synced");
       return;
@@ -262,6 +274,7 @@ async function pushOnce(mode: SyncMode = "background"): Promise<void> {
     const s = useSyncStore.getState();
     s.setFileId(fileId);
     s.setLastSyncedAt(doc.updatedAt);
+    if (useChartStore.getState().watchlistSections === doc.state.watchlistSections) s.setWatchlistDirty(false);
     s.setStatus("synced");
   });
 }
@@ -274,9 +287,8 @@ function schedulePush(): void {
   }, PUSH_DEBOUNCE_MS);
 }
 
-function handleStoreChange(state: ChartSnapshot, prev: ChartSnapshot): void {
-  if (applyingRemote) return;
-  const changed =
+export function shouldPushChartChange(state: ChartSnapshot, prev: ChartSnapshot): boolean {
+  return (
     state.drawings !== prev.drawings ||
     state.priceLines !== prev.priceLines ||
     state.indicators !== prev.indicators ||
@@ -285,8 +297,20 @@ function handleStoreChange(state: ChartSnapshot, prev: ChartSnapshot): void {
     state.indicatorsHidden !== prev.indicatorsHidden ||
     state.config !== prev.config ||
     state.drawingDefaults !== prev.drawingDefaults ||
-    state.scripts !== prev.scripts;
-  if (changed) schedulePush();
+    state.scripts !== prev.scripts ||
+    state.watchlistSections !== prev.watchlistSections ||
+    state.watchlist !== prev.watchlist
+  );
+}
+
+export function watchlistChanged(state: ChartSnapshot, prev: ChartSnapshot): boolean {
+  return state.watchlistSections !== prev.watchlistSections || state.watchlist !== prev.watchlist;
+}
+
+function handleStoreChange(state: ChartSnapshot, prev: ChartSnapshot): void {
+  if (applyingRemote) return;
+  if (watchlistChanged(state, prev)) useSyncStore.getState().setWatchlistDirty(true);
+  if (shouldPushChartChange(state, prev)) schedulePush();
 }
 
 function handleVisibilityChange(): void {

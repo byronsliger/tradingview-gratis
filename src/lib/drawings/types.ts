@@ -5,6 +5,7 @@ export interface TrendLinePoint {
 
 export interface TrendLineDrawing {
   id: string;
+  locked?: boolean;
   symbol: string;
   type: "trendline";
   a: TrendLinePoint;
@@ -18,6 +19,7 @@ export interface TrendLineDrawing {
 
 export interface RectangleDrawing {
   id: string;
+  locked?: boolean;
   symbol: string;
   type: "rectangle";
   a: TrendLinePoint;   // first corner

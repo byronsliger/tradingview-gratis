@@ -22,6 +22,8 @@ interface SyncState {
   lastSyncedAt: number;
   /** La configuración completa ya se descargó una vez en este dispositivo */
   bootstrapped: boolean;
+  /** Local watchlist edits not yet acknowledged by a successful Drive upload. */
+  watchlistDirty: boolean;
 
   // Efímero (no persistido)
   status: SyncStatus;
@@ -31,6 +33,7 @@ interface SyncState {
   setFileId: (fileId: string | null) => void;
   setLastSyncedAt: (t: number) => void;
   markBootstrapped: () => void;
+  setWatchlistDirty: (dirty: boolean) => void;
   connect: (email: string | null) => void;
   disconnect: () => void;
 }
@@ -43,6 +46,7 @@ export const useSyncStore = create<SyncState>()(
       fileId: null,
       lastSyncedAt: 0,
       bootstrapped: false,
+      watchlistDirty: false,
       status: "off",
       error: null,
 
@@ -50,6 +54,7 @@ export const useSyncStore = create<SyncState>()(
       setFileId: (fileId) => set({ fileId }),
       setLastSyncedAt: (lastSyncedAt) => set({ lastSyncedAt }),
       markBootstrapped: () => set({ bootstrapped: true }),
+      setWatchlistDirty: (watchlistDirty) => set({ watchlistDirty }),
       connect: (email) =>
         set({ enabled: true, email, status: "loading", error: null }),
       disconnect: () =>
@@ -59,6 +64,7 @@ export const useSyncStore = create<SyncState>()(
           fileId: null,
           lastSyncedAt: 0,
           bootstrapped: false,
+          watchlistDirty: false,
           status: "off",
           error: null,
         }),
@@ -71,6 +77,7 @@ export const useSyncStore = create<SyncState>()(
         fileId: s.fileId,
         lastSyncedAt: s.lastSyncedAt,
         bootstrapped: s.bootstrapped,
+        watchlistDirty: s.watchlistDirty,
       }),
     },
   ),

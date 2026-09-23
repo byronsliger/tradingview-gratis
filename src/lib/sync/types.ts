@@ -7,6 +7,7 @@ import type {
   Theme,
 } from "@/lib/store/chart-store";
 import type { Drawing } from "@/lib/drawings/types";
+import type { WatchlistSection } from "@/lib/store/watchlist-sections";
 
 /**
  * Snapshot del estado que se guarda en Google Drive (appDataFolder).
@@ -25,6 +26,8 @@ export interface SyncedState {
   indicatorsHidden?: boolean;
   config: IndicatorConfig;
   watchlist: string[];
+  /** Optional for documents created before named watchlist sections existed. */
+  watchlistSections?: WatchlistSection[];
   priceLines: PriceLine[];
   drawings: Drawing[];
   drawingDefaults: DrawingDefaults;

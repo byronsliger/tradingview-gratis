@@ -65,7 +65,7 @@ class RectanglePaneRenderer implements IPrimitivePaneRenderer {
       ctx.setLineDash(dash.map((v) => v * pr));
       ctx.strokeRect(x, y, w, h);
 
-      if (selected) {
+      if (selected && !drawing.locked) {
         ctx.setLineDash([]);
         ctx.lineWidth = 2 * pr;
         ctx.strokeStyle = drawing.color;
@@ -180,6 +180,7 @@ export class RectanglePrimitive {
   }
 
   testEndpoint(px: number, py: number): RectHandle | null {
+    if (this.drawing.locked) return null;
     const c = this.getRectCoords();
     if (!c) return null;
     const { lx, rx, ty } = c;

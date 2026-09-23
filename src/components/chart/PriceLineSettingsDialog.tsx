@@ -39,6 +39,7 @@ export function PriceLineSettingsDialog() {
   const setPriceLineEditTarget = useChartStore((s) => s.setPriceLineEditTarget);
   const priceLines = useChartStore((s) => s.priceLines);
   const updatePriceLine = useChartStore((s) => s.updatePriceLine);
+  const setPriceLineLocked = useChartStore((s) => s.setPriceLineLocked);
   const updatePriceLineOptions = useChartStore((s) => s.updatePriceLineOptions);
   const setDrawingDefault = useChartStore((s) => s.setDrawingDefault);
 
@@ -52,6 +53,7 @@ export function PriceLineSettingsDialog() {
     lineStyle: 2,
     axisLabelVisible: true,
     price: 0,
+    locked: false,
   });
 
   useEffect(() => {
@@ -64,6 +66,7 @@ export function PriceLineSettingsDialog() {
           lineStyle: line.lineStyle ?? 2,
           axisLabelVisible: line.axisLabelVisible ?? true,
           price: roundPrice(line.price),
+          locked: line.locked ?? false,
         });
       });
     }
@@ -72,7 +75,8 @@ export function PriceLineSettingsDialog() {
 
   function handleSave() {
     if (!priceLineEditTarget) return;
-    updatePriceLine(priceLineEditTarget, draft.price);
+    if (!line?.locked && !draft.locked) updatePriceLine(priceLineEditTarget, draft.price);
+    if (Boolean(line?.locked) !== draft.locked) setPriceLineLocked(priceLineEditTarget, draft.locked);
     updatePriceLineOptions(priceLineEditTarget, {
       color: draft.color,
       lineWidth: draft.lineWidth,
@@ -187,6 +191,7 @@ export function PriceLineSettingsDialog() {
                 type="number"
                 step="any"
                 value={draft.price}
+                disabled={draft.locked}
                 onChange={(e) => {
                   const n = parseFloat(e.target.value);
                   if (!isNaN(n)) setDraft((d) => ({ ...d, price: n }));
@@ -197,6 +202,12 @@ export function PriceLineSettingsDialog() {
           </div>
         )}
 
+        <label className="flex cursor-pointer items-center gap-2">
+          <input type="checkbox" checked={draft.locked}
+            onChange={(e) => setDraft((d) => ({ ...d, locked: e.target.checked }))}
+            className="h-3.5 w-3.5 accent-tv-blue" />
+          <span className="text-xs text-tv-text">Bloquear posición</span>
+        </label>
         <div className="mt-1 flex items-center justify-end gap-2">
           <Button
             variant="ghost"
