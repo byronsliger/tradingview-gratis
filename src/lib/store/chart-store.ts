@@ -4,6 +4,14 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Timeframe } from "@/lib/binance/types";
 import type { Drawing, TrendLineDrawing, RectangleDrawing } from "@/lib/drawings/types";
+import {
+  DEFAULT_SECTION_ID,
+  flattenWatchlist,
+  moveWatchlistSection,
+  moveWatchlistSymbol,
+  normalizeWatchlistSections,
+  type WatchlistSection,
+} from "./watchlist-sections";
 
 export type IndicatorKey =
   | "ema20"
@@ -24,6 +32,7 @@ export type Theme = "dark" | "light";
 
 export interface PriceLine {
   id: string;
+  locked?: boolean;
   symbol: string;
   price: number;
   color?: string;
@@ -258,6 +267,7 @@ interface ChartState {
   /** Periods and parameters for each indicator */
   config: IndicatorConfig;
   watchlist: string[];
+  watchlistSections: WatchlistSection[];
   /** Pine scripts del usuario (persistidos) */
   scripts: PineScriptRecord[];
 
@@ -296,10 +306,16 @@ interface ChartState {
   setConfig: (patch: Partial<IndicatorConfig>) => void;
   addToWatchlist: (s: string) => void;
   removeFromWatchlist: (s: string) => void;
+  addWatchlistSection: () => string;
+  renameWatchlistSection: (id: string, name: string) => void;
+  removeWatchlistSection: (id: string) => void;
+  moveWatchlistSection: (sourceId: string, targetId: string) => void;
+  moveWatchlistSymbol: (symbol: string, targetSectionId: string, beforeSymbol?: string) => void;
   setTool: (t: DrawingTool) => void;
   addPriceLine: (price: number, symbol: string) => void;
   removePriceLine: (id: string) => void;
   updatePriceLine: (id: string, price: number) => void;
+  setPriceLineLocked: (id: string, locked: boolean) => void;
   clearPriceLines: (symbol?: string) => void;
   setSymbolDialogOpen: (v: boolean, mode?: "search" | "add") => void;
   setSettingsTarget: (k: SettingsTarget | null) => void;
@@ -361,6 +377,7 @@ export const useChartStore = create<ChartState>()(
       indicatorsHidden: false,
       config: { ...DEFAULT_CONFIG },
       watchlist: DEFAULT_WATCHLIST,
+      watchlistSections: [{ id: DEFAULT_SECTION_ID, name: "Main", symbols: [...DEFAULT_WATCHLIST] }],
       scripts: [],
       tool: "cursor",
       priceLines: [],
@@ -419,15 +436,67 @@ export const useChartStore = create<ChartState>()(
       setConfig: (patch) =>
         set((s) => ({ config: { ...s.config, ...patch } })),
       addToWatchlist: (s) =>
-        set((state) => ({
-          watchlist: state.watchlist.includes(s)
-            ? state.watchlist
-            : [...state.watchlist, s],
-        })),
+        set((state) => {
+          if (state.watchlist.includes(s)) return state;
+          const watchlistSections = state.watchlistSections.map((section) =>
+            section.id === DEFAULT_SECTION_ID
+              ? { ...section, symbols: [...section.symbols, s] }
+              : section,
+          );
+          return { watchlist: flattenWatchlist(watchlistSections), watchlistSections };
+        }),
       removeFromWatchlist: (s) =>
+        set((state) => {
+          if (!state.watchlist.includes(s)) return state;
+          const watchlistSections = state.watchlistSections.map((section) => ({
+            ...section,
+            symbols: section.symbols.filter((symbol) => symbol !== s),
+          }));
+          return { watchlist: flattenWatchlist(watchlistSections), watchlistSections };
+        }),
+      addWatchlistSection: () => {
+        const id = typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random()}`;
         set((state) => ({
-          watchlist: state.watchlist.filter((x) => x !== s),
-        })),
+          watchlistSections: [...state.watchlistSections, { id, name: "New section", symbols: [] }],
+        }));
+        return id;
+      },
+      renameWatchlistSection: (id, name) => {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        set((state) => ({
+          watchlistSections: state.watchlistSections.map((section) =>
+            section.id === id ? { ...section, name: trimmed } : section,
+          ),
+        }));
+      },
+      removeWatchlistSection: (id) => {
+        if (id === DEFAULT_SECTION_ID) return;
+        set((state) => {
+          const removed = state.watchlistSections.find((section) => section.id === id);
+          if (!removed) return state;
+          const watchlistSections = state.watchlistSections
+            .filter((section) => section.id !== id)
+            .map((section) => section.id === DEFAULT_SECTION_ID
+              ? { ...section, symbols: [...section.symbols, ...removed.symbols] }
+              : section);
+          return { watchlist: flattenWatchlist(watchlistSections), watchlistSections };
+        });
+      },
+      moveWatchlistSection: (sourceId, targetId) =>
+        set((state) => {
+          const watchlistSections = moveWatchlistSection(state.watchlistSections, sourceId, targetId);
+          if (watchlistSections === state.watchlistSections) return state;
+          return { watchlistSections, watchlist: flattenWatchlist(watchlistSections) };
+        }),
+      moveWatchlistSymbol: (symbol, targetSectionId, beforeSymbol) =>
+        set((state) => {
+          const watchlistSections = moveWatchlistSymbol(state.watchlistSections, symbol, targetSectionId, beforeSymbol);
+          if (watchlistSections === state.watchlistSections) return state;
+          return { watchlist: flattenWatchlist(watchlistSections), watchlistSections };
+        }),
       setTool: (tool) => set({ tool }),
       addPriceLine: (price, symbol) =>
         set((state) => ({
@@ -455,7 +524,11 @@ export const useChartStore = create<ChartState>()(
         })),
       updatePriceLine: (id, price) =>
         set((state) => ({
-          priceLines: state.priceLines.map((p) => p.id === id ? { ...p, price } : p),
+          priceLines: state.priceLines.map((p) => p.id === id && !p.locked ? { ...p, price } : p),
+        })),
+      setPriceLineLocked: (id, locked) =>
+        set((state) => ({
+          priceLines: state.priceLines.map((p) => p.id === id ? { ...p, locked } : p),
         })),
       clearPriceLines: (symbol) =>
         set((state) => ({
@@ -482,7 +555,13 @@ export const useChartStore = create<ChartState>()(
       removeDrawing: (id) => set((s) => ({ drawings: s.drawings.filter((d) => d.id !== id) })),
       updateDrawing: (id, patch) =>
         set((s) => ({
-          drawings: s.drawings.map((d) => d.id === id ? { ...d, ...patch } : d),
+          drawings: s.drawings.map((d) => {
+            if (d.id !== id) return d;
+            const { a, b, ...other } = patch;
+            // A lock transition never moves geometry, including unlock-and-move patches.
+            if (d.locked || patch.locked === true || patch.locked === false) return { ...d, ...other };
+            return { ...d, ...patch, a: a ?? d.a, b: b ?? d.b };
+          }),
         })),
       clearDrawings: (symbol) =>
         set((s) => ({
@@ -569,6 +648,7 @@ export const useChartStore = create<ChartState>()(
         indicatorsHidden: s.indicatorsHidden,
         config: s.config,
         watchlist: s.watchlist,
+        watchlistSections: s.watchlistSections,
         scripts: s.scripts,
         priceLines: s.priceLines,
         drawings: s.drawings,
@@ -584,9 +664,12 @@ export const useChartStore = create<ChartState>()(
        */
       merge: (persisted, current) => {
         const p = persisted as Partial<typeof current>;
+        const watchlistSections = normalizeWatchlistSections(p.watchlistSections, p.watchlist ?? (p.watchlistSections ? [] : current.watchlist));
         return {
           ...current,
           ...p,
+          watchlistSections,
+          watchlist: flattenWatchlist(watchlistSections),
           // Spread DEFAULT_CONFIG first so new keys are never undefined
           config: { ...DEFAULT_CONFIG, ...(p.config ?? {}) },
           // Same for indicator flags — new keys default to `false`

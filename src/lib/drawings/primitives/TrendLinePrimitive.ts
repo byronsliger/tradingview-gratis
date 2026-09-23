@@ -72,7 +72,7 @@ class TrendLinePaneRenderer implements IPrimitivePaneRenderer {
       ctx.lineTo(ext.x2 * pr, ext.y2 * vpr);
       ctx.stroke();
 
-      if (selected) {
+      if (selected && !drawing.locked) {
         ctx.setLineDash([]);
         ctx.lineWidth = 2 * pr;
         ctx.strokeStyle = drawing.color;
@@ -160,6 +160,7 @@ export class TrendLinePrimitive {
 
   /** Returns which endpoint (if any) is within HANDLE_RADIUS px of (px, py). */
   testEndpoint(px: number, py: number): "a" | "b" | null {
+    if (this.drawing.locked) return null;
     const ab = this._getEndpointPixels();
     if (!ab) return null;
     if (Math.hypot(px - ab.ax, py - ab.ay) <= 14) return "a";
