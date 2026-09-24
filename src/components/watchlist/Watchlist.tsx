@@ -195,8 +195,12 @@ export function Watchlist({ onClose }: { onClose?: () => void } = {}) {
         <h2 className="text-sm font-semibold text-tv-text">Watchlist</h2>
         <div className="flex items-center gap-1">
           <button type="button" onClick={() => setEditingSectionId(addSection())}
-            className="flex h-8 items-center gap-1 rounded-full bg-tv-bg px-2 text-xs text-tv-text-muted transition-colors hover:text-tv-text"
-            title="Add section" aria-label="Add watchlist section"><Plus className="h-3.5 w-3.5" /> Section</button>
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-tv-bg text-tv-text-muted transition-colors hover:text-tv-text"
+            title="Sección" aria-label="Add watchlist section">
+            <span aria-hidden="true" className="flex flex-col items-center -space-y-1.5">
+              <Plus className="h-3 w-3" /><Plus className="h-3 w-3" />
+            </span>
+          </button>
           <button type="button" onClick={() => openSymbolDialog(true, "add")}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-tv-bg text-tv-text-muted transition-colors hover:text-tv-text"
             title="Add symbol" aria-label="Add symbol to watchlist"><Plus className="h-4 w-4" /></button>

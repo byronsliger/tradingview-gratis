@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useSyncStore } from "./sync-store";
 import type { Timeframe } from "@/lib/binance/types";
 import type { Drawing, TrendLineDrawing, RectangleDrawing } from "@/lib/drawings/types";
 import {
@@ -687,3 +688,14 @@ export const useChartStore = create<ChartState>()(
     },
   ),
 );
+
+// Track watchlist edits even while Drive sync is stopped or disconnected.
+// The persisted baseline lets a later connection distinguish local edits from
+// a genuinely newer remote watchlist without relying on a mounted sync engine.
+useChartStore.subscribe((state, previous) => {
+  if (state.watchlistSections === previous.watchlistSections && state.watchlist === previous.watchlist) return;
+  const baseline = useSyncStore.getState().watchlistBaseline;
+  useSyncStore.getState().setWatchlistDirty(
+    baseline === null || JSON.stringify(state.watchlistSections) !== baseline,
+  );
+});

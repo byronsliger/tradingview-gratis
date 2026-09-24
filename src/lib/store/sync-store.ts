@@ -12,6 +12,9 @@ export type SyncStatus =
   | "reauth" // la sesión de Google expiró: requiere reconectar manualmente
   | "error";
 
+export const UNKNOWN_WATCHLIST_ACCOUNT_ERROR =
+  "No podemos identificar a qué cuenta pertenece esta lista local. Para conservarla, elige explícitamente una cuenta e impórtala; no se subirá automáticamente.";
+
 interface SyncState {
   /** El usuario activó la sincronización con Google Drive (opt-in) */
   enabled: boolean;
@@ -24,6 +27,10 @@ interface SyncState {
   bootstrapped: boolean;
   /** Local watchlist edits not yet acknowledged by a successful Drive upload. */
   watchlistDirty: boolean;
+  /** Last watchlist acknowledged by Drive, including section names and order. */
+  watchlistBaseline: string | null;
+  /** Account owning the persisted Drive file and watchlist baseline. */
+  syncedEmail: string | null;
 
   // Efímero (no persistido)
   status: SyncStatus;
@@ -34,7 +41,9 @@ interface SyncState {
   setLastSyncedAt: (t: number) => void;
   markBootstrapped: () => void;
   setWatchlistDirty: (dirty: boolean) => void;
-  connect: (email: string | null) => void;
+  acknowledgeWatchlist: (baseline: string, current: string) => void;
+  /** Refuses a different account while its predecessor has pending edits. */
+  connect: (email: string | null) => boolean;
   disconnect: () => void;
 }
 
@@ -47,6 +56,8 @@ export const useSyncStore = create<SyncState>()(
       lastSyncedAt: 0,
       bootstrapped: false,
       watchlistDirty: false,
+      watchlistBaseline: null,
+      syncedEmail: null,
       status: "off",
       error: null,
 
@@ -55,16 +66,45 @@ export const useSyncStore = create<SyncState>()(
       setLastSyncedAt: (lastSyncedAt) => set({ lastSyncedAt }),
       markBootstrapped: () => set({ bootstrapped: true }),
       setWatchlistDirty: (watchlistDirty) => set({ watchlistDirty }),
-      connect: (email) =>
-        set({ enabled: true, email, status: "loading", error: null }),
+      acknowledgeWatchlist: (watchlistBaseline, current) =>
+        set({ watchlistBaseline, watchlistDirty: current !== watchlistBaseline }),
+      connect: (email) => {
+        let accepted = true;
+        set((state) => {
+          // Older persisted states have `email` but not `syncedEmail`.
+          const previousEmail = state.syncedEmail ?? state.email;
+          const switching = previousEmail !== null && previousEmail !== email;
+          if (switching && state.watchlistDirty) {
+            accepted = false;
+            return {
+              enabled: false,
+              email: null,
+              syncedEmail: previousEmail,
+              status: "off",
+              error: "Hay cambios pendientes de la lista en la cuenta anterior. Reconecta esa cuenta para subirlos antes de cambiar.",
+            };
+          }
+          return {
+            enabled: true,
+            email,
+            syncedEmail: email,
+            // A file ID and watchlist baseline must never cross accounts.
+            fileId: switching ? null : state.fileId,
+            lastSyncedAt: switching ? 0 : state.lastSyncedAt,
+            bootstrapped: switching ? false : state.bootstrapped,
+            watchlistBaseline: switching ? null : state.watchlistBaseline,
+            watchlistDirty: switching ? false : state.watchlistDirty,
+            status: "loading",
+            error: null,
+          };
+        });
+        return accepted;
+      },
       disconnect: () =>
         set({
           enabled: false,
           email: null,
-          fileId: null,
-          lastSyncedAt: 0,
-          bootstrapped: false,
-          watchlistDirty: false,
+          // Keep the baseline and pending edits so offline changes survive reconnect.
           status: "off",
           error: null,
         }),
@@ -78,6 +118,8 @@ export const useSyncStore = create<SyncState>()(
         lastSyncedAt: s.lastSyncedAt,
         bootstrapped: s.bootstrapped,
         watchlistDirty: s.watchlistDirty,
+        watchlistBaseline: s.watchlistBaseline,
+        syncedEmail: s.syncedEmail,
       }),
     },
   ),
