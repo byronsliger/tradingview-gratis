@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useSyncStore, type SyncStatus } from "@/lib/store/sync-store";
+import { UNKNOWN_WATCHLIST_ACCOUNT_ERROR, useSyncStore, type SyncStatus } from "@/lib/store/sync-store";
 import { connectDrive, disconnectDrive, syncNow } from "@/lib/sync/drive-sync";
 import { isSyncConfigured } from "@/lib/sync/google-auth";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,7 @@ export function SyncMenu() {
   const error = useSyncStore((s) => s.error);
   const lastSyncedAt = useSyncStore((s) => s.lastSyncedAt);
   const configured = isSyncConfigured();
+  const needsLegacyImport = error === UNKNOWN_WATCHLIST_ACCOUNT_ERROR;
 
   const lastSync = formatLastSync(lastSyncedAt);
 
@@ -86,11 +87,11 @@ export function SyncMenu() {
                 funcionando en local.
               </p>
               <DropdownMenuItem
-                onClick={() => void connectDrive()}
+                onClick={() => void connectDrive(needsLegacyImport)}
                 className="text-xs font-medium text-tv-blue"
               >
                 <Cloud className="h-3.5 w-3.5" />
-                Conectar con Google
+                {needsLegacyImport ? "Elegir cuenta e importar lista local" : "Conectar con Google"}
               </DropdownMenuItem>
               {status === "off" && error && (
                 <p className="px-1.5 py-1 text-[11px] text-tv-red">{error}</p>
@@ -111,7 +112,12 @@ export function SyncMenu() {
                 )}
               </div>
               <DropdownMenuSeparator />
-              {status === "reauth" ? (
+              {needsLegacyImport ? (
+                <DropdownMenuItem onClick={() => void connectDrive(true)} className="text-xs font-medium text-tv-blue">
+                  <Cloud className="h-3.5 w-3.5" />
+                  Elegir cuenta e importar lista local
+                </DropdownMenuItem>
+              ) : status === "reauth" ? (
                 <DropdownMenuItem
                   onClick={() => void connectDrive()}
                   className="text-xs font-medium text-tv-blue"
@@ -146,11 +152,13 @@ export function SyncSheetSection() {
   const enabled = useSyncStore((s) => s.enabled);
   const email = useSyncStore((s) => s.email);
   const status = useSyncStore((s) => s.status);
+  const error = useSyncStore((s) => s.error);
   const lastSyncedAt = useSyncStore((s) => s.lastSyncedAt);
 
   if (!isSyncConfigured()) return null;
 
   const lastSync = formatLastSync(lastSyncedAt);
+  const needsLegacyImport = error === UNKNOWN_WATCHLIST_ACCOUNT_ERROR;
 
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-tv-bg px-3 py-2.5">
@@ -167,9 +175,17 @@ export function SyncSheetSection() {
         </div>
         <StatusIcon enabled={enabled} status={status} className="h-4 w-4 shrink-0 text-tv-text-muted" />
       </div>
+      {needsLegacyImport && <p className="text-[11px] text-amber-500">{error}</p>}
       {enabled ? (
         <div className="flex gap-2">
-          {status === "reauth" ? (
+          {needsLegacyImport ? (
+            <button
+              onClick={() => void connectDrive(true)}
+              className="flex-1 rounded-lg bg-tv-blue/10 py-1.5 text-xs font-medium text-tv-blue hover:bg-tv-blue/20"
+            >
+              Elegir cuenta e importar lista local
+            </button>
+          ) : status === "reauth" ? (
             <button
               onClick={() => void connectDrive()}
               className="flex-1 rounded-lg bg-tv-blue/10 py-1.5 text-xs font-medium text-tv-blue hover:bg-tv-blue/20"
@@ -193,10 +209,10 @@ export function SyncSheetSection() {
         </div>
       ) : (
         <button
-          onClick={() => void connectDrive()}
+          onClick={() => void connectDrive(needsLegacyImport)}
           className="rounded-lg bg-tv-blue py-1.5 text-xs font-medium text-white hover:bg-tv-blue/90"
         >
-          Conectar con Google
+          {needsLegacyImport ? "Elegir cuenta e importar lista local" : "Conectar con Google"}
         </button>
       )}
     </div>
