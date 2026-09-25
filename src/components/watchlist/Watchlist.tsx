@@ -16,6 +16,7 @@ import { DEFAULT_SECTION_ID, type WatchlistSection } from "@/lib/store/watchlist
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatPrice, formatPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { resolveAssetDrop } from "./asset-drop";
 
 const pointerSensor = PointerSensor.configure({
   activationConstraints: (event) => event.pointerType === "touch"
@@ -302,6 +303,11 @@ export function Watchlist({ onClose }: { onClose?: () => void } = {}) {
           pointerSensor, keyboardSensor,
         ]}
           onDragStart={(event) => { draggedId.current = String(event.operation.source?.id ?? ""); }}
+          onDragOver={(event) => {
+            // Keep React in control of asset DOM nodes across section parents.
+            // Optimistic DOM reparenting makes React's eventual removal fail.
+            if (String(event.operation.source?.id ?? "").startsWith("asset:")) event.preventDefault();
+          }}
           onDragEnd={(event) => {
             if (clearDragTimer.current !== null) clearTimeout(clearDragTimer.current);
             clearDragTimer.current = setTimeout(() => { draggedId.current = null; clearDragTimer.current = null; }, 0);
@@ -312,18 +318,8 @@ export function Watchlist({ onClose }: { onClose?: () => void } = {}) {
               moveSection(sourceId.slice(8), targetId.slice(8));
               return;
             }
-            if (!sourceId.startsWith("asset:")) return;
-            const asset = sourceId.slice(6);
-            if (targetId.startsWith("section-assets:")) moveSymbol(asset, targetId.slice(15));
-            else if (targetId.startsWith("asset:")) {
-              const targetAsset = targetId.slice(6);
-              const targetSection = sections.find((section) => section.symbols.includes(targetAsset));
-              if (!targetSection || asset === targetAsset) return;
-              const sourceIndex = targetSection.symbols.indexOf(asset);
-              const targetIndex = targetSection.symbols.indexOf(targetAsset);
-              const before = sourceIndex >= 0 && sourceIndex < targetIndex ? targetSection.symbols[targetIndex + 1] : targetAsset;
-              moveSymbol(asset, targetSection.id, before);
-            }
+            const move = resolveAssetDrop(sections, event);
+            if (move) moveSymbol(move.symbol, move.sectionId, move.beforeSymbol);
           }}>
           {sections.map((section, index) => <Section key={`${section.id}:${editingSectionId === section.id}`} section={section} index={index}
             startEditing={editingSectionId === section.id} onEditDone={() => setEditingSectionId(null)}
