@@ -5,15 +5,17 @@ import { DragDropProvider, useDroppable } from "@dnd-kit/react";
 import { KeyboardSensor, PointerActivationConstraints, PointerSensor } from "@dnd-kit/dom";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { Plus, X, PanelRightClose } from "lucide-react";
-import { fetchTickers24h } from "@/lib/binance/rest";
+import { fetchUtcTradingDayTickers } from "@/lib/binance/rest";
+import {
+  applyLivePrice, applyTradingDaySnapshot, invalidatePreviousDay,
+  untilNextUtcDay, utcDayRetryDelay, utcDayStart, type WatchlistDayRow,
+} from "@/lib/binance/watchlist-day-change";
 import { getBinanceWS } from "@/lib/binance/ws";
 import { useChartStore } from "@/lib/store/chart-store";
 import { DEFAULT_SECTION_ID, type WatchlistSection } from "@/lib/store/watchlist-sections";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatPrice, formatPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-interface Row { symbol: string; price: number; pct: number }
 
 const pointerSensor = PointerSensor.configure({
   activationConstraints: (event) => event.pointerType === "touch"
@@ -33,7 +35,7 @@ const keyboardSensor = KeyboardSensor.configure({
 });
 
 function Asset({ symbol, index, sectionId, row, flash, active, onSelect, onRemove, suppressClick, isDragInteraction }: {
-  symbol: string; index: number; sectionId: string; row?: Row;
+  symbol: string; index: number; sectionId: string; row?: WatchlistDayRow;
   flash?: "up" | "down" | null; active: boolean; onSelect: () => void; onRemove: () => void;
   suppressClick: (id: string, event: React.MouseEvent) => void;
   isDragInteraction: (id: string) => boolean;
@@ -58,9 +60,9 @@ function Asset({ symbol, index, sectionId, row, flash, active, onSelect, onRemov
         <span className="text-[10px] text-tv-text-dim">USDT</span>
       </span>
       <span className={cn("text-right tabular-nums transition-colors",
-        flash === "up" && "text-tv-green", flash === "down" && "text-tv-red", !flash && "text-tv-text")}>{row ? formatPrice(row.price) : "—"}</span>
+        flash === "up" && "text-tv-green", flash === "down" && "text-tv-red", !flash && "text-tv-text")}>{row?.price !== undefined ? formatPrice(row.price) : "—"}</span>
       <div className="flex items-center justify-end gap-1">
-        <span className={cn("tabular-nums", row ? row.pct >= 0 ? "text-tv-green" : "text-tv-red" : "text-tv-text-muted")}>{row ? formatPct(row.pct) : "—"}</span>
+        <span className={cn("tabular-nums", row?.pct !== undefined ? row.pct >= 0 ? "text-tv-green" : "text-tv-red" : "text-tv-text-muted")}>{row?.pct !== undefined ? formatPct(row.pct) : "—"}</span>
         <button type="button" onClick={(event) => { event.stopPropagation(); onRemove(); }}
           className="rounded p-0.5 text-tv-text-muted hover:bg-tv-bg hover:text-tv-red focus-visible:outline-2 focus-visible:outline-blue-500 md:invisible md:group-hover:visible md:focus-visible:visible"
           aria-label={`Remove ${symbol} from watchlist`}><X className="h-3 w-3" /></button>
@@ -71,7 +73,7 @@ function Asset({ symbol, index, sectionId, row, flash, active, onSelect, onRemov
 
 function Section({ section, index, startEditing, onEditDone, rows, flash, activeSymbol, onSelect, suppressClick, isDragInteraction }: {
   section: WatchlistSection; index: number; startEditing: boolean; onEditDone: () => void;
-  rows: Record<string, Row>; flash: Record<string, "up" | "down" | null>;
+  rows: Record<string, WatchlistDayRow>; flash: Record<string, "up" | "down" | null>;
   activeSymbol: string; onSelect: (symbol: string) => void;
   suppressClick: (id: string, event: React.MouseEvent) => void;
   isDragInteraction: (id: string) => boolean;
@@ -152,7 +154,7 @@ export function Watchlist({ onClose }: { onClose?: () => void } = {}) {
   const moveSection = useChartStore((s) => s.moveWatchlistSection);
   const openSymbolDialog = useChartStore((s) => s.setSymbolDialogOpen);
   const toggleWatchlistCollapsed = useChartStore((s) => s.toggleWatchlistCollapsed);
-  const [rows, setRows] = useState<Record<string, Row>>({});
+  const [rows, setRows] = useState<Record<string, WatchlistDayRow>>({});
   const [flash, setFlash] = useState<Record<string, "up" | "down" | null>>({});
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const draggedId = useRef<string | null>(null);
@@ -170,23 +172,106 @@ export function Watchlist({ onClose }: { onClose?: () => void } = {}) {
     if (!subscriptionKey) return;
     const symbols = subscriptionKey.split(",");
     let cancelled = false;
-    fetchTickers24h(symbols).then((tickers) => {
+    let dayStart = utcDayStart(Date.now());
+    let attempt = 0;
+    let loaded = false;
+    let inFlight = false;
+    let requestId = 0;
+    let activeRequest: AbortController | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let midnightTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearRetry = () => {
+      if (retryTimer !== null) clearTimeout(retryTimer);
+      retryTimer = null;
+    };
+
+    const loadDay = () => {
+      clearRetry();
+      activeRequest?.abort();
+      const controller = new AbortController();
+      activeRequest = controller;
+      inFlight = true;
+      const requestedDay = dayStart;
+      const thisRequest = ++requestId;
+      fetchUtcTradingDayTickers(symbols, requestedDay, controller.signal).then((tickers) => {
+        if (cancelled || thisRequest !== requestId) return;
+        inFlight = false;
+        activeRequest = null;
+        if (utcDayStart(Date.now()) !== requestedDay) {
+          rollover();
+          return;
+        }
+        loaded = true;
+        attempt = 0;
+        setRows((previous) => applyTradingDaySnapshot(previous, tickers, requestedDay, Date.now()));
+      }).catch((error: unknown) => {
+        if (cancelled || thisRequest !== requestId) return;
+        inFlight = false;
+        activeRequest = null;
+        if (utcDayStart(Date.now()) !== requestedDay) {
+          rollover();
+          return;
+        }
+        if (error instanceof Error && error.name === "AbortError") return;
+        attempt += 1;
+        retryTimer = setTimeout(loadDay, utcDayRetryDelay(attempt));
+      });
+    };
+
+    const rollover = () => {
+      const currentDay = utcDayStart(Date.now());
+      if (currentDay === dayStart) return;
+      dayStart = currentDay;
+      loaded = false;
+      attempt = 0;
+      setRows((previous) => invalidatePreviousDay(previous, currentDay));
+      loadDay();
+    };
+
+    const scheduleMidnight = () => {
+      midnightTimer = setTimeout(() => {
+        rollover();
+        scheduleMidnight();
+      }, untilNextUtcDay(Date.now()));
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      rollover();
+      if (!loaded && !inFlight) loadDay();
+    };
+
+    queueMicrotask(() => {
       if (cancelled) return;
-      const map: Record<string, Row> = {};
-      tickers.forEach((t) => { map[t.symbol] = { symbol: t.symbol, price: t.lastPrice, pct: t.priceChangePercent }; });
-      setRows(map);
-    }).catch(console.error);
+      setRows((previous) => invalidatePreviousDay(Object.fromEntries(
+        Object.entries(previous).filter(([asset]) => symbols.includes(asset)),
+      ), dayStart));
+    });
+    loadDay();
+    scheduleMidnight();
+    document.addEventListener("visibilitychange", onVisibilityChange);
     const unsub = getBinanceWS().subscribeMiniTickers(symbols, (tick) => {
+      if (!Number.isFinite(tick.close) || tick.close <= 0) return;
+      rollover();
       setRows((prev) => {
-        const previous = prev[tick.symbol];
-        if (previous && tick.close !== previous.price) {
-          setFlash((f) => ({ ...f, [tick.symbol]: tick.close > previous.price ? "up" : "down" }));
+        const previousPrice = prev[tick.symbol]?.price;
+        if (previousPrice !== undefined && tick.close !== previousPrice) {
+          setFlash((f) => ({ ...f, [tick.symbol]: tick.close > previousPrice ? "up" : "down" }));
           setTimeout(() => setFlash((f) => ({ ...f, [tick.symbol]: null })), 300);
         }
-        return { ...prev, [tick.symbol]: { symbol: tick.symbol, price: tick.close, pct: tick.pct } };
+        return applyLivePrice(prev, tick.symbol, tick.close, Date.now());
       });
     });
-    return () => { cancelled = true; unsub(); };
+    return () => {
+      cancelled = true;
+      requestId += 1;
+      activeRequest?.abort();
+      clearRetry();
+      if (midnightTimer !== null) clearTimeout(midnightTimer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      unsub();
+    };
   }, [subscriptionKey]);
 
   return (
@@ -209,7 +294,7 @@ export function Watchlist({ onClose }: { onClose?: () => void } = {}) {
         </div>
       </div>
       <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-tv-border px-3 py-1.5 text-[10px] uppercase tracking-wider text-tv-text-dim">
-        <span>Symbol</span><span className="text-right">Price</span><span className="text-right">24h</span>
+        <span>Symbol</span><span className="text-right">Price</span><span className="text-right" title="Change since 00:00 UTC">UTC Day</span>
       </div>
       <ScrollArea className="flex-1">
         <DragDropProvider sensors={(defaults) => [

@@ -2,6 +2,65 @@ import type { Candle, SymbolInfo, Ticker24h, Timeframe } from "./types";
 
 const BASE = "https://api.binance.com/api/v3";
 
+export interface TradingDayTicker {
+  symbol: string;
+  openPrice: number;
+  lastPrice: number;
+  openTime: number;
+}
+
+/** Binance accepts at most 100 symbols per trading-day request. */
+export async function fetchUtcTradingDayTickers(
+  symbols: string[], expectedDayStart: number, signal?: AbortSignal,
+): Promise<TradingDayTicker[]> {
+  const unique = [...new Set(symbols.map((symbol) => symbol.toUpperCase()))];
+  if (unique.length === 0) return [];
+
+  const batches: string[][] = [];
+  for (let offset = 0; offset < unique.length; offset += 100) batches.push(unique.slice(offset, offset + 100));
+
+  const responses = await Promise.all(batches.map(async (batch) => {
+    const query = new URLSearchParams({ symbols: JSON.stringify(batch), timeZone: "0" });
+    const response = await fetch(`${BASE}/ticker/tradingDay?${query}`, { cache: "no-store", signal });
+    if (!response.ok) throw new Error(`tradingDay ${response.status}`);
+    const data: unknown = await response.json();
+    if (!Array.isArray(data)) throw new Error("Invalid trading-day ticker response");
+    const requested = new Set(batch);
+    const seen = new Set<string>();
+    const tickers: TradingDayTicker[] = [];
+    for (const item of data) {
+      if (typeof item !== "object" || item === null) throw new Error("Invalid trading-day ticker");
+      const raw = item as Record<string, unknown>;
+      const symbol = raw.symbol;
+      if (typeof symbol !== "string" || !requested.has(symbol) || seen.has(symbol)) {
+        throw new Error("Invalid trading-day ticker symbol");
+      }
+      seen.add(symbol);
+      if ((typeof raw.openPrice !== "string" && typeof raw.openPrice !== "number")
+        || (typeof raw.lastPrice !== "string" && typeof raw.lastPrice !== "number")
+        || (typeof raw.openPrice === "string" && raw.openPrice.trim() === "")
+        || (typeof raw.lastPrice === "string" && raw.lastPrice.trim() === "")) {
+        throw new Error("Invalid trading-day ticker price");
+      }
+      const openPrice = Number(raw.openPrice);
+      const lastPrice = Number(raw.lastPrice);
+      const openTime = raw.openTime;
+      if (!Number.isFinite(openPrice) || openPrice < 0
+        || !Number.isFinite(lastPrice) || lastPrice < 0
+        || typeof openTime !== "number" || openTime !== expectedDayStart) {
+        throw new Error("Invalid or stale trading-day ticker");
+      }
+      // Binance can return zero prices for inactive symbols; keep the rest of the batch.
+      if (openPrice > 0 && lastPrice > 0) tickers.push({ symbol, openPrice, lastPrice, openTime });
+    }
+    if (seen.size !== batch.length) {
+      throw new Error("Incomplete trading-day ticker response");
+    }
+    return tickers;
+  }));
+  return responses.flat();
+}
+
 export async function fetchKlines(
   symbol: string,
   interval: Timeframe,
