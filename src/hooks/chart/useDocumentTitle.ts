@@ -2,25 +2,22 @@
 
 import { useEffect } from "react";
 import { formatPct, formatPrice } from "@/lib/format";
+import { useMarketData } from "@/hooks/useMarketData";
 
 const BASE_TITLE = "TradingView Gratis — Crypto charts open source";
 
-/**
- * Mantiene el título de la pestaña sincronizado con el precio en vivo,
- * al estilo TradingView: "ETHUSDT 1,657.44 ▲ +2.21% — TradingView Gratis"
- */
-export function useDocumentTitle(
-  symbol: string,
-  lastPrice: { value: number; pct: number } | null,
-) {
+/** Keep the tab on the same live UTC-day quote and formatting as the watchlist. */
+export function useDocumentTitle(symbol: string) {
+  const { rows } = useMarketData();
+  const row = rows[symbol];
   useEffect(() => {
-    if (!lastPrice) {
+    if (row?.price === undefined) {
       document.title = `${symbol} — TradingView Gratis`;
       return;
     }
-    const arrow = lastPrice.pct >= 0 ? "▲" : "▼";
-    document.title = `${symbol} ${formatPrice(lastPrice.value)} ${arrow} ${formatPct(lastPrice.pct)} — TradingView Gratis`;
-  }, [symbol, lastPrice]);
+    const change = row.pct === undefined ? "" : ` ${row.pct >= 0 ? "▲" : "▼"} ${formatPct(row.pct)}`;
+    document.title = `${symbol} ${formatPrice(row.price)}${change} — TradingView Gratis`;
+  }, [symbol, row]);
 
   // Restore the static title when the chart unmounts
   useEffect(() => {

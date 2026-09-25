@@ -169,7 +169,7 @@ export function PriceChart({ symbol, timeframe }: Props) {
     recomputePaneOffsets,
   });
 
-  useDocumentTitle(symbol, lastPrice);
+  useDocumentTitle(symbol);
 
   const lastValues = {
     ema20: lastEMA20,
