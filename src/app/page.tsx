@@ -13,6 +13,7 @@ import { DrawingSettingsDialog } from "@/components/chart/DrawingSettingsDialog"
 import { ScriptSettingsDialog } from "@/components/pine/ScriptSettingsDialog";
 import { useChartStore } from "@/lib/store/chart-store";
 import { useUrlSymbolSync } from "@/hooks/useUrlSymbolSync";
+import { MarketDataProvider } from "@/hooks/useMarketData";
 import { useDriveSync } from "@/hooks/useDriveSync";
 import { MobileChartTools } from "@/components/layout/MobileChartTools";
 
@@ -37,6 +38,10 @@ if (typeof window !== "undefined" && typeof Element !== "undefined") {
 }
 
 export default function HomePage() {
+  return <MarketDataProvider><ChartPage /></MarketDataProvider>;
+}
+
+function ChartPage() {
   const symbol = useChartStore((s) => s.symbol);
   const timeframe = useChartStore((s) => s.timeframe);
   const pineEditorOpen = useChartStore((s) => s.pineEditorOpen);

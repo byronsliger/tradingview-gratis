@@ -1,17 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { DragDropProvider, useDroppable } from "@dnd-kit/react";
 import { KeyboardSensor, PointerActivationConstraints, PointerSensor } from "@dnd-kit/dom";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { Plus, X, PanelRightClose } from "lucide-react";
-import { fetchUtcTradingDayTickers } from "@/lib/binance/rest";
-import {
-  applyLivePrice, applyTradingDaySnapshot, invalidatePreviousDay,
-  untilNextUtcDay, utcDayRetryDelay, utcDayStart, type WatchlistDayRow,
-} from "@/lib/binance/watchlist-day-change";
-import { getBinanceWS } from "@/lib/binance/ws";
+import type { WatchlistDayRow } from "@/lib/binance/watchlist-day-change";
 import { useChartStore } from "@/lib/store/chart-store";
+import { useMarketData } from "@/hooks/useMarketData";
 import { DEFAULT_SECTION_ID, type WatchlistSection } from "@/lib/store/watchlist-sections";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatPrice, formatPct } from "@/lib/format";
@@ -146,7 +142,6 @@ function Section({ section, index, startEditing, onEditDone, rows, flash, active
 }
 
 export function Watchlist({ onClose }: { onClose?: () => void } = {}) {
-  const watchlist = useChartStore((s) => s.watchlist);
   const sections = useChartStore((s) => s.watchlistSections);
   const symbol = useChartStore((s) => s.symbol);
   const setSymbol = useChartStore((s) => s.setSymbol);
@@ -155,8 +150,7 @@ export function Watchlist({ onClose }: { onClose?: () => void } = {}) {
   const moveSection = useChartStore((s) => s.moveWatchlistSection);
   const openSymbolDialog = useChartStore((s) => s.setSymbolDialogOpen);
   const toggleWatchlistCollapsed = useChartStore((s) => s.toggleWatchlistCollapsed);
-  const [rows, setRows] = useState<Record<string, WatchlistDayRow>>({});
-  const [flash, setFlash] = useState<Record<string, "up" | "down" | null>>({});
+  const { rows, flash } = useMarketData();
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const draggedId = useRef<string | null>(null);
   const clearDragTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -166,114 +160,6 @@ export function Watchlist({ onClose }: { onClose?: () => void } = {}) {
     event.stopPropagation();
   };
   const isDragInteraction = (id: string) => draggedId.current === id;
-  // Prices depend on membership, not visual order. Reordering should not reopen the WebSocket.
-  const subscriptionKey = [...watchlist].sort().join(",");
-
-  useEffect(() => {
-    if (!subscriptionKey) return;
-    const symbols = subscriptionKey.split(",");
-    let cancelled = false;
-    let dayStart = utcDayStart(Date.now());
-    let attempt = 0;
-    let loaded = false;
-    let inFlight = false;
-    let requestId = 0;
-    let activeRequest: AbortController | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let midnightTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const clearRetry = () => {
-      if (retryTimer !== null) clearTimeout(retryTimer);
-      retryTimer = null;
-    };
-
-    const loadDay = () => {
-      clearRetry();
-      activeRequest?.abort();
-      const controller = new AbortController();
-      activeRequest = controller;
-      inFlight = true;
-      const requestedDay = dayStart;
-      const thisRequest = ++requestId;
-      fetchUtcTradingDayTickers(symbols, requestedDay, controller.signal).then((tickers) => {
-        if (cancelled || thisRequest !== requestId) return;
-        inFlight = false;
-        activeRequest = null;
-        if (utcDayStart(Date.now()) !== requestedDay) {
-          rollover();
-          return;
-        }
-        loaded = true;
-        attempt = 0;
-        setRows((previous) => applyTradingDaySnapshot(previous, tickers, requestedDay, Date.now()));
-      }).catch((error: unknown) => {
-        if (cancelled || thisRequest !== requestId) return;
-        inFlight = false;
-        activeRequest = null;
-        if (utcDayStart(Date.now()) !== requestedDay) {
-          rollover();
-          return;
-        }
-        if (error instanceof Error && error.name === "AbortError") return;
-        attempt += 1;
-        retryTimer = setTimeout(loadDay, utcDayRetryDelay(attempt));
-      });
-    };
-
-    const rollover = () => {
-      const currentDay = utcDayStart(Date.now());
-      if (currentDay === dayStart) return;
-      dayStart = currentDay;
-      loaded = false;
-      attempt = 0;
-      setRows((previous) => invalidatePreviousDay(previous, currentDay));
-      loadDay();
-    };
-
-    const scheduleMidnight = () => {
-      midnightTimer = setTimeout(() => {
-        rollover();
-        scheduleMidnight();
-      }, untilNextUtcDay(Date.now()));
-    };
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState !== "visible") return;
-      rollover();
-      if (!loaded && !inFlight) loadDay();
-    };
-
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setRows((previous) => invalidatePreviousDay(Object.fromEntries(
-        Object.entries(previous).filter(([asset]) => symbols.includes(asset)),
-      ), dayStart));
-    });
-    loadDay();
-    scheduleMidnight();
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    const unsub = getBinanceWS().subscribeMiniTickers(symbols, (tick) => {
-      if (!Number.isFinite(tick.close) || tick.close <= 0) return;
-      rollover();
-      setRows((prev) => {
-        const previousPrice = prev[tick.symbol]?.price;
-        if (previousPrice !== undefined && tick.close !== previousPrice) {
-          setFlash((f) => ({ ...f, [tick.symbol]: tick.close > previousPrice ? "up" : "down" }));
-          setTimeout(() => setFlash((f) => ({ ...f, [tick.symbol]: null })), 300);
-        }
-        return applyLivePrice(prev, tick.symbol, tick.close, Date.now());
-      });
-    });
-    return () => {
-      cancelled = true;
-      requestId += 1;
-      activeRequest?.abort();
-      clearRetry();
-      if (midnightTimer !== null) clearTimeout(midnightTimer);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      unsub();
-    };
-  }, [subscriptionKey]);
 
   return (
     <div className="flex h-full flex-col">
